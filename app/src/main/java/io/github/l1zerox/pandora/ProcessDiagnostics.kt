@@ -38,7 +38,7 @@ internal object ProcessDiagnostics {
                 if(record.reason in setOf(ApplicationExitInfo.REASON_LOW_MEMORY,ApplicationExitInfo.REASON_CRASH,
                     ApplicationExitInfo.REASON_CRASH_NATIVE,ApplicationExitInfo.REASON_ANR,
                     ApplicationExitInfo.REASON_SIGNALED,ApplicationExitInfo.REASON_EXCESSIVE_RESOURCE_USAGE)) {
-                    AppLog.error("Androidの終了記録",IllegalStateException(description))
+                    AppLog.errorMessage("Androidの終了記録",description)
                 } else AppLog.info("Androidの終了記録",description)
             }
             records.lastOrNull()?.let { preferences.edit().putLong("last_timestamp",it.timestamp).apply() }

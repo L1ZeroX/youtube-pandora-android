@@ -139,12 +139,19 @@ class Engine(private val context: Context, private val progress: (String, Float?
         AppLog.info("ネイティブ処理","$binary 開始 / ライブラリー参照先=python,ffmpeg")
         ProcessDiagnostics.memory(context,"$binary 開始前")
         val process = builder.start(); native = process
+        AppLog.info("ネイティブ処理","$binary プロセス起動完了")
         if(cancelled.get()) process.destroyForcibly()
         val output = StringBuilder()
         var lastMemory=System.nanoTime()
+        var firstLine=true
         try {
             process.inputStream.bufferedReader().useLines { lines -> lines.forEach {
-                check(); line?.invoke(it)
+                check()
+                if(firstLine) {
+                    firstLine=false
+                    AppLog.info("ネイティブ出力","$binary 最初の出力: ${it.take(500)}")
+                }
+                line?.invoke(it)
                 if(binary == "libffmpeg.so" && System.nanoTime()-lastMemory > 5_000_000_000L) {
                     lastMemory=System.nanoTime(); ProcessDiagnostics.memory(context,"変換中")
                 }

@@ -70,7 +70,7 @@ object Store {
         // Persist recovered statuses so another restart doesn't treat them as active work.
         val raw=runCatching { JSONArray(data.getString("queue","[]")) }.getOrNull()
         if(raw != null && (0 until raw.length()).any { interruptedStatus(raw.optJSONObject(it)?.optString("status").orEmpty()) }) {
-            AppLog.error("前回の処理中断",IllegalStateException("処理中の動画が残ったままアプリが再起動しました。保存完了ではありません。Androidの終了記録を確認してください。"))
+            AppLog.errorMessage("前回の処理中断","処理中の動画が残ったままアプリが再起動しました。保存完了ではありません。クラッシュ詳細・Androidの終了記録を確認してください。")
             save()
         }
     }
@@ -89,4 +89,4 @@ object Store {
             .putString("queue",videos.toString()).apply()
     }
 }
-class PandoraApp : Application() { override fun onCreate() { super.onCreate(); AppLog.init(this); Store.init(this) } }
+class PandoraApp : Application() { override fun onCreate() { super.onCreate(); CrashDiagnostics.install(this); AppLog.init(this); Store.init(this) } }

@@ -24,7 +24,11 @@ object AppLog {
         worker.execute {
             runCatching {
                 journal = LogJournal(directory)
-                state.value = LogSnapshot(journal!!.read())
+                val crash=CrashJournal(directory)
+                var warning=""
+                runCatching { crash.read()?.let { journal!!.append(it); crash.clear() } }
+                    .onFailure { warning="クラッシュ詳細の読み込み失敗: ${cleanLog(it.toString())}" }
+                state.value = LogSnapshot(journal!!.read(),warning)
             }.onFailure { state.value = LogSnapshot(storageWarning="ログの読み込み失敗: ${cleanLog(it.toString())}") }
             ProcessDiagnostics.reportPreviousExit(context.applicationContext)
         }
@@ -32,6 +36,7 @@ object AppLog {
     }
     fun info(stage: String, message: String) = record("INFO",stage,message)
     fun error(stage: String, error: Throwable) = record("ERROR",stage,error.stackTraceToString())
+    fun errorMessage(stage: String, message: String) = record("ERROR",stage,message)
     @Synchronized fun progress(stage: String, detail: String) {
         val now = System.nanoTime()
         if(stage == lastStage && now-lastProgress < 5_000_000_000L) return
@@ -39,6 +44,7 @@ object AppLog {
         info(stage,detail)
     }
     private fun record(level: String, stage: String, message: String) {
+        CrashDiagnostics.stage=stage
         val entry = LogEntry(System.currentTimeMillis(),level,stage.replace(Regex("[\\t\\r\\n]")," ").take(50),cleanLog(message))
         worker.execute {
             var warning = state.value.storageWarning
