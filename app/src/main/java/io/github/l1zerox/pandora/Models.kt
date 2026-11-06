@@ -78,4 +78,4 @@ object Store {
             .putString("queue",videos.toString()).apply()
     }
 }
-class PandoraApp : Application() { override fun onCreate() { super.onCreate(); Store.init(this) } }
+class PandoraApp : Application() { override fun onCreate() { super.onCreate(); AppLog.init(this); Store.init(this) } }

@@ -10,6 +10,16 @@ import java.io.File
 
 class ScreenTest {
     @get:Rule val screen = createAndroidComposeRule<MainActivity>()
+    @Test fun logDialogShowsRecordedFailure() {
+        AppLog.error("テスト",IllegalStateException("診断用エラー"))
+        screen.waitUntil(5000) { AppLog.state.value.entries.any { it.message.contains("診断用エラー") } }
+        screen.onNodeWithText("ログ (",substring=true).performClick()
+        screen.onNodeWithText("処理ログ").assertIsDisplayed()
+        screen.onNodeWithText("診断用エラー",substring=true).assertExists()
+        screen.onNodeWithText("コピー").assertIsDisplayed()
+        screen.onNodeWithText("共有").assertIsDisplayed()
+        screen.onNodeWithText("閉じる").performClick()
+    }
     @Test fun opensSettingsAndQualityMenu() {
         screen.onNodeWithText("リンクを追加").assertIsDisplayed()
         screen.onNodeWithText("環境設定").performClick()

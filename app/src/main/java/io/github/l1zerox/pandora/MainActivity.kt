@@ -74,11 +74,13 @@ fun PandoraScreen() {
     val p = s.preferences
     var text by rememberSaveable { mutableStateOf("") }
     var settings by rememberSaveable { mutableStateOf(false) }
+    var logs by rememberSaveable { mutableStateOf(false) }
+    val logSnapshot by AppLog.state.collectAsStateWithLifecycle()
     var preview by remember { mutableStateOf<Video?>(null) }
     var error by remember { mutableStateOf("") }
     var pending by remember { mutableStateOf<Intent?>(null) }
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-        pending?.let { task -> runCatching { ContextCompat.startForegroundService(context,task) }.onFailure { error = it.message.orEmpty() } }; pending = null
+        pending?.let { task -> runCatching { ContextCompat.startForegroundService(context,task) }.onFailure { error = it.message.orEmpty(); AppLog.error("処理開始",it) } }; pending = null
     }
     fun start(action: String, retry: Boolean = false) {
         if(s.busy) return
@@ -88,7 +90,7 @@ fun PandoraScreen() {
             if(Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context,Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                 pending = intent; permission.launch(Manifest.permission.POST_NOTIFICATIONS)
             } else ContextCompat.startForegroundService(context,intent)
-        } catch(e: Exception) { error = e.message ?: "開始できませんでした。" }
+        } catch(e: Exception) { error = e.message ?: "開始できませんでした。"; AppLog.error("処理開始",e) }
     }
     LaunchedEffect(s.incomingUrl) { if(s.incomingUrl.isNotEmpty()) { text = s.incomingUrl; Store.state.update { it.copy(incomingUrl="") } } }
     val bitmap by produceState<Bitmap?>(null,p.wallpaper) {
@@ -114,7 +116,10 @@ fun PandoraScreen() {
             Scaffold(containerColor=Color.Transparent, bottomBar={
                 Surface(color=colors.surface.copy(alpha=if(bitmap == null) 1f else 1-p.glass),shape=RoundedCornerShape(topStart=28.dp,topEnd=28.dp)) {
                     Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                        Text(s.message,maxLines=3,overflow=TextOverflow.Ellipsis,fontSize=13.sp)
+                        Row(verticalAlignment=Alignment.CenterVertically) {
+                            Text(s.message,modifier=Modifier.weight(1f),maxLines=3,overflow=TextOverflow.Ellipsis,fontSize=13.sp)
+                            TextButton(onClick={logs=true}) { Text(if(logSnapshot.errors > 0) "ログ (${logSnapshot.errors})" else "ログを見る") }
+                        }
                         if(s.busy) {
                             if(s.progress == null) LinearProgressIndicator(Modifier.fillMaxWidth()) else LinearProgressIndicator(progress={s.progress!!},modifier=Modifier.fillMaxWidth())
                             Text("${s.done} / ${s.total} 件" + (s.progress?.let { " · ${(it*100).toInt()}%" } ?: ""),fontSize=12.sp)
@@ -191,6 +196,7 @@ fun PandoraScreen() {
             }
         }
         if(error.isNotEmpty()) AlertDialog(onDismissRequest={error=""},title={Text("確認")},text={Text(error)},confirmButton={TextButton(onClick={error=""}) { Text("閉じる") }})
+        if(logs) LogDialog { logs=false }
         preview?.let { video -> AlertDialog(onDismissRequest={preview=null},title={Text(video.title,maxLines=3)},text={
             Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)) {
                 if(video.thumbnail.isNotBlank()) AsyncImage(video.thumbnail,"サムネイル",Modifier.fillMaxWidth().height(170.dp).clip(RoundedCornerShape(16.dp)),contentScale=ContentScale.Fit)
@@ -240,6 +246,7 @@ fun PandoraScreen() {
                     Slider(p.blur,{Store.preferences(p.copy(blur=it))},valueRange=0f..40f)
                     Text("画像は中央を基準に画面いっぱいに表示します。ボタンの色は画像に合わせます。設定は自動保存されます。",fontSize=12.sp)
                     OutlinedButton(onClick={settings=false; start("UPDATE")},enabled=!s.busy) { Text("yt-dlpを更新") }
+                    OutlinedButton(onClick={settings=false;logs=true}) { Text("処理ログを見る") }
                     Text("配信中ライブ・ログイン必須の動画は対象外です。",fontSize=12.sp)
                 }
             },confirmButton={TextButton(onClick={settings=false}) { Text("閉じる") }})

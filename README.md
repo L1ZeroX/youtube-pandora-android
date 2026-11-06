@@ -4,7 +4,7 @@ Windows版と別プロジェクトのAndroid用アプリです。Android 10以�
 
 ## インストール
 
-**[Android版APK v0.1.3をダウンロード](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.1.3/YoutubePandora-Android-v0.1.3.apk)**
+**[Android版APK v0.1.4をダウンロード](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.1.4/YoutubePandora-Android-v0.1.4.apk)**
 
 [リリース一覧・更新情報](https://github.com/L1ZeroX/youtube-pandora-android/releases) / [Windows版](https://github.com/L1ZeroX/media-downloader)
 
@@ -28,6 +28,17 @@ v0.1.2から上記の保存先を使います。Android標準のダウンロー�
 - 最高 / 1080p以下 / 720p以下、元のfps / 24 / 30 / 60fps
 - ダークモード、背景画像、透明度、ぼかし、画像に合わせたボタン色
 - 設定・動画一覧の復元、アプリ内yt-dlp更新
+- 処理ログ・エラー件数、ログのコピー・共有・消去
+
+## エラーを調べる
+
+1. v0.1.4以降に更新してから、問題が起きる操作をもう一度行います。
+2. 画面下部の「ログを見る」または「ログ (件数)」を開きます。環境設定の「処理ログを見る」からも開けます。
+3. 「エラーのみ」で失敗記録を絞り込めます。「コピー」は表示対象の記録をコピーし、「共有」はテキストファイルをAndroidの共有メニューへ渡します。
+
+日時、アプリ・Androidバージョン、機種名、処理段階、ffprobe/FFmpegの終了コード、保存先、失敗の詳細を記録します。URLの詳細とAuthorization・Cookie等の認証情報は伏せます。ログは端末内のみで保持し、自動送信しません。
+
+ログは再起動後も残り、端末内の保存量は約256KiB、画面は最大300件・本文約48,000文字です。古い記録は順次入れ替わります。更新前の処理は遡って記録できません。消去操作はログだけに適用され、動画ファイルは消しません。
 
 ## 初版の範囲
 

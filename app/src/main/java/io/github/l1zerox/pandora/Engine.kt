@@ -18,7 +18,11 @@ class Engine(private val context: Context, private val progress: (String, Float?
     private val cancelled = AtomicBoolean(false)
     @Volatile private var native: Process? = null
     private val id = UUID.randomUUID().toString()
-    fun init() { YoutubeDL.init(context); FFmpeg.init(context); check() }
+    fun init() {
+        AppLog.info("準備","yt-dlp / FFmpegを初期化")
+        YoutubeDL.init(context); FFmpeg.init(context); check()
+        AppLog.info("準備","初期化完了 / yt-dlp ${YoutubeDL.version(context) ?: "不明"} / 空き容量 ${context.filesDir.usableSpace / (1024*1024)} MiB")
+    }
     fun check() { if(cancelled.get()) throw CancellationException("停止しました") }
     fun cancel() {
         cancelled.set(true)
@@ -50,12 +54,14 @@ class Engine(private val context: Context, private val progress: (String, Float?
         check()
         return YoutubeDL.execute(request, id) { percent, eta, line ->
             if(cancelled.get()) { cancel(); return@execute }
+            if(line.trimStart().startsWith("{")) return@execute
             val phase = if(line.contains("[download]")) "ダウンロード中" else if(line.contains("[Merger]") || line.contains("[ExtractAudio]")) "変換中" else "情報を確認中"
             progress(phase, percent.takeIf { it >= 0 }?.coerceIn(0f,100f)?.div(100f),
                 line.take(300) + if(eta >= 0) " · 残り ${durationText(eta.toDouble())}" else "")
         }.out.also { check() }
     }
     fun discover(url: String, playlist: Boolean): List<Video> {
+        AppLog.info("情報取得","開始 / プレイリスト=$playlist / $url")
         val req = request(url).apply {
             addOption("--dump-single-json"); addOption("--skip-download"); addOption("--flat-playlist")
             addOption("--playlist-end", "500")
@@ -89,6 +95,7 @@ class Engine(private val context: Context, private val progress: (String, Float?
                 addOption("--merge-output-format", "mkv")
             }
             execute(req)
+            AppLog.info("ダウンロード","取得完了、動画の解析へ")
             val source = work.listFiles()!!.firstOrNull { it.name.startsWith("source.") && it.extension !in listOf("part","ytdl","json") }
                 ?: error("保存する動画ファイルがありません。")
             check()
@@ -99,6 +106,7 @@ class Engine(private val context: Context, private val progress: (String, Float?
             val audio = list.firstOrNull { it.optString("codec_type") == "audio" }
             val duration = metadata.optJSONObject("format")?.optString("duration")?.toDoubleOrNull() ?: video.duration ?: 0.0
             val output = File(work, "output.${preferences.format.lowercase()}")
+            AppLog.info("動画解析","映像=${visual?.optString("codec_name")} / 音声=${audio?.optString("codec_name")} / 時間=$duration 秒")
             val args = mutableListOf("-y","-i",source.absolutePath)
             if(preferences.format == "MP3") {
                 require(audio != null) { "音声がない動画です。" }
@@ -128,6 +136,7 @@ class Engine(private val context: Context, private val progress: (String, Float?
     private fun runNative(binary: String, args: List<String>, line: ((String)->Unit)? = null): String {
         check()
         val builder = NativeRuntime.command(context,binary,args)
+        AppLog.info("ネイティブ処理","$binary 開始 / ライブラリー参照先=python,ffmpeg")
         val process = builder.start(); native = process
         if(cancelled.get()) process.destroyForcibly()
         val output = StringBuilder()
@@ -138,6 +147,7 @@ class Engine(private val context: Context, private val progress: (String, Float?
                 output.appendLine(it)
             } }
             val exit = process.waitFor(); check()
+            AppLog.info("ネイティブ処理","$binary 終了コード=$exit")
             check(exit == 0) { "${if(binary == "libffprobe.so") "動画の解析" else "変換"}に失敗しました: ${output.takeLast(1600)}" }
             return output.toString()
         } finally { if(process.isAlive) process.destroyForcibly(); native = null }
@@ -147,6 +157,7 @@ class Engine(private val context: Context, private val progress: (String, Float?
         val isVideo = format == "MP4"
         // Video/Audio insert endpoints reject Download paths; publish typed media via Downloads.
         val collection = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+        AppLog.info("保存","開始 / ${saveRelativePath(format)} / ${file.length()} bytes")
         val values = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME,name)
             put(MediaStore.MediaColumns.MIME_TYPE,if(isVideo) "video/mp4" else "audio/mpeg")
@@ -163,6 +174,7 @@ class Engine(private val context: Context, private val progress: (String, Float?
             check(resolver.update(uri,ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING,0) },null,null) == 1) {
                 "保存したメディアを公開できませんでした。"
             }
+            AppLog.info("保存","書き込み・公開完了 / $uri")
             return uri.toString()
         } catch(error: Exception) { resolver.delete(uri,null,null); throw error }
     }

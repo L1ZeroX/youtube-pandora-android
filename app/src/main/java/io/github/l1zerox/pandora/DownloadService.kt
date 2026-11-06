@@ -25,7 +25,7 @@ class DownloadService : Service() {
             NotificationChannel("downloads","ダウンロード",NotificationManager.IMPORTANCE_LOW))
     }
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if(intent?.action == "STOP") { engine?.cancel(); if(job?.isActive != true) stopSelf(); return START_NOT_STICKY }
+        if(intent?.action == "STOP") { AppLog.info("停止","停止ボタンが押されました。"); engine?.cancel(); if(job?.isActive != true) stopSelf(); return START_NOT_STICKY }
         if(job?.isActive == true) return START_NOT_STICKY
         startForeground(101,notification("準備中",null),ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
         Store.state.update { it.copy(busy=true,message="準備中…",progress=null,detail="",done=0,total=0) }
@@ -37,9 +37,10 @@ class DownloadService : Service() {
         job = scope.launch {
             var message = "完了しました。"
             try {
+                AppLog.info("処理開始","$operation / 再試行=$retry")
                 engine!!.init()
                 when(operation) {
-                    "UPDATE" -> { engine!!.update(); message = "yt-dlpを更新しました。" }
+                    "UPDATE" -> { engine!!.update(); message = "yt-dlpを更新しました。"; AppLog.info("更新",message) }
                     "FETCH" -> {
                         val urls = validUrls(input); require(urls.isNotEmpty()) { "URLを入力してください。" }
                         var failures = 0
@@ -47,9 +48,10 @@ class DownloadService : Service() {
                             engine!!.check()
                             try {
                                 val found = engine!!.discover(url,Store.state.value.preferences.playlists)
+                                AppLog.info("情報取得","${found.size} 件を取得")
                                 Store.state.update { s -> s.copy(videos=(s.videos + found).distinctBy { it.key }) }
                                 Store.save()
-                            } catch(e: Exception) { engine!!.check(); failures++; message = e.message ?: "情報を取得できません。" }
+                            } catch(e: Exception) { engine!!.check(); AppLog.error("情報取得",e); failures++; message = e.message ?: "情報を取得できません。" }
                         }
                         message = if(failures == 0) "情報を取得しました。保存する動画を選んでください。" else "$failures 件のURLで失敗: $message"
                     }
@@ -62,12 +64,14 @@ class DownloadService : Service() {
                         for((index,video) in queue.withIndex()) {
                             engine!!.check()
                             Store.state.update { it.copy(current=video.key,done=index,progress=null) }
+                            AppLog.info("動画開始","${index+1}/${queue.size} / ${video.key} / ${s.preferences.format} / ${s.preferences.quality} / ${s.preferences.audio} / ${s.preferences.fps}")
                             Store.edit(video.key) { it.copy(status="ダウンロード中",error="") }; Store.save()
                             try {
                                 val uri = engine!!.download(video,s.preferences)
+                                AppLog.info("動画完了","${video.key} / $uri")
                                 Store.edit(video.key) { it.copy(status="完了",savedUri=uri,error="") }
                             } catch(e: Exception) {
-                                engine!!.check(); failed++
+                                engine!!.check(); AppLog.error("動画保存 ${index+1}/${queue.size}",e); failed++
                                 Store.edit(video.key) { it.copy(status="失敗",error=(e.message ?: "保存できませんでした。").takeLast(2000)) }
                             }
                             Store.state.update { it.copy(done=index+1) }; Store.save()
@@ -76,11 +80,13 @@ class DownloadService : Service() {
                     }
                 }
             } catch(e: CancellationException) {
+                AppLog.info("停止","処理を停止しました。")
                 message = "停止しました。待機中の動画は残っています。"
                 val key = Store.state.value.current
                 Store.edit(key) { if(it.status != "完了") it.copy(status="停止") else it }
-            } catch(e: Exception) { message = (e.message ?: "処理に失敗しました。").takeLast(2000) }
+            } catch(e: Exception) { AppLog.error("処理エラー",e); message = (e.message ?: "処理に失敗しました。").takeLast(2000) }
             finally {
+                AppLog.info("処理終了",message)
                 Store.state.update { it.copy(busy=false,message=message,current="",progress=null,detail="") }
                 Store.save()
                 if(wakeLock?.isHeld == true) wakeLock?.release()
@@ -93,6 +99,7 @@ class DownloadService : Service() {
         val now = System.currentTimeMillis()
         if(now-lastUpdate < 200 && phase == Store.state.value.message) return
         lastUpdate = now
+        AppLog.progress(phase,detail)
         Store.state.update { it.copy(message=phase,progress=value,detail=detail) }
         if(Store.state.value.current.isNotEmpty()) Store.edit(Store.state.value.current) { it.copy(status=phase) }
         val notification = notification(phase,value)
@@ -108,7 +115,7 @@ class DownloadService : Service() {
             .setContentText(text).setOngoing(true).setOnlyAlertOnce(true).setContentIntent(open)
             .setProgress(100,((value ?: 0f)*100).toInt(),value == null).addAction(0,"停止",stop).build()
     }
-    override fun onTimeout(startId: Int, fgsType: Int) { engine?.cancel(); stopSelf() }
+    override fun onTimeout(startId: Int, fgsType: Int) { AppLog.error("OSの実行時間制限",IllegalStateException("Androidによりバックグラウンド処理の時間上限に達しました。")); engine?.cancel(); stopSelf() }
     override fun onDestroy() {
         engine?.cancel()
         if(wakeLock?.isHeld == true) wakeLock?.release()
