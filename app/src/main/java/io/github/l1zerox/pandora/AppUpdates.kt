@@ -13,13 +13,13 @@ internal object AppUpdates {
     val state=MutableStateFlow(UpdateState())
     private val scope=CoroutineScope(SupervisorJob()+Dispatchers.Main.immediate)
     private var startupChecked=false
-    fun check(manual: Boolean = false) {
+    fun check(manual: Boolean = false, beta: Boolean = BuildConfig.BETA, offer: Boolean = false) {
         if(state.value.checking || (!manual && startupChecked)) return
         startupChecked=true
         state.update { it.copy(checking=true) }
         scope.launch {
             try {
-                val release=withContext(Dispatchers.IO) { fetchRelease() }
+                val release=withContext(Dispatchers.IO) { fetchRelease(beta,offer) }
                 state.value=UpdateState(release=release,message=if(manual && release == null) "利用可能な新しいバージョンはありません。現在 ${BuildConfig.VERSION_NAME}" else "")
                 AppLog.info("バージョンチェック",release?.let { "新しいバージョン ${it.version}" } ?: "利用可能な更新はありません。")
             } catch(e: Exception) {
@@ -30,7 +30,7 @@ internal object AppUpdates {
         }
     }
     fun dismiss() { state.update { it.copy(release=null,message="") } }
-    private fun fetchRelease(): AppRelease? {
+    private fun fetchRelease(beta: Boolean, offer: Boolean): AppRelease? {
         val connection=URL("https://api.github.com/repos/L1ZeroX/youtube-pandora-android/releases?per_page=30").openConnection() as HttpURLConnection
         try {
             connection.connectTimeout=10_000; connection.readTimeout=10_000
@@ -59,7 +59,7 @@ internal object AppUpdates {
                         assets.optJSONObject(i)?.let { ReleaseAsset(it.optString("name"),it.optString("browser_download_url"),it.optString("state") == "uploaded") }
                     })
             }
-            return newestRelease(releases,BuildConfig.VERSION_NAME)
+            return newestRelease(releases,BuildConfig.VERSION_NAME,beta,offer)
         } finally { connection.disconnect() }
     }
 }

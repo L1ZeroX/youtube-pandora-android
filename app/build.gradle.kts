@@ -3,15 +3,18 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+val betaBuild = providers.gradleProperty("pandoraBeta").orNull == "true"
 android {
     namespace = "io.github.l1zerox.pandora"
     compileSdk = 36
     defaultConfig {
-        applicationId = "io.github.l1zerox.pandora"
+        applicationId = if(betaBuild) "io.github.l1zerox.pandora.beta" else "io.github.l1zerox.pandora"
         minSdk = 29
         targetSdk = 36
-        versionCode = 11
-        versionName = "0.2.4"
+        versionCode = 12
+        versionName = if(betaBuild) "0.3.0-beta.1" else "0.2.5"
+        buildConfigField("boolean", "BETA", betaBuild.toString())
+        manifestPlaceholders["appLabel"] = if(betaBuild) "Youtube Pandora! Beta" else "Youtube Pandora!"
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

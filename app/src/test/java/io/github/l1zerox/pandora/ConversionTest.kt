@@ -4,6 +4,17 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ConversionTest {
+    @Test fun interpolationCreatesMotionOnlyForLowerRatesAndKeepsDuration() {
+        val filter=interpolationFilter(30.0,2.0)!!
+        assertTrue(filter.contains("mi_mode=mci"))
+        assertTrue(filter.contains("trim=duration=2.000000"))
+        assertTrue(videoEncodingArgs(false,INTERPOLATED_FPS,filter).contains(filter))
+        assertNull(interpolationFilter(60.0,2.0))
+        assertNull(interpolationFilter(120.0,2.0))
+        assertThrows(IllegalArgumentException::class.java) { interpolationFilter(null,2.0) }
+        assertFalse(canCopyVideo("h264","yuv420p",INTERPOLATED_FPS,"30/1","30/1"))
+        assertTrue(canCopyVideo("h264","yuv420p",INTERPOLATED_FPS,"60/1","60/1"))
+    }
     @Test fun parsesValidRatesAndRejectsUnknownRates() {
         assertEquals(60.0,frameRate("60/1")!!,0.000001)
         assertEquals(59.94005994,frameRate("60000/1001")!!,0.000001)

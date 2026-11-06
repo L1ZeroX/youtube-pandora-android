@@ -21,12 +21,12 @@ internal fun UpdateDialog(state: UpdateState, dismiss: ()->Unit) {
             .onFailure { browserError="ブラウザーを開けませんでした。GitHubのリリースページから更新してください。" }
     }
     val release=state.release
-    AlertDialog(onDismissRequest=dismiss,title={Text(if(release != null) "新しいバージョンがあります" else "バージョンチェック")},text={
+    AlertDialog(onDismissRequest=dismiss,title={Text(if(release?.version?.contains("-beta.") == true) "ベータ版をダウンロード" else if(release != null) "新しいバージョンがあります" else "バージョンチェック")},text={
         Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)) {
             if(release != null) {
                 Text("現在 ${BuildConfig.VERSION_NAME} → ${release.version}${if(release.preview) "（試用版）" else ""}")
                 Text(release.notes,fontSize=13.sp)
-                Text("APKをダウンロードして開き、アプリを削除せず上書き更新してください。",fontSize=12.sp)
+                Text(if(release.version.contains("-beta.")) "ベータ版は通常版と別にインストールされます。設定・一覧も別管理です。" else "APKをダウンロードして開き、アプリを削除せず上書き更新してください。",fontSize=12.sp)
                 TextButton(onClick={open(release.pageUrl)}) { Text("GitHubで更新内容を見る") }
             } else Text(state.message)
             if(browserError.isNotBlank()) Text(browserError,color=MaterialTheme.colorScheme.error)

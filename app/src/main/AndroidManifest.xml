@@ -6,7 +6,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROCESSING" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <application android:name=".PandoraApp" android:label="Youtube Pandora!" android:icon="@drawable/ic_pandora"
+    <application android:name=".PandoraApp" android:label="${appLabel}" android:icon="@drawable/ic_pandora"
         android:theme="@style/Theme.Pandora" android:allowBackup="false" android:pageSizeCompat="enabled"
         android:supportsRtl="true" android:usesCleartextTraffic="true">
         <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTop">

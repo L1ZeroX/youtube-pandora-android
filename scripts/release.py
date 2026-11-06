@@ -9,6 +9,8 @@ import subprocess
 import sys
 import zipfile
 
+beta = "--beta" in sys.argv
+version = "0.3.0-beta.1" if beta else "0.2.5"
 root = Path(__file__).resolve().parent.parent
 config = json.loads((root / '.tools/environment.json').read_text())
 private = root / '.signing'
@@ -24,27 +26,27 @@ if not key.exists():
                     '-storetype', 'JKS', '-storepass:env', 'PANDORA_KEY_PASSWORD', '-keypass:env', 'PANDORA_KEY_PASSWORD',
                     '-alias', 'pandora', '-keyalg', 'RSA', '-keysize', '3072', '-validity', '10000',
                     '-dname', 'CN=Youtube Pandora Android'], env=env, check=True)
-subprocess.run([sys.executable, str(root / 'scripts/build.py'), 'assembleRelease', 'testReleaseUnitTest', 'lintRelease'], check=True)
+subprocess.run([sys.executable, str(root / 'scripts/build.py'), 'assembleRelease', 'testReleaseUnitTest', 'lintRelease', *(['-PpandoraBeta=true'] if beta else [])], check=True)
 release = root / 'release'
 release.mkdir(exist_ok=True)
 tools = Path(config['sdk']) / 'build-tools/35.0.0'
 unsigned = root / 'app/build/outputs/apk/release/app-release-unsigned.apk'
 aligned = root / '.tools/aligned.apk'
-apk = release / 'YoutubePandora-Android-v0.2.4.apk'
+apk = release / f"YoutubePandora-Android-v{version}.apk"
 subprocess.run([str(tools / 'zipalign.exe'), '-f', '-P', '16', '4', str(unsigned), str(aligned)], check=True)
 subprocess.run([str(tools / 'apksigner.bat'), 'sign', '--ks', str(key), '--ks-key-alias', 'pandora',
                 '--ks-pass', 'env:PANDORA_KEY_PASSWORD', '--key-pass', 'env:PANDORA_KEY_PASSWORD',
                 '--out', str(apk), str(aligned)], env=env, check=True)
 subprocess.run([str(tools / 'apksigner.bat'), 'verify', '--verbose', str(apk)], env=env, check=True)
-(release / 'SHA256SUMS.txt').write_text(hashlib.sha256(apk.read_bytes()).hexdigest() + '  ' + apk.name + '\n')
-source = release / 'YoutubePandora-Android-v0.2.4-source.zip'
+(release / f"SHA256SUMS-v{version}.txt").write_text(hashlib.sha256(apk.read_bytes()).hexdigest() + '  ' + apk.name + '\n')
+source = release / f"YoutubePandora-Android-v{version}-source.zip"
 with zipfile.ZipFile(source, 'w', zipfile.ZIP_DEFLATED) as archive:
-    for path in root.rglob('*'):
-        relative = path.relative_to(root)
-        if any(part in {'.tools', '.signing', '.gradle', '.kotlin', '.idea', '.git', 'build', 'release', '.test-artifacts', '__pycache__'} for part in relative.parts):
-            continue
-        if path.is_file() and path.name != 'local.properties' and path.suffix not in {'.log', '.jks', '.keystore'}:
-            archive.write(path, relative)
+    # Export only tracked source; private signing material never enters source ZIPs.
+    paths = subprocess.check_output(['git', 'ls-files', '-z'], cwd=root).decode().split('\0')
+    for name in filter(None, paths):
+        path = root / name
+        if path.is_file():
+            archive.write(path, name)
 for name in ('README.md', 'LICENSE', 'THIRD_PARTY.md', 'VALIDATION.md'):
     shutil.copy2(root / name, release / name)
 print('APK: ' + str(apk))

@@ -1,12 +1,12 @@
 package io.github.l1zerox.pandora
 
 internal const val RELEASES_URL = "https://github.com/L1ZeroX/youtube-pandora-android/releases"
-internal data class ReleaseVersion(val major: Int, val minor: Int, val patch: Int): Comparable<ReleaseVersion> {
-    override fun compareTo(other: ReleaseVersion): Int = compareValuesBy(this,other,{it.major},{it.minor},{it.patch})
+internal data class ReleaseVersion(val major: Int, val minor: Int, val patch: Int, val beta: Int? = null): Comparable<ReleaseVersion> {
+    override fun compareTo(other: ReleaseVersion): Int = compareValuesBy(this,other,{it.major},{it.minor},{it.patch},{it.beta ?: Int.MAX_VALUE})
     companion object {
         fun parse(value: String): ReleaseVersion? {
-            val match=Regex("v?(\\d{1,9})\\.(\\d{1,9})\\.(\\d{1,9})").matchEntire(value) ?: return null
-            return ReleaseVersion(match.groupValues[1].toInt(),match.groupValues[2].toInt(),match.groupValues[3].toInt())
+            val match=Regex("v?(\\d{1,9})\\.(\\d{1,9})\\.(\\d{1,9})(?:-beta\\.(\\d{1,9}))?").matchEntire(value) ?: return null
+            return ReleaseVersion(match.groupValues[1].toInt(),match.groupValues[2].toInt(),match.groupValues[3].toInt(),match.groupValues[4].toIntOrNull())
         }
     }
 }
@@ -14,11 +14,11 @@ internal data class ReleaseAsset(val name: String, val url: String, val uploaded
 internal data class ReleaseCandidate(val tag: String, val draft: Boolean, val preview: Boolean, val notes: String, val assets: List<ReleaseAsset>)
 internal data class AppRelease(val version: String, val pageUrl: String, val downloadUrl: String, val notes: String, val preview: Boolean)
 
-internal fun newestRelease(releases: List<ReleaseCandidate>, current: String): AppRelease? {
+internal fun newestRelease(releases: List<ReleaseCandidate>, current: String, beta: Boolean = false, offer: Boolean = false): AppRelease? {
     val installed=requireNotNull(ReleaseVersion.parse(current))
     return releases.mapNotNull { release ->
         val number=ReleaseVersion.parse(release.tag) ?: return@mapNotNull null
-        if(release.draft || number <= installed) return@mapNotNull null
+        if(release.draft || (number.beta != null) != beta || (!offer && number <= installed)) return@mapNotNull null
         // Android is currently distributed through GitHub's prerelease channel as well.
         val version=release.tag.removePrefix("v")
         val name="YoutubePandora-Android-v$version.apk"

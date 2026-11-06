@@ -147,7 +147,7 @@ fun PandoraScreen() {
                     item {
                         Column(Modifier.padding(top=16.dp,bottom=10.dp)) {
                             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                                Text("Youtube Pandora!",fontSize=12.sp,modifier=Modifier.weight(1f))
+                                Text(if(BuildConfig.BETA) "Youtube Pandora! Beta" else "Youtube Pandora!",fontSize=12.sp,modifier=Modifier.weight(1f))
                                 TextButton(onClick={settings=true}) { Text("環境設定") }
                             }
                             Text("ダウンロード",fontSize=32.sp,fontWeight=FontWeight.Bold)
@@ -192,10 +192,10 @@ fun PandoraScreen() {
                             Choice("形式",p.format,listOf("MP4","MP3"),!s.busy) { Store.preferences(p.copy(format=it)) }
                             if(p.format == "MP4") {
                                 Choice("画質",p.quality,listOf("1080p以下","720p以下","最高"),!s.busy) { Store.preferences(p.copy(quality=it)) }
-                                Choice("フレームレート",p.fps,listOf("元のまま","24fps","30fps","60fps"),!s.busy) { Store.preferences(p.copy(fps=it)) }
+                                Choice("フレームレート",p.fps,listOf("元のまま","24fps","30fps","60fps") + if(BuildConfig.BETA) listOf(INTERPOLATED_FPS) else emptyList(),!s.busy) { Store.preferences(p.copy(fps=it)) }
                             } else Choice("音質",p.audio,listOf("192kbps","320kbps","128kbps"),!s.busy) { Store.preferences(p.copy(audio=it)) }
                             Text("保存先: 内部ストレージ/${saveRelativePath(p.format)}",fontSize=12.sp)
-                            Text("互換性のある映像は再圧縮せず保存します。fps変更はCPUで変換します。",fontSize=11.sp,color=colors.onSurfaceVariant)
+                            Text(if(BuildConfig.BETA) "フレーム補間はCPUで中間の動きを生成します。処理に時間がかかり、動きが崩れる場合があります。" else "互換性のある映像は再圧縮せず保存します。fps変更はCPUで変換します。",fontSize=11.sp,color=colors.onSurfaceVariant)
                         }
                     }
                     item { Text("Android版 ${BuildConfig.VERSION_NAME} · yt-dlp",fontSize=11.sp,color=colors.onSurfaceVariant) }
@@ -262,6 +262,9 @@ fun PandoraScreen() {
                     Text("起動時にGitHubの公開版・試用版を確認し、新しいバージョンがあると通知します。",fontSize=12.sp)
                     OutlinedButton(enabled=!updateState.checking,onClick={settings=false;AppUpdates.check(manual=true)}) {
                         Text(if(updateState.checking) "確認中…" else "新しいバージョンを確認")
+                    }
+                    OutlinedButton(enabled=!updateState.checking,onClick={settings=false;AppUpdates.check(manual=true,beta=true,offer=true)}) {
+                        Text("ベータ版をダウンロード")
                     }
                     Text("配信中ライブ・ログイン必須の動画は対象外です。",fontSize=12.sp)
                 }

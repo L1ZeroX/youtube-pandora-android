@@ -4,6 +4,15 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ReleaseVersionTest {
+    @Test fun betaChannelRequiresOptInAndHasNumericOrdering() {
+        val beta=release("0.3.0-beta.1")
+        assertNull(newestRelease(listOf(beta),"0.2.5"))
+        assertEquals("0.3.0-beta.1",newestRelease(listOf(beta),"0.2.5",beta=true)!!.version)
+        assertNull(newestRelease(listOf(beta),"0.3.0-beta.1",beta=true))
+        assertNotNull(newestRelease(listOf(beta),"0.3.0-beta.1",beta=true,offer=true))
+        assertTrue(ReleaseVersion.parse("0.3.0-beta.10")!! > ReleaseVersion.parse("0.3.0-beta.2")!!)
+        assertTrue(ReleaseVersion.parse("0.3.0")!! > ReleaseVersion.parse("0.3.0-beta.10")!!)
+    }
     private fun release(version: String, draft: Boolean = false, preview: Boolean = true): ReleaseCandidate {
         val tag="v$version"
         val name="YoutubePandora-Android-v$version.apk"

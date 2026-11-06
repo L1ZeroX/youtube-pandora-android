@@ -108,26 +108,42 @@ class Engine(private val context: Context, private val progress: (String, Float?
             val output = File(work, "output.${preferences.format.lowercase()}")
             AppLog.info("動画解析","映像=${visual?.optString("codec_name")} / ${visual?.optInt("width")}x${visual?.optInt("height")} / fps=${visual?.optString("avg_frame_rate")} (nominal=${visual?.optString("r_frame_rate")}) / 音声=${audio?.optString("codec_name")} / 時間=$duration 秒")
             val args = conversionInputArgs(source.absolutePath).toMutableList()
+            var interpolating = false
             if(preferences.format == "MP3") {
                 require(audio != null) { "音声がない動画です。" }
                 args += listOf("-vn","-c:a","libmp3lame","-b:a",preferences.audio.removeSuffix("bps"))
             } else {
                 require(visual != null) { "映像がありません。MP3を選択してください。" }
+                val motionFilter = if(preferences.fps == INTERPOLATED_FPS) {
+                    require(BuildConfig.BETA) { "フレーム補間はベータ版で利用できます。" }
+                    interpolationFilter(frameRate(visual.optString("avg_frame_rate")) ?: frameRate(visual.optString("r_frame_rate")),duration)
+                } else null
+                interpolating = motionFilter != null
+                if(interpolating) {
+                    require(runNative("libffmpeg.so",listOf("-hide_banner","-filters")).contains("minterpolate")) { "この端末のFFmpegはフレーム補間に対応していません。" }
+                    AppLog.info("フレーム補間","中間フレームを生成して60fpsにします（CPU）。")
+                }
                 val copy = canCopyVideo(visual.optString("codec_name"),visual.optString("pix_fmt"),preferences.fps,
                     visual.optString("avg_frame_rate"),visual.optString("r_frame_rate"))
                 AppLog.info("変換方式",if(copy) "映像を再圧縮せずMP4へ保存" else "CPU変換 / 入力1スレッド・フィルター1・映像出力2 / ${preferences.fps}")
-                args += listOf("-map","0:v:0","-map","0:a:0?") + videoEncodingArgs(copy,preferences.fps)
+                args += listOf("-map","0:v:0","-map","0:a:0?") + videoEncodingArgs(copy,preferences.fps,motionFilter)
                 args += if(audio?.optString("codec_name") == "aac") listOf("-c:a","copy") else listOf("-c:a","aac","-b:a","192k")
                 args += listOf("-movflags","+faststart")
             }
-            progress("変換中", null, "${preferences.format} に保存中")
+            val conversionDetail = if(interpolating) "フレーム補間中（CPU・60fps）" else "${preferences.format} 変換中"
+            progress("変換中", null, conversionDetail)
             args += listOf("-progress","pipe:1","-nostats",output.absolutePath)
             runNative("libffmpeg.so",args) { line ->
                 if(line.startsWith("out_time_us=")) line.substringAfter('=').toDoubleOrNull()?.let {
-                    progress("変換中", if(duration > 0) (it / 1e6 / duration).toFloat().coerceIn(0f,.999f) else null, "${preferences.format} 変換中")
+                    progress("変換中", if(duration > 0) (it / 1e6 / duration).toFloat().coerceIn(0f,.999f) else null, conversionDetail)
                 }
             }
             require(output.exists() && output.length() > 0) { "変換後のファイルがありません。" }
+            if(interpolating) {
+                val verified=JSONObject(runNative("libffprobe.so",listOf("-v","quiet","-print_format","json","-show_streams",output.absolutePath))).getJSONArray("streams")
+                val rate=(0 until verified.length()).map { verified.getJSONObject(it) }.first { it.optString("codec_type") == "video" }.optString("avg_frame_rate")
+                require(kotlin.math.abs((frameRate(rate) ?: 0.0)-60) < .01) { "補間後の60fps検証に失敗しました。" }
+            }
             check()
             progress("端末へ保存中",null,saveRelativePath(preferences.format))
             return publish(output,"${safeName(video.title)} [${safeName(video.key.substringAfter(':'))}].${preferences.format.lowercase()}",preferences.format)

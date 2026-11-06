@@ -4,7 +4,7 @@ Windows版と別プロジェクトのAndroid用アプリです。Android 10以�
 
 ## インストール
 
-**[Android版APK v0.2.4をダウンロード](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.2.4/YoutubePandora-Android-v0.2.4.apk)**
+**[Android版APK v0.2.5をダウンロード](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.2.5/YoutubePandora-Android-v0.2.5.apk)**
 
 [リリース一覧・更新情報](https://github.com/L1ZeroX/youtube-pandora-android/releases) / [Windows版](https://github.com/L1ZeroX/media-downloader)
 
@@ -93,3 +93,11 @@ GPL-3.0。依存ライブラリーとネイティブツールのライセンス�
 動画カードはタイトルを上部に配置し、チェック欄の右に横幅いっぱいの16:9サムネイルを表示します。画像の上部にはサイト名と時間を丸角ラベルで重ねます。タイトル・ラベルはサムネイル色に同期し、画像が取得できない場合も表示枠を保ちます。
 
 「リンクを追加」の横の「リンクを削除」はURL入力欄を空にします。「保存する動画」の横の「動画を削除」はチェックした項目を一覧から外します。保存済みのMP4・MP3ファイルは削除しません。処理中は削除できません。
+
+## 通常版 v0.2.5 / ベータ版 v0.3.0-beta.1
+
+環境設定の「ベータ版をダウンロード」から入手できます。ベータ版はアプリ名にBetaが付き、通常版と別にインストールされます。設定と一覧も別管理です。通常版の自動更新ではベータ版を案内しません。
+
+ベータ版ではMP4のフレームレートに「60fps（フレーム補間）」を追加しています。元動画が30fpsなどの場合に動きを推定して中間フレームを生成します。元から60fps以上は補間を省略します。補間はCPUで処理するため時間がかかり、映像によって動きが崩れる場合があります。まず短い720p動画でお試しください。
+
+署名付きビルドは `python scripts/release.py`（通常版）/ `python scripts/release.py --beta`（ベータ版）。Gradleのみの場合は `-PpandoraBeta=true` を渡すとベータ構成になります。
