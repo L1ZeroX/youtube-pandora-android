@@ -43,6 +43,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.toBitmap
+import coil.request.ImageRequest
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
@@ -108,7 +110,7 @@ fun PandoraScreen() {
             }.getOrNull()
         }
     }
-    val accent = remember(bitmap,p.dark) { bitmap?.let { accentColor(it,p.dark) } ?: Color(0xFF4388FF) }
+    val accent = remember(bitmap,p.dark) { readableBadgeColor(bitmap?.let { accentColor(it,p.dark) } ?: Color(0xFF4388FF)) }
     val animatedAccent by animateColorAsState(accent,label="accent")
     val colors = if(p.dark) darkColorScheme(primary=animatedAccent,onPrimary=Color.White,
         background=Color(0xFF090B10),surface=Color(0xFF191C23)) else lightColorScheme(primary=animatedAccent,onPrimary=Color.White,
@@ -116,8 +118,8 @@ fun PandoraScreen() {
     MaterialTheme(colorScheme=colors) {
         Box(Modifier.fillMaxSize().background(colors.background)) {
             bitmap?.let { Image(it.asImageBitmap(),null,Modifier.fillMaxSize().blur(p.blur.dp),contentScale=ContentScale.Crop,alpha=1-p.opacity) }
-            Scaffold(containerColor=Color.Transparent, bottomBar={
-                Surface(color=colors.surface.copy(alpha=if(bitmap == null) 1f else 1-p.glass),shape=RoundedCornerShape(topStart=28.dp,topEnd=28.dp)) {
+            Scaffold(containerColor=Color.Transparent, contentColor=colors.onBackground, bottomBar={
+                Surface(color=colors.surface.copy(alpha=if(bitmap == null) 1f else 1-p.glass),contentColor=colors.onSurface,shape=RoundedCornerShape(topStart=28.dp,topEnd=28.dp)) {
                     Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
                         Row(verticalAlignment=Alignment.CenterVertically) {
                             Text(s.message,modifier=Modifier.weight(1f),maxLines=3,overflow=TextOverflow.Ellipsis,fontSize=13.sp)
@@ -154,7 +156,7 @@ fun PandoraScreen() {
                     }
                     item {
                         Panel(bitmap != null,p.glass) {
-                            Text("リンクを追加",fontWeight=FontWeight.Bold)
+                            TintBadge("リンクを追加",strong=true)
                             OutlinedTextField(value=text,onValueChange={text=it},modifier=Modifier.fillMaxWidth(),minLines=3,maxLines=6,
                                 placeholder={Text("1行に1つのURL\nYouTube以外の対応サイトも使えます")},enabled=!s.busy,shape=RoundedCornerShape(18.dp))
                             val clipboard = LocalClipboardManager.current
@@ -167,29 +169,30 @@ fun PandoraScreen() {
                     }
                     item {
                         Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                            Text("保存する動画 (${s.videos.size})",fontWeight=FontWeight.Bold,modifier=Modifier.weight(1f))
+                            Box(Modifier.weight(1f)) { TintBadge("保存する動画 (${s.videos.size})",strong=true) }
                             TextButton(onClick={Store.state.update { it.copy(videos=it.videos.map { v -> v.copy(selected=true) }) }; Store.save()},enabled=!s.busy) { Text("全選択") }
                             TextButton(onClick={Store.state.update { it.copy(videos=it.videos.map { v -> v.copy(selected=false) }) }; Store.save()},enabled=!s.busy) { Text("解除") }
                         }
                     }
                     if(s.videos.isEmpty()) item { Panel(bitmap != null,p.glass) { Text("動画を追加すると、サムネイルと時間を表示します。",color=colors.onSurfaceVariant) } }
                     items(s.videos,key={it.key}) { video ->
+                        var thumbnailTone by remember(video.thumbnail) { mutableStateOf<Color?>(null) }
                         Panel(bitmap != null,p.glass) {
                             Row(verticalAlignment=Alignment.CenterVertically) {
                                 Checkbox(checked=video.selected,onCheckedChange={checked -> Store.edit(video.key) { it.copy(selected=checked) }; Store.save()},enabled=!s.busy)
                                 Column(Modifier.weight(1f).clickable { preview=video }) {
-                                    Text(video.title,maxLines=2,overflow=TextOverflow.Ellipsis,fontWeight=FontWeight.Medium)
+                                    TintBadge(video.title,color=thumbnailTone,maxLines=2,modifier=Modifier.fillMaxWidth())
                                     Text("${video.site} · ${durationText(video.duration)}",fontSize=12.sp,color=colors.onSurfaceVariant)
                                     Text(video.status,fontSize=12.sp,color=if(video.status == "失敗") colors.error else colors.primary)
                                     if(video.status == "失敗") Text(video.error.ifBlank { "タップして詳細を確認" },maxLines=2,overflow=TextOverflow.Ellipsis,fontSize=11.sp,color=colors.error)
                                 }
-                                if(video.thumbnail.isNotBlank()) AsyncImage(video.thumbnail,"サムネイル",Modifier.size(76.dp,48.dp).clip(RoundedCornerShape(10.dp)).clickable { preview=video },contentScale=ContentScale.Crop)
+                                if(video.thumbnail.isNotBlank()) TintedThumbnail(video.thumbnail,Modifier.padding(start=8.dp).size(76.dp,48.dp).clip(RoundedCornerShape(10.dp)).clickable { preview=video },ContentScale.Crop) { thumbnailTone=it }
                             }
                         }
                     }
                     item {
                         Panel(bitmap != null,p.glass) {
-                            Text("保存設定",fontWeight=FontWeight.Bold)
+                            TintBadge("保存設定",strong=true)
                             Choice("形式",p.format,listOf("MP4","MP3"),!s.busy) { Store.preferences(p.copy(format=it)) }
                             if(p.format == "MP4") {
                                 Choice("画質",p.quality,listOf("1080p以下","720p以下","最高"),!s.busy) { Store.preferences(p.copy(quality=it)) }
@@ -207,9 +210,11 @@ fun PandoraScreen() {
         if(logs) LogDialog { logs=false }
         if(!s.busy && !settings && !logs && preview == null && error.isEmpty() && pending == null &&
             (updateState.release != null || updateState.message.isNotEmpty())) UpdateDialog(updateState) { AppUpdates.dismiss() }
-        preview?.let { video -> AlertDialog(onDismissRequest={preview=null},title={Text(video.title,maxLines=3)},text={
+        preview?.let { video ->
+            var thumbnailTone by remember(video.thumbnail) { mutableStateOf<Color?>(null) }
+            AlertDialog(onDismissRequest={preview=null},title={TintBadge(video.title,color=thumbnailTone,maxLines=3)},text={
             Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-                if(video.thumbnail.isNotBlank()) AsyncImage(video.thumbnail,"サムネイル",Modifier.fillMaxWidth().height(170.dp).clip(RoundedCornerShape(16.dp)),contentScale=ContentScale.Fit)
+                if(video.thumbnail.isNotBlank()) TintedThumbnail(video.thumbnail,Modifier.fillMaxWidth().height(170.dp).clip(RoundedCornerShape(16.dp)),ContentScale.Fit) { thumbnailTone=it }
                 Text("${video.site} · ${durationText(video.duration)} · ${video.status}")
                 if(video.error.isNotBlank()) {
                     SelectionContainer { Text(video.error,fontSize=12.sp,color=colors.error) }
@@ -271,7 +276,7 @@ fun PandoraScreen() {
 
 @Composable
 private fun Panel(image: Boolean, glass: Float, content: @Composable ColumnScope.()->Unit) {
-    Surface(shape=RoundedCornerShape(24.dp),color=MaterialTheme.colorScheme.surface.copy(alpha=if(image) 1-glass else 1f)) {
+    Surface(shape=RoundedCornerShape(24.dp),color=MaterialTheme.colorScheme.surface.copy(alpha=if(image) 1-glass else 1f),contentColor=MaterialTheme.colorScheme.onSurface) {
         Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp),content=content)
     }
 }
@@ -279,7 +284,7 @@ private fun Panel(image: Boolean, glass: Float, content: @Composable ColumnScope
 private fun Choice(title: String, value: String, options: List<String>, enabled: Boolean, onSelect: (String)->Unit) {
     var expanded by remember { mutableStateOf(false) }
     Row(verticalAlignment=Alignment.CenterVertically) {
-        Text(title,Modifier.weight(1f),fontSize=13.sp)
+        Box(Modifier.weight(1f).padding(end=8.dp)) { TintBadge(title) }
         Box {
             OutlinedButton(onClick={expanded=true},enabled=enabled) { Text("$value  ${if(expanded) "▲" else "▼"}") }
             DropdownMenu(expanded,{expanded=false}) { options.forEach { item ->
@@ -304,4 +309,28 @@ private fun accentColor(bitmap: Bitmap, dark: Boolean): Color {
     }
     best[1]=best[1].coerceIn(.25f,.72f); best[2]=if(dark) .65f else .52f
     return Color(android.graphics.Color.HSVToColor(best))
+}
+
+
+@Composable
+private fun TintBadge(text: String, modifier: Modifier = Modifier, color: Color? = null,
+                      strong: Boolean = false, maxLines: Int = 2) {
+    val standard = readableBadgeColor(color ?: MaterialTheme.colorScheme.primary)
+    Surface(modifier=modifier,shape=RoundedCornerShape(16.dp),
+        color=if(strong) strongBadgeColor(standard) else standard,contentColor=Color.White) {
+        Text(text,Modifier.padding(horizontal=12.dp,vertical=7.dp),fontSize=13.sp,
+            fontWeight=if(strong) FontWeight.Bold else FontWeight.Medium,
+            maxLines=maxLines,overflow=TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+private fun TintedThumbnail(url: String, modifier: Modifier, scale: ContentScale, onTone: (Color?)->Unit) {
+    val context = LocalContext.current
+    // Reuse Coil's display request/cache; software pixels can safely be sampled.
+    val request = remember(context,url) { ImageRequest.Builder(context).data(url).allowHardware(false).build() }
+    AsyncImage(request,"サムネイル",modifier,contentScale=scale,
+        onSuccess={ state ->
+            onTone(runCatching { readableBadgeColor(accentColor(state.result.drawable.toBitmap(48,48),true)) }.getOrNull())
+        },onError={onTone(null)})
 }

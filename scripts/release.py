@@ -30,14 +30,14 @@ release.mkdir(exist_ok=True)
 tools = Path(config['sdk']) / 'build-tools/35.0.0'
 unsigned = root / 'app/build/outputs/apk/release/app-release-unsigned.apk'
 aligned = root / '.tools/aligned.apk'
-apk = release / 'YoutubePandora-Android-v0.2.2.apk'
+apk = release / 'YoutubePandora-Android-v0.2.3.apk'
 subprocess.run([str(tools / 'zipalign.exe'), '-f', '-P', '16', '4', str(unsigned), str(aligned)], check=True)
 subprocess.run([str(tools / 'apksigner.bat'), 'sign', '--ks', str(key), '--ks-key-alias', 'pandora',
                 '--ks-pass', 'env:PANDORA_KEY_PASSWORD', '--key-pass', 'env:PANDORA_KEY_PASSWORD',
                 '--out', str(apk), str(aligned)], env=env, check=True)
 subprocess.run([str(tools / 'apksigner.bat'), 'verify', '--verbose', str(apk)], env=env, check=True)
 (release / 'SHA256SUMS.txt').write_text(hashlib.sha256(apk.read_bytes()).hexdigest() + '  ' + apk.name + '\n')
-source = release / 'YoutubePandora-Android-v0.2.2-source.zip'
+source = release / 'YoutubePandora-Android-v0.2.3-source.zip'
 with zipfile.ZipFile(source, 'w', zipfile.ZIP_DEFLATED) as archive:
     for path in root.rglob('*'):
         relative = path.relative_to(root)
