@@ -13,6 +13,20 @@ import java.io.File
 
 class ScreenTest {
     @get:Rule val screen = createAndroidComposeRule<MainActivity>()
+    @Test fun addLinkPastesAndPreservesExistingInput() {
+        screen.runOnIdle {
+            AppUpdates.dismiss()
+            Store.state.update { it.copy(busy=false) }
+            val clipboard=screen.activity.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+            clipboard.setPrimaryClip(android.content.ClipData.newPlainText("link","https://b.test\nhttps://c.test"))
+        }
+        screen.onNode(hasSetTextAction()).performTextReplacement("https://a.test")
+        screen.onNodeWithText("リンクを追加").performClick()
+        screen.onNode(hasSetTextAction()).assertTextEquals("https://a.test\nhttps://b.test\nhttps://c.test")
+        screen.runOnIdle { Store.state.update { it.copy(busy=true) } }
+        screen.onNodeWithText("リンクを追加").assertIsNotEnabled()
+        screen.runOnIdle { Store.state.update { it.copy(busy=false) } }
+    }
     @Test fun progressSurvivesKnownToUnknownBeforeNextFrame() {
         val original=Store.state.value
         try {

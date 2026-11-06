@@ -83,6 +83,15 @@ fun PandoraScreen() {
     val updateState by AppUpdates.state.collectAsStateWithLifecycle()
     var preview by remember { mutableStateOf<Video?>(null) }
     var error by remember { mutableStateOf("") }
+    val clipboard = LocalClipboardManager.current
+    fun pasteLinks() {
+        if(s.busy) return
+        runCatching {
+            val copied = clipboard.getText()?.text
+            require(!copied.isNullOrBlank()) { "クリップボードにテキストがありません。リンクをコピーしてからお試しください。" }
+            text = appendClipboardText(text,copied)
+        }.onFailure { error = it.message ?: "クリップボードを読み取れませんでした。" }
+    }
     var pending by remember { mutableStateOf<Intent?>(null) }
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
         pending?.let { task -> runCatching { ContextCompat.startForegroundService(context,task) }.onFailure { error = it.message.orEmpty(); AppLog.error("処理開始",it) } }; pending = null
@@ -157,14 +166,13 @@ fun PandoraScreen() {
                     item {
                         Panel(bitmap != null,p.glass) {
                             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                                Box(Modifier.weight(1f)) { TintBadge("リンクを追加",strong=true) }
+                                Button(onClick={pasteLinks()},enabled=!s.busy,modifier=Modifier.weight(1f)) { Text("リンクを追加") }
                                 Button(onClick={text=""},enabled=!s.busy && text.isNotEmpty()) { Text("リンクを削除") }
                             }
                             OutlinedTextField(value=text,onValueChange={text=it},modifier=Modifier.fillMaxWidth(),minLines=3,maxLines=6,
                                 placeholder={Text("1行に1つのURL\nYouTube以外の対応サイトも使えます")},enabled=!s.busy,shape=RoundedCornerShape(18.dp))
-                            val clipboard = LocalClipboardManager.current
                             Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                                OutlinedButton(onClick={text=clipboard.getText()?.text.orEmpty()},enabled=!s.busy) { Text("貼り付け") }
+                                OutlinedButton(onClick={pasteLinks()},enabled=!s.busy) { Text("貼り付け") }
                                 Button(onClick={start("FETCH")},enabled=!s.busy,modifier=Modifier.weight(1f)) { Text("＋ 情報を取得") }
                             }
                             Text("動画＋プレイリストのURL: ${if(p.playlists) "プレイリスト全体" else "動画1件"}",fontSize=11.sp,color=colors.onSurfaceVariant)
@@ -265,6 +273,9 @@ fun PandoraScreen() {
                     }
                     OutlinedButton(enabled=!updateState.checking,onClick={settings=false;AppUpdates.check(manual=true,beta=true,offer=true)}) {
                         Text("ベータ版をダウンロード")
+                    }
+                    OutlinedButton(enabled=!updateState.checking,onClick={settings=false;AppUpdates.check(manual=true,beta=false,offer=true)}) {
+                        Text(if(BuildConfig.BETA) "リリース版に戻す" else "リリース版をダウンロード")
                     }
                     Text("配信中ライブ・ログイン必須の動画は対象外です。",fontSize=12.sp)
                 }

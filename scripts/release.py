@@ -10,7 +10,7 @@ import sys
 import zipfile
 
 beta = "--beta" in sys.argv
-version = "0.3.0-beta.1" if beta else "0.2.5"
+version = "0.3.0-beta.2" if beta else "0.2.6"
 root = Path(__file__).resolve().parent.parent
 config = json.loads((root / '.tools/environment.json').read_text())
 private = root / '.signing'
@@ -41,9 +41,10 @@ subprocess.run([str(tools / 'apksigner.bat'), 'verify', '--verbose', str(apk)], 
 (release / f"SHA256SUMS-v{version}.txt").write_text(hashlib.sha256(apk.read_bytes()).hexdigest() + '  ' + apk.name + '\n')
 source = release / f"YoutubePandora-Android-v{version}-source.zip"
 with zipfile.ZipFile(source, 'w', zipfile.ZIP_DEFLATED) as archive:
-    # Export only tracked source; private signing material never enters source ZIPs.
+    # Include new Kotlin source before commit, restricted to app/src; never export signing material.
     paths = subprocess.check_output(['git', 'ls-files', '-z'], cwd=root).decode().split('\0')
-    for name in filter(None, paths):
+    paths += subprocess.check_output(['git', 'ls-files', '--others', '--exclude-standard', '-z', '--', 'app/src'], cwd=root).decode().split('\0')
+    for name in sorted(set(filter(None, paths))):
         path = root / name
         if path.is_file():
             archive.write(path, name)

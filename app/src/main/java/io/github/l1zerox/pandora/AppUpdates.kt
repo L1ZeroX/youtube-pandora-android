@@ -20,8 +20,11 @@ internal object AppUpdates {
         scope.launch {
             try {
                 val release=withContext(Dispatchers.IO) { fetchRelease(beta,offer) }
-                state.value=UpdateState(release=release,message=if(manual && release == null) "利用可能な新しいバージョンはありません。現在 ${BuildConfig.VERSION_NAME}" else "")
-                AppLog.info("バージョンチェック",release?.let { "新しいバージョン ${it.version}" } ?: "利用可能な更新はありません。")
+                state.value=UpdateState(release=release,message=if(manual && release == null) {
+                    if(offer) "ダウンロード可能な${if(beta) "ベータ版" else "リリース版"}が見つかりませんでした。"
+                    else "利用可能な新しいバージョンはありません。現在 ${BuildConfig.VERSION_NAME}"
+                } else "")
+                AppLog.info("バージョンチェック",release?.let { "ダウンロード可能なバージョン ${it.version}" } ?: "利用可能な更新はありません。")
             } catch(e: Exception) {
                 if(e is CancellationException) throw e
                 AppLog.info("バージョンチェック","確認できません: ${e.message}")

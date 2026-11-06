@@ -4,6 +4,12 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ReleaseVersionTest {
+    @Test fun returnToReleaseOffersOlderVersionOnlyOnExplicitRequest() {
+        val releases=listOf(release("0.2.5"),release("0.2.6"),release("0.3.0-beta.2"),release("0.4.0",draft=true))
+        assertNull(newestRelease(releases,"0.3.0-beta.2"))
+        assertEquals("0.2.6",newestRelease(releases,"0.3.0-beta.2",beta=false,offer=true)!!.version)
+        assertNull(newestRelease(listOf(release("0.3.0-beta.2")),"0.3.0-beta.2",beta=false,offer=true))
+    }
     @Test fun betaChannelRequiresOptInAndHasNumericOrdering() {
         val beta=release("0.3.0-beta.1")
         assertNull(newestRelease(listOf(beta),"0.2.5"))
