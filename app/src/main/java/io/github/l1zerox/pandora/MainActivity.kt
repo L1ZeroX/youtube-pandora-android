@@ -156,7 +156,10 @@ fun PandoraScreen() {
                     }
                     item {
                         Panel(bitmap != null,p.glass) {
-                            TintBadge("リンクを追加",strong=true)
+                            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                                Box(Modifier.weight(1f)) { TintBadge("リンクを追加",strong=true) }
+                                Button(onClick={text=""},enabled=!s.busy && text.isNotEmpty()) { Text("リンクを削除") }
+                            }
                             OutlinedTextField(value=text,onValueChange={text=it},modifier=Modifier.fillMaxWidth(),minLines=3,maxLines=6,
                                 placeholder={Text("1行に1つのURL\nYouTube以外の対応サイトも使えます")},enabled=!s.busy,shape=RoundedCornerShape(18.dp))
                             val clipboard = LocalClipboardManager.current
@@ -168,27 +171,20 @@ fun PandoraScreen() {
                         }
                     }
                     item {
-                        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                        Column {
+                          Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                             Box(Modifier.weight(1f)) { TintBadge("保存する動画 (${s.videos.size})",strong=true) }
+                            Button(onClick={Store.removeSelected()},enabled=!s.busy && s.videos.any { it.selected }) { Text("動画を削除") }
+                          }
+                          Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End) {
                             TextButton(onClick={Store.state.update { it.copy(videos=it.videos.map { v -> v.copy(selected=true) }) }; Store.save()},enabled=!s.busy) { Text("全選択") }
                             TextButton(onClick={Store.state.update { it.copy(videos=it.videos.map { v -> v.copy(selected=false) }) }; Store.save()},enabled=!s.busy) { Text("解除") }
+                          }
                         }
                     }
                     if(s.videos.isEmpty()) item { Panel(bitmap != null,p.glass) { Text("動画を追加すると、サムネイルと時間を表示します。",color=colors.onSurfaceVariant) } }
                     items(s.videos,key={it.key}) { video ->
-                        var thumbnailTone by remember(video.thumbnail) { mutableStateOf<Color?>(null) }
-                        Panel(bitmap != null,p.glass) {
-                            Row(verticalAlignment=Alignment.CenterVertically) {
-                                Checkbox(checked=video.selected,onCheckedChange={checked -> Store.edit(video.key) { it.copy(selected=checked) }; Store.save()},enabled=!s.busy)
-                                Column(Modifier.weight(1f).clickable { preview=video }) {
-                                    TintBadge(video.title,color=thumbnailTone,maxLines=2,modifier=Modifier.fillMaxWidth())
-                                    Text("${video.site} · ${durationText(video.duration)}",fontSize=12.sp,color=colors.onSurfaceVariant)
-                                    Text(video.status,fontSize=12.sp,color=if(video.status == "失敗") colors.error else colors.primary)
-                                    if(video.status == "失敗") Text(video.error.ifBlank { "タップして詳細を確認" },maxLines=2,overflow=TextOverflow.Ellipsis,fontSize=11.sp,color=colors.error)
-                                }
-                                if(video.thumbnail.isNotBlank()) TintedThumbnail(video.thumbnail,Modifier.padding(start=8.dp).size(76.dp,48.dp).clip(RoundedCornerShape(10.dp)).clickable { preview=video },ContentScale.Crop) { thumbnailTone=it }
-                            }
-                        }
+                        VideoPanel(video,bitmap != null,p.glass,s.busy) { preview=video }
                     }
                     item {
                         Panel(bitmap != null,p.glass) {
@@ -333,4 +329,38 @@ private fun TintedThumbnail(url: String, modifier: Modifier, scale: ContentScale
         onSuccess={ state ->
             onTone(runCatching { readableBadgeColor(accentColor(state.result.drawable.toBitmap(48,48),true)) }.getOrNull())
         },onError={onTone(null)})
+}
+
+
+@Composable
+private fun VideoPanel(video: Video, image: Boolean, glass: Float, busy: Boolean, onPreview: ()->Unit) {
+    var tone by remember(video.thumbnail) { mutableStateOf<Color?>(null) }
+    var thumbnailFailed by remember(video.thumbnail) { mutableStateOf(false) }
+    val colors=MaterialTheme.colorScheme
+    Panel(image,glass) {
+        Row {
+            Spacer(Modifier.width(48.dp))
+            TintBadge(video.title,color=tone,maxLines=2,modifier=Modifier.weight(1f).clickable(onClick=onPreview))
+        }
+        Row(verticalAlignment=Alignment.CenterVertically) {
+            Checkbox(checked=video.selected,onCheckedChange={checked ->
+                Store.edit(video.key) { it.copy(selected=checked) }; Store.save()
+            },enabled=!busy,modifier=Modifier.width(48.dp))
+            Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                Box(Modifier.fillMaxWidth().aspectRatio(16f/9f).clip(RoundedCornerShape(18.dp))
+                    .background(colors.surfaceVariant).clickable(onClick=onPreview).testTag("thumbnail-${video.key}")) {
+                    Text(if(video.thumbnail.isBlank() || thumbnailFailed) "サムネイルを取得できません" else "サムネイルを読み込み中…",Modifier.align(Alignment.Center).padding(12.dp),
+                        color=colors.onSurfaceVariant,fontSize=12.sp)
+                    if(video.thumbnail.isNotBlank()) TintedThumbnail(video.thumbnail,Modifier.fillMaxSize(),ContentScale.Crop) { tone=it; thumbnailFailed=it == null }
+                    Row(Modifier.fillMaxWidth().align(Alignment.TopCenter).padding(8.dp),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+                        TintBadge(video.site.ifBlank { "サイト不明" },color=tone,maxLines=1,modifier=Modifier.weight(1f))
+                        TintBadge(durationText(video.duration),color=tone,maxLines=1)
+                    }
+                }
+                Text(video.status,fontSize=12.sp,color=if(video.status == "失敗") colors.error else colors.onSurfaceVariant)
+                if(video.status == "失敗") Text(video.error.ifBlank { "タップして詳細を確認" },
+                    Modifier.clickable(onClick=onPreview),maxLines=2,overflow=TextOverflow.Ellipsis,fontSize=11.sp,color=colors.error)
+            }
+        }
+    }
 }

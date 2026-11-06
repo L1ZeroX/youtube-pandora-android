@@ -4,7 +4,7 @@ Windows版と別プロジェクトのAndroid用アプリです。Android 10以�
 
 ## インストール
 
-**[Android版APK v0.2.3をダウンロード](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.2.3/YoutubePandora-Android-v0.2.3.apk)**
+**[Android版APK v0.2.4をダウンロード](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.2.4/YoutubePandora-Android-v0.2.4.apk)**
 
 [リリース一覧・更新情報](https://github.com/L1ZeroX/youtube-pandora-android/releases) / [Windows版](https://github.com/L1ZeroX/media-downloader)
 
@@ -41,7 +41,7 @@ v0.2.0以降は起動時にGitHub Releasesをバックグラウンドで確認�
 
 確認先は公開リポジトリ `L1ZeroX/youtube-pandora-android` の直近30件のReleasesです。`v数字.数字.数字` を数値で比較し、公開済みAPKがある正式版・試用版を対象にします。下書き・同じ版・古い版は通知しません。GitHubへのログインは不要です。通信失敗はログに記録し、通常の操作は続けられます。起動後に公開された更新は、手動確認または次回起動時に検出します。
 
-v0.2.1では未処理のJava/Kotlin例外を、終了直前に専用ファイルへ同期保存します。次の起動で「クラッシュ詳細」として通常ログに取り込みます。OSの終了理由・中断記録には診断用の架空の例外スタックを付けず、実際の例外と区別します。v0.2.3では診断ログで特定した、進捗バーの値が不明へ切り替わった際のNullPointerExceptionを修正しました。
+v0.2.1では未処理のJava/Kotlin例外を、終了直前に専用ファイルへ同期保存します。次の起動で「クラッシュ詳細」として通常ログに取り込みます。OSの終了理由・中断記録には診断用の架空の例外スタックを付けず、実際の例外と区別します。v0.2.4では診断ログで特定した、進捗バーの値が不明へ切り替わった際のNullPointerExceptionを修正しました。
 
 ## エラーを調べる
 
@@ -87,3 +87,9 @@ Android 16の16KBページ端末向けに互換モードを指定しています
 ## ライセンス
 
 GPL-3.0。依存ライブラリーとネイティブツールのライセンス・ソースは `THIRD_PARTY.md` を参照してください。
+
+## v0.2.4 の画面変更
+
+動画カードはタイトルを上部に配置し、チェック欄の右に横幅いっぱいの16:9サムネイルを表示します。画像の上部にはサイト名と時間を丸角ラベルで重ねます。タイトル・ラベルはサムネイル色に同期し、画像が取得できない場合も表示枠を保ちます。
+
+「リンクを追加」の横の「リンクを削除」はURL入力欄を空にします。「保存する動画」の横の「動画を削除」はチェックした項目を一覧から外します。保存済みのMP4・MP3ファイルは削除しません。処理中は削除できません。

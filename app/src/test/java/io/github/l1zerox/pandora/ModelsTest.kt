@@ -4,6 +4,21 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ModelsTest {
+    @Test fun removingCheckedVideosPreservesUncheckedFilesAndSettings() {
+        val selected=Video("a","https://example.com/a","A",status="完了",savedUri="content://media/1")
+        val retained=Video("b","https://example.com/b","B",selected=false,savedUri="content://media/2")
+        val state=ScreenState(videos=listOf(selected,retained),preferences=Preferences(format="MP3"))
+        val result=state.withoutSelectedVideos()
+        assertEquals(listOf(retained),result.videos)
+        assertEquals(state.preferences,result.preferences)
+        assertEquals("content://media/2",result.videos.single().savedUri)
+        assertEquals("1件を一覧から削除しました。",result.message)
+        assertEquals(result,result.withoutSelectedVideos())
+    }
+    @Test fun removingCheckedVideosCannotModifyActiveQueue() {
+        val state=ScreenState(videos=listOf(Video("a","https://example.com/a","A")),busy=true)
+        assertSame(state,state.withoutSelectedVideos())
+    }
     @Test fun urlsAreSeparatedAndDeduplicated() {
         assertEquals(listOf("https://example.com/a","https://example.com/b"), validUrls(" https://example.com/a\nhttps://example.com/b\nhttps://example.com/a "))
     }

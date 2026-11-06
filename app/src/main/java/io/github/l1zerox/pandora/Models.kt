@@ -38,6 +38,9 @@ fun formatSelector(p: Preferences): String {
     return "bestvideo$height+bestaudio/best$height"
 }
 fun saveRelativePath(format: String): String = "Download/YoutubePandora!/${if(format == "MP4") "mp4" else "mp3"}/"
+fun ScreenState.withoutSelectedVideos(): ScreenState =
+    if(busy || videos.none { it.selected }) this else copy(videos=videos.filterNot { it.selected },
+        message="${videos.count { it.selected }}件を一覧から削除しました。")
 fun safeName(value: String): String = value.replace(Regex("[\\\\/:*?\"<>|\\p{Cntrl}]"), "_").trim().take(150).ifBlank { "video" }
 
 object Store {
@@ -76,6 +79,7 @@ object Store {
     }
     fun edit(key: String, transform: (Video) -> Video) { state.update { s -> s.copy(videos=s.videos.map { if(it.key == key) transform(it) else it }) } }
     fun preferences(p: Preferences) { state.update { it.copy(preferences=p) }; save() }
+    fun removeSelected() { state.update { it.withoutSelectedVideos() }; save() }
     fun save() {
         val s = state.value; val p = s.preferences
         val config = JSONObject().put("format",p.format).put("quality",p.quality).put("audio",p.audio).put("fps",p.fps)
