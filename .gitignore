@@ -1,0 +1,16 @@
+.tools/
+.gradle/
+.kotlin/
+.idea/
+__pycache__/
+*.pyc
+*.iml
+**/build/
+local.properties
+release/
+.test-artifacts/
+*.jks
+*.keystore
+signing.properties
+.signing/
+*.log

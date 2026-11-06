@@ -1,0 +1,61 @@
+# Youtube Pandora! Android
+
+Windows版と別プロジェクトのAndroid用アプリです。Android 10以降（64bit ARM / x86_64）向けに実装し、Android 16 / API 36をターゲットにしています。初版の試用APKです。実機の動作検証は未完了です。
+
+## インストール
+
+**[Android版APK v0.1.2をダウンロード](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.1.2/YoutubePandora-Android-v0.1.2.apk)**
+
+[リリース一覧・更新情報](https://github.com/L1ZeroX/youtube-pandora-android/releases) / [Windows版](https://github.com/L1ZeroX/media-downloader)
+
+スマートフォンで上のAPKリンクを開き、ダウンロードしたファイルをタップしてください。Androidから求められた場合、そのAPKを開いたブラウザーまたはファイル管理アプリに「この提供元のアプリを許可」を設定します。更新時はアプリを削除せず、同じ署名のAPKを上書きインストールしてください。
+
+1. URLを1行に1つ貼り付けて「情報を取得」。YouTubeなどの共有メニューから本アプリへ送ることもできます。
+2. 保存する動画、MP4 / MP3、画質・音質・フレームレートを選びます。
+3. 動画は内部ストレージの `Download/YoutubePandora!/mp4`、音楽は `Download/YoutubePandora!/mp3` に保存します。動画・音楽のMIMEを指定してMediaStoreへ登録し、保存完了後に公開します。動画の詳細画面からもファイルを開けます。
+
+v0.1.2から上記の保存先を使います。Android標準のダウンロードフォルダー名は `Download` です。旧版で保存したファイルは元の場所に残ります。同じ署名鍵で作成しているので、アプリを削除せずAPKを上書きインストールできます。ギャラリーの表示名・反映タイミングは使用するアプリによって異なります（アルバム名は末尾の `mp4` になる場合があります）。
+
+通知を許可すると、画面を離れている間も進捗と停止ボタンを利用できます。プレイリスト全体を追加する場合は環境設定で切り替えてください（1回につき最大500件）。既存のファイルは上書きしません。
+
+## 機能
+
+- yt-dlp対応サイトの公開動画、複数URL、プレイリスト、重複除外
+- サムネイル、動画時間、進捗、停止、失敗分の再試行
+- MP4（H.264 / AAC）、MP3（128 / 192 / 320kbps）
+- 最高 / 1080p以下 / 720p以下、元のfps / 24 / 30 / 60fps
+- ダークモード、背景画像、透明度、ぼかし、画像に合わせたボタン色
+- 設定・動画一覧の復元、アプリ内yt-dlp更新
+
+## 初版の範囲
+
+Windows版とは別のネイティブUIです。背景は中央を基準とした自動トリミングで、手動トリミング、細かなレイアウト変更、GPUエンコード、Cookie指定、ライブ録画には対応していません。ぼかしはAndroid 12以降で表示されます。
+
+互換性のあるH.264映像はfpsを変更しなければ再圧縮を避けます。それ以外はCPU変換のため時間がかかります。端末の空き容量はダウンロード素材・変換中ファイル・保存結果を含めて必要です。OSによる強制終了時は自動再開しません。サイト側の変更やアクセス制限で取得できない場合があります。
+
+## 開発・ビルド（Windows）
+
+Python 3.12以降で以下を実行します。JDK・Gradle・Android SDKはプロジェクトの `.tools` 内へ導入され、システムのPATHは変更しません。Android SDKのライセンスはセットアップ時に承諾します。
+
+```powershell
+python scripts/setup_build.py
+python scripts/build.py
+```
+
+通常のAndroid Studioからも開けます。Gradle 8.13 / Android Gradle Plugin 8.11.1 / JDK 17以降が必要です。`local.properties` は各環境のSDKに合わせてください。
+
+```powershell
+python scripts/build.py assembleDebug testDebugUnitTest lintDebug
+```
+
+署名鍵や `.tools`、`local.properties` はリポジトリ・ソース配布には含めません。
+
+配布用APKを作るには `python scripts/release.py` を実行します。初回に `.signing` 内へ署名鍵を生成します。このフォルダーは公開せずにバックアップしてください。同じ署名鍵を使わないと既存アプリを上書き更新できません。
+
+端末または起動済みエミュレーターを接続した場合は `python scripts/build.py connectedDebugAndroidTest` で、合成動画の情報取得・MP4保存・24fps変換・MP3保存と画面操作を検証できます。テストが作った保存結果は終了時に削除します。
+
+Android 16の16KBページ端末向けに互換モードを指定しています。FFmpeg内のWebP関連ライブラリー5本が4KBアラインメントのため、完全な16KBネイティブ対応ではありません。16KB端末での動作は未検証です。Google Play公開用ではなく、直接インストール用のAPKです。
+
+## ライセンス
+
+GPL-3.0。依存ライブラリーとネイティブツールのライセンス・ソースは `THIRD_PARTY.md` を参照してください。
