@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
@@ -123,8 +124,13 @@ fun PandoraScreen() {
                             TextButton(onClick={logs=true}) { Text(if(logSnapshot.errors > 0) "ログ (${logSnapshot.errors})" else "ログを見る") }
                         }
                         if(s.busy) {
-                            if(s.progress == null) LinearProgressIndicator(Modifier.fillMaxWidth()) else LinearProgressIndicator(progress={s.progress!!},modifier=Modifier.fillMaxWidth())
-                            Text("${s.done} / ${s.total} 件" + (s.progress?.let { " · ${(it*100).toInt()}%" } ?: ""),fontSize=12.sp)
+                            // Drawing/semantics may invoke this callback after the next state update,
+                            // before recomposition replaces it. Capture the value, not the live state.
+                            val displayedProgress=s.progress?.takeIf { it.isFinite() }?.coerceIn(0f,1f)
+                            val progressModifier=Modifier.fillMaxWidth().testTag("download-progress")
+                            if(displayedProgress == null) LinearProgressIndicator(progressModifier)
+                            else LinearProgressIndicator(progress={displayedProgress},modifier=progressModifier)
+                            Text("${s.done} / ${s.total} 件" + (displayedProgress?.let { " · ${(it*100).toInt()}%" } ?: ""),fontSize=12.sp)
                             if(s.detail.isNotBlank()) Text(s.detail,maxLines=2,fontSize=10.sp,color=colors.onSurfaceVariant)
                         }
                         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {

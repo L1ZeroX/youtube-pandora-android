@@ -4,12 +4,36 @@ import android.graphics.Bitmap
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.SemanticsProperties
+import kotlinx.coroutines.flow.update
 import org.junit.Rule
 import org.junit.Test
 import java.io.File
 
 class ScreenTest {
     @get:Rule val screen = createAndroidComposeRule<MainActivity>()
+    @Test fun progressSurvivesKnownToUnknownBeforeNextFrame() {
+        val original=Store.state.value
+        try {
+            screen.runOnIdle { AppUpdates.dismiss(); Store.state.update { it.copy(busy=true,progress=.75f) } }
+            screen.onNodeWithTag("download-progress").assertExists()
+            screen.mainClock.autoAdvance=false
+            // Force semantics reads while the old progress callback may still be installed.
+            for(value in listOf(null,.5f,Float.NaN,1f,null,.2f)) {
+                screen.runOnIdle { Store.state.update { it.copy(progress=value) } }
+                screen.onNodeWithTag("download-progress").fetchSemanticsNode().config
+                screen.mainClock.advanceTimeByFrame()
+                screen.waitForIdle()
+                val expected=if(value == null || !value.isFinite()) ProgressBarRangeInfo.Indeterminate
+                    else ProgressBarRangeInfo(value,0f..1f)
+                screen.onNodeWithTag("download-progress").assert(SemanticsMatcher.expectValue(SemanticsProperties.ProgressBarRangeInfo,expected))
+            }
+        } finally {
+            screen.mainClock.autoAdvance=true
+            screen.runOnIdle { Store.state.value=original }
+        }
+    }
     @Test fun logDialogShowsRecordedFailure() {
         AppLog.error("テスト",IllegalStateException("診断用エラー"))
         screen.waitUntil(5000) { AppLog.state.value.entries.any { it.message.contains("診断用エラー") } }
