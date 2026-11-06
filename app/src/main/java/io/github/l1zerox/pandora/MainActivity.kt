@@ -55,6 +55,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState); enableEdgeToEdge(); acceptShare(intent)
         setContent { PandoraScreen() }
+        AppUpdates.check()
     }
     override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); acceptShare(intent) }
     private fun acceptShare(intent: Intent?) {
@@ -76,6 +77,7 @@ fun PandoraScreen() {
     var settings by rememberSaveable { mutableStateOf(false) }
     var logs by rememberSaveable { mutableStateOf(false) }
     val logSnapshot by AppLog.state.collectAsStateWithLifecycle()
+    val updateState by AppUpdates.state.collectAsStateWithLifecycle()
     var preview by remember { mutableStateOf<Video?>(null) }
     var error by remember { mutableStateOf("") }
     var pending by remember { mutableStateOf<Intent?>(null) }
@@ -197,6 +199,8 @@ fun PandoraScreen() {
         }
         if(error.isNotEmpty()) AlertDialog(onDismissRequest={error=""},title={Text("確認")},text={Text(error)},confirmButton={TextButton(onClick={error=""}) { Text("閉じる") }})
         if(logs) LogDialog { logs=false }
+        if(!s.busy && !settings && !logs && preview == null && error.isEmpty() && pending == null &&
+            (updateState.release != null || updateState.message.isNotEmpty())) UpdateDialog(updateState) { AppUpdates.dismiss() }
         preview?.let { video -> AlertDialog(onDismissRequest={preview=null},title={Text(video.title,maxLines=3)},text={
             Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)) {
                 if(video.thumbnail.isNotBlank()) AsyncImage(video.thumbnail,"サムネイル",Modifier.fillMaxWidth().height(170.dp).clip(RoundedCornerShape(16.dp)),contentScale=ContentScale.Fit)
@@ -247,6 +251,11 @@ fun PandoraScreen() {
                     Text("画像は中央を基準に画面いっぱいに表示します。ボタンの色は画像に合わせます。設定は自動保存されます。",fontSize=12.sp)
                     OutlinedButton(onClick={settings=false; start("UPDATE")},enabled=!s.busy) { Text("yt-dlpを更新") }
                     OutlinedButton(onClick={settings=false;logs=true}) { Text("処理ログを見る") }
+                    Text("アプリの更新 · 現在 ${BuildConfig.VERSION_NAME}")
+                    Text("起動時にGitHubの公開版・試用版を確認し、新しいバージョンがあると通知します。",fontSize=12.sp)
+                    OutlinedButton(enabled=!updateState.checking,onClick={settings=false;AppUpdates.check(manual=true)}) {
+                        Text(if(updateState.checking) "確認中…" else "新しいバージョンを確認")
+                    }
                     Text("配信中ライブ・ログイン必須の動画は対象外です。",fontSize=12.sp)
                 }
             },confirmButton={TextButton(onClick={settings=false}) { Text("閉じる") }})

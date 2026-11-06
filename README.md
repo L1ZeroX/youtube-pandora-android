@@ -4,7 +4,7 @@ Windows版と別プロジェクトのAndroid用アプリです。Android 10以�
 
 ## インストール
 
-**[Android版APK v0.1.5をダウンロード](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.1.5/YoutubePandora-Android-v0.1.5.apk)**
+**[Android版APK v0.2.0をダウンロード](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.2.0/YoutubePandora-Android-v0.2.0.apk)**
 
 [リリース一覧・更新情報](https://github.com/L1ZeroX/youtube-pandora-android/releases) / [Windows版](https://github.com/L1ZeroX/media-downloader)
 
@@ -31,6 +31,14 @@ v0.1.2から上記の保存先を使います。Android標準のダウンロー�
 - 処理ログ・エラー件数、ログのコピー・共有・消去
 
 v0.1.5では変換のデコード・フィルターの並列数とエンコーダーの先読みを抑え、互換映像のfpsが指定値と一致する場合も再圧縮を避けます。処理途中のアプリ終了を次回起動時に検出し、Androidが残した終了理由（Android 11以降）、fps・解像度・メモリー状況をログに追加します。終了原因の特定と実機での改善確認は継続中です。
+
+## アプリのバージョンチェック
+
+v0.2.0以降は起動時にGitHub Releasesをバックグラウンドで確認し、新しいAndroid版がある場合だけポップアップを表示します。「環境設定 → 新しいバージョンを確認」から手動でも確認できます。ダウンロードなどの処理中や別ダイアログの表示中は通知を待機します。
+
+現在の版・新しい版・更新内容を表示し、「APKをダウンロード」でブラウザーを開きます。ダウンロードしたAPKを開き、アプリを削除せず上書き更新してください。自動インストールは行いません。最初にこの機能のある版へ手動で更新する必要があります。
+
+確認先は公開リポジトリ `L1ZeroX/youtube-pandora-android` の直近30件のReleasesです。`v数字.数字.数字` を数値で比較し、公開済みAPKがある正式版・試用版を対象にします。下書き・同じ版・古い版は通知しません。GitHubへのログインは不要です。通信失敗はログに記録し、通常の操作は続けられます。起動後に公開された更新は、手動確認または次回起動時に検出します。
 
 ## エラーを調べる
 
