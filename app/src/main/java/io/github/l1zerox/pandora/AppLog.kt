@@ -26,6 +26,7 @@ object AppLog {
                 journal = LogJournal(directory)
                 state.value = LogSnapshot(journal!!.read())
             }.onFailure { state.value = LogSnapshot(storageWarning="ログの読み込み失敗: ${cleanLog(it.toString())}") }
+            ProcessDiagnostics.reportPreviousExit(context.applicationContext)
         }
         info("起動","Youtube Pandora! ${BuildConfig.VERSION_NAME} / Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT}) / ${Build.MANUFACTURER} ${Build.MODEL} / ${Build.SUPPORTED_ABIS.joinToString()}")
     }

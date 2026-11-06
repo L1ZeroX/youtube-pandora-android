@@ -55,13 +55,24 @@ object Store {
             val array = JSONArray(data.getString("queue", "[]"))
             (0 until array.length()).map { index ->
                 val v = array.getJSONObject(index)
+                val interrupted=interruptedStatus(v.optString("status"))
                 Video(v.getString("key"), v.getString("url"), v.getString("title"), v.optString("site"),
                     v.optDouble("duration").takeIf { it.isFinite() && it >= 0 }, v.optString("thumbnail"),
-                    v.optBoolean("selected", true), v.optString("status").takeIf { it in listOf("完了","失敗") } ?: "待機中",
-                    error=v.optString("error"),savedUri=v.optString("savedUri"))
+                    v.optBoolean("selected", true), if(interrupted) "失敗" else v.optString("status").takeIf { it in listOf("完了","失敗") } ?: "待機中",
+                    error=if(interrupted) "前回の処理中にアプリが終了しました。保存完了は確認できません。ログを確認し、再試行してください。" else v.optString("error"),savedUri=v.optString("savedUri"))
             }
         }.getOrDefault(emptyList())
         state.value = ScreenState(videos=videos, preferences=preferences)
+        val interrupted=videos.count { it.error.startsWith("前回の処理中にアプリが終了しました。") }
+        if(interrupted > 0) {
+            state.value=state.value.copy(message="前回の処理が中断されています。ログを確認し、再試行してください。")
+        }
+        // Persist recovered statuses so another restart doesn't treat them as active work.
+        val raw=runCatching { JSONArray(data.getString("queue","[]")) }.getOrNull()
+        if(raw != null && (0 until raw.length()).any { interruptedStatus(raw.optJSONObject(it)?.optString("status").orEmpty()) }) {
+            AppLog.error("前回の処理中断",IllegalStateException("処理中の動画が残ったままアプリが再起動しました。保存完了ではありません。Androidの終了記録を確認してください。"))
+            save()
+        }
     }
     fun edit(key: String, transform: (Video) -> Video) { state.update { s -> s.copy(videos=s.videos.map { if(it.key == key) transform(it) else it }) } }
     fun preferences(p: Preferences) { state.update { it.copy(preferences=p) }; save() }

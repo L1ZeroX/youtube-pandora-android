@@ -106,17 +106,17 @@ class Engine(private val context: Context, private val progress: (String, Float?
             val audio = list.firstOrNull { it.optString("codec_type") == "audio" }
             val duration = metadata.optJSONObject("format")?.optString("duration")?.toDoubleOrNull() ?: video.duration ?: 0.0
             val output = File(work, "output.${preferences.format.lowercase()}")
-            AppLog.info("動画解析","映像=${visual?.optString("codec_name")} / 音声=${audio?.optString("codec_name")} / 時間=$duration 秒")
-            val args = mutableListOf("-y","-i",source.absolutePath)
+            AppLog.info("動画解析","映像=${visual?.optString("codec_name")} / ${visual?.optInt("width")}x${visual?.optInt("height")} / fps=${visual?.optString("avg_frame_rate")} (nominal=${visual?.optString("r_frame_rate")}) / 音声=${audio?.optString("codec_name")} / 時間=$duration 秒")
+            val args = conversionInputArgs(source.absolutePath).toMutableList()
             if(preferences.format == "MP3") {
                 require(audio != null) { "音声がない動画です。" }
                 args += listOf("-vn","-c:a","libmp3lame","-b:a",preferences.audio.removeSuffix("bps"))
             } else {
                 require(visual != null) { "映像がありません。MP3を選択してください。" }
-                val copy = visual.optString("codec_name") == "h264" && visual.optString("pix_fmt") == "yuv420p" && preferences.fps == "元のまま"
-                args += listOf("-map","0:v:0","-map","0:a:0?","-c:v",if(copy) "copy" else "libx264")
-                if(!copy) args += listOf("-preset","ultrafast","-crf","22","-pix_fmt","yuv420p","-threads","2")
-                if(preferences.fps != "元のまま") args += listOf("-r",preferences.fps.removeSuffix("fps"))
+                val copy = canCopyVideo(visual.optString("codec_name"),visual.optString("pix_fmt"),preferences.fps,
+                    visual.optString("avg_frame_rate"),visual.optString("r_frame_rate"))
+                AppLog.info("変換方式",if(copy) "映像を再圧縮せずMP4へ保存" else "CPU変換 / 入力1スレッド・フィルター1・映像出力2 / ${preferences.fps}")
+                args += listOf("-map","0:v:0","-map","0:a:0?") + videoEncodingArgs(copy,preferences.fps)
                 args += if(audio?.optString("codec_name") == "aac") listOf("-c:a","copy") else listOf("-c:a","aac","-b:a","192k")
                 args += listOf("-movflags","+faststart")
             }
@@ -137,12 +137,18 @@ class Engine(private val context: Context, private val progress: (String, Float?
         check()
         val builder = NativeRuntime.command(context,binary,args)
         AppLog.info("ネイティブ処理","$binary 開始 / ライブラリー参照先=python,ffmpeg")
+        ProcessDiagnostics.memory(context,"$binary 開始前")
         val process = builder.start(); native = process
         if(cancelled.get()) process.destroyForcibly()
         val output = StringBuilder()
+        var lastMemory=System.nanoTime()
         try {
             process.inputStream.bufferedReader().useLines { lines -> lines.forEach {
                 check(); line?.invoke(it)
+                if(binary == "libffmpeg.so" && System.nanoTime()-lastMemory > 5_000_000_000L) {
+                    lastMemory=System.nanoTime(); ProcessDiagnostics.memory(context,"変換中")
+                }
+                if(binary == "libffmpeg.so" && (it.contains("Error",ignoreCase=true) || it.contains("failed",ignoreCase=true) || it.startsWith("Stream mapping:"))) AppLog.info("FFmpeg出力",it)
                 if(output.length > 100_000) output.delete(0,50_000)
                 output.appendLine(it)
             } }
