@@ -4,9 +4,11 @@ Windows版と別プロジェクトのAndroid用アプリです。Android 10以�
 
 ## インストール
 
-**[Android版APK v0.1.2をダウンロード](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.1.2/YoutubePandora-Android-v0.1.2.apk)**
+**[Android版APK v0.1.3をダウンロード](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.1.3/YoutubePandora-Android-v0.1.3.apk)**
 
 [リリース一覧・更新情報](https://github.com/L1ZeroX/youtube-pandora-android/releases) / [Windows版](https://github.com/L1ZeroX/media-downloader)
+
+v0.1.3では動画解析・変換に必要なライブラリーの参照先不足を修正しました。旧版で失敗した動画は、更新後に「再試行」または「ダウンロード」を押してください。失敗した場合は動画をタップし「エラーをコピー」で詳細を取得できます。
 
 スマートフォンで上のAPKリンクを開き、ダウンロードしたファイルをタップしてください。Androidから求められた場合、そのAPKを開いたブラウザーまたはファイル管理アプリに「この提供元のアプリを許可」を設定します。更新時はアプリを削除せず、同じ署名のAPKを上書きインストールしてください。
 

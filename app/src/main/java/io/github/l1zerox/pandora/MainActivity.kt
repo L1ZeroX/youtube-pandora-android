@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -36,6 +37,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -166,6 +168,7 @@ fun PandoraScreen() {
                                     Text(video.title,maxLines=2,overflow=TextOverflow.Ellipsis,fontWeight=FontWeight.Medium)
                                     Text("${video.site} · ${durationText(video.duration)}",fontSize=12.sp,color=colors.onSurfaceVariant)
                                     Text(video.status,fontSize=12.sp,color=if(video.status == "失敗") colors.error else colors.primary)
+                                    if(video.status == "失敗") Text(video.error.ifBlank { "タップして詳細を確認" },maxLines=2,overflow=TextOverflow.Ellipsis,fontSize=11.sp,color=colors.error)
                                 }
                                 if(video.thumbnail.isNotBlank()) AsyncImage(video.thumbnail,"サムネイル",Modifier.size(76.dp,48.dp).clip(RoundedCornerShape(10.dp)).clickable { preview=video },contentScale=ContentScale.Crop)
                             }
@@ -192,7 +195,11 @@ fun PandoraScreen() {
             Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)) {
                 if(video.thumbnail.isNotBlank()) AsyncImage(video.thumbnail,"サムネイル",Modifier.fillMaxWidth().height(170.dp).clip(RoundedCornerShape(16.dp)),contentScale=ContentScale.Fit)
                 Text("${video.site} · ${durationText(video.duration)} · ${video.status}")
-                if(video.error.isNotBlank()) Text(video.error,fontSize=12.sp,color=colors.error)
+                if(video.error.isNotBlank()) {
+                    SelectionContainer { Text(video.error,fontSize=12.sp,color=colors.error) }
+                    val clipboard = LocalClipboardManager.current
+                    TextButton(onClick={clipboard.setText(AnnotatedString("Youtube Pandora! Android ${BuildConfig.VERSION_NAME}\n${video.error}"))}) { Text("エラーをコピー") }
+                }
                 if(video.savedUri.isNotEmpty()) Button(onClick={runCatching {
                     val uri = Uri.parse(video.savedUri)
                     context.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri,context.contentResolver.getType(uri) ?: "*/*").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))

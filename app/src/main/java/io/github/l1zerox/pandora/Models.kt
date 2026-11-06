@@ -57,8 +57,8 @@ object Store {
                 val v = array.getJSONObject(index)
                 Video(v.getString("key"), v.getString("url"), v.getString("title"), v.optString("site"),
                     v.optDouble("duration").takeIf { it.isFinite() && it >= 0 }, v.optString("thumbnail"),
-                    v.optBoolean("selected", true), if(v.optString("status") == "完了") "完了" else "待機中",
-                    savedUri=v.optString("savedUri"))
+                    v.optBoolean("selected", true), v.optString("status").takeIf { it in listOf("完了","失敗") } ?: "待機中",
+                    error=v.optString("error"),savedUri=v.optString("savedUri"))
             }
         }.getOrDefault(emptyList())
         state.value = ScreenState(videos=videos, preferences=preferences)
@@ -73,7 +73,7 @@ object Store {
         val videos = JSONArray()
         s.videos.forEach { v -> videos.put(JSONObject().put("key",v.key).put("url",v.url).put("title",v.title)
             .put("site",v.site).put("duration",v.duration).put("thumbnail",v.thumbnail).put("selected",v.selected)
-            .put("status",v.status).put("savedUri",v.savedUri)) }
+            .put("status",v.status).put("error",v.error).put("savedUri",v.savedUri)) }
         context.getSharedPreferences("pandora", Context.MODE_PRIVATE).edit().putString("preferences",config.toString())
             .putString("queue",videos.toString()).apply()
     }

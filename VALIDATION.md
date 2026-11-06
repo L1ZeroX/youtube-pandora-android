@@ -1,5 +1,11 @@
 # 初版の確認状況
 
+## v0.1.3（2026-11-06）
+
+直接起動するffprobe / FFmpegのLD_LIBRARY_PATHにPythonパッケージのusr/libを追加。ARM64・x86_64の同梱ELFの推移的依存関係（ZIP内シンボリックリンクも解決）を確認し、旧参照先ではlibandroid-posix-semaphore.so、libandroid-support.so、libc++_shared.so、libcrypto.so.3、libexpat.so.1の5本が不足すること、修正後はシステム標準ライブラリー以外の不足がなくなることを確認した。
+
+アプリ本体と実行テストで起動環境を共通化。失敗状態・エラー保存とコピー表示を追加。実機からのエラー全文はまだ未取得で、今回の端末症状との一致および実機での修正後の保存成功は未確認。
+
 ## v0.1.2（2026-11-06）
 
 保存先を内部ストレージのDownload/YoutubePandora!/mp4・mp3へ変更。Download配下を許容するMediaStore.DownloadsへMIME付きで挿入し、完了時に公開。画面の保存先表示も共通化。実行テストに指定パスと動画・音楽コレクションからの参照確認を追加。実機での保存・ギャラリー表示は未確認。

@@ -127,9 +127,7 @@ class Engine(private val context: Context, private val progress: (String, Float?
     }
     private fun runNative(binary: String, args: List<String>, line: ((String)->Unit)? = null): String {
         check()
-        val command = listOf(File(context.applicationInfo.nativeLibraryDir,binary).absolutePath) + args
-        val builder = ProcessBuilder(command).redirectErrorStream(true)
-        builder.environment()["LD_LIBRARY_PATH"] = File(context.noBackupFilesDir,"youtubedl-android/packages/ffmpeg/usr/lib").absolutePath
+        val builder = NativeRuntime.command(context,binary,args)
         val process = builder.start(); native = process
         if(cancelled.get()) process.destroyForcibly()
         val output = StringBuilder()
@@ -140,7 +138,7 @@ class Engine(private val context: Context, private val progress: (String, Float?
                 output.appendLine(it)
             } }
             val exit = process.waitFor(); check()
-            check(exit == 0) { "変換に失敗しました: ${output.takeLast(1200)}" }
+            check(exit == 0) { "${if(binary == "libffprobe.so") "動画の解析" else "変換"}に失敗しました: ${output.takeLast(1600)}" }
             return output.toString()
         } finally { if(process.isAlive) process.destroyForcibly(); native = null }
     }

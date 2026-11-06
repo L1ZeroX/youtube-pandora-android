@@ -19,8 +19,7 @@ import java.util.concurrent.Executors
 class RuntimeTest {
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
     private fun native(binary: String, args: List<String>): String {
-        val builder = ProcessBuilder(listOf(File(context.applicationInfo.nativeLibraryDir,binary).absolutePath) + args).redirectErrorStream(true)
-        builder.environment()["LD_LIBRARY_PATH"] = File(context.noBackupFilesDir,"youtubedl-android/packages/ffmpeg/usr/lib").absolutePath
+        val builder = NativeRuntime.command(context,binary,args)
         val process = builder.start()
         val output = process.inputStream.bufferedReader().readText()
         assertEquals(output,0,process.waitFor())
