@@ -4,6 +4,17 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ThumbnailBlurTest {
+    @Test fun strongPanelBlurSoftensEdgesMoreThanTheNormalGlassBlur() {
+        val width=96; val height=24
+        val source=IntArray(width*height) { if(it%width < width/2) 0xFF000000.toInt() else 0xFFFFFFFF.toInt() }
+        val normal=source.clone(); val strong=source.clone()
+        blurThumbnailPixels(normal,width,height)
+        blurThumbnailPixels(strong,width,height,passes=6)
+        val beforeEdge=width*12+width/2-8
+        assertTrue((strong[beforeEdge] and 255) > (normal[beforeEdge] and 255))
+        assertTrue(strong.all { it ushr 24 == 255 })
+        assertEquals(0xFF000000.toInt(),source[beforeEdge])
+    }
     @Test fun tinyAndUniformImagesKeepTheirColorAndAlpha() {
         for(size in listOf(1 to 1,1 to 7,7 to 1,15 to 9)) {
             val pixels=IntArray(size.first*size.second) { 0xA0356C91.toInt() }

@@ -6,6 +6,7 @@ import android.graphics.Canvas
 import android.graphics.ColorFilter
 import android.graphics.Matrix
 import android.graphics.Paint
+import android.graphics.Outline
 import android.graphics.PixelFormat
 import android.graphics.Rect
 import android.graphics.RectF
@@ -32,13 +33,18 @@ internal fun artworkGlassAccent(source: Color?): Color {
 }
 
 /** A blurred artwork backplate with a translucent tint, usable by Compose and Media3 Views. */
-internal class ArtworkGlassDrawable(bitmap: Bitmap?, tint: Color, private val density: Float): Drawable() {
+internal class ArtworkGlassDrawable(bitmap: Bitmap?, tint: Color, private val density: Float,
+    private val strongFrost: Boolean = false): Drawable() {
     private val area=RectF()
     private val image=bitmap?.let { BitmapShader(it,Shader.TileMode.CLAMP,Shader.TileMode.CLAMP) }
     private val size=bitmap?.let { it.width to it.height }
-    private val imagePaint=Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply { shader=image; alpha=170 }
+    private val imagePaint=Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply { shader=image; alpha=if(strongFrost) 200 else 170 }
     private val tintPaint=Paint(Paint.ANTI_ALIAS_FLAG).apply { color=tint.toArgb() }
-    private val rim=Paint(Paint.ANTI_ALIAS_FLAG).apply { color=0x30FFFFFF; style=Paint.Style.STROKE; strokeWidth=density }
+    private val rim=Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color=if(strongFrost) 0x50FFFFFF else 0x30FFFFFF
+        style=Paint.Style.STROKE; strokeWidth=if(strongFrost) 1.3f*density else density
+    }
+    private val radius get() = (if(strongFrost) 22f else 16f)*density
     override fun onBoundsChange(bounds: Rect) {
         area.set(bounds)
         size?.let { (width,height) ->
@@ -48,11 +54,11 @@ internal class ArtworkGlassDrawable(bitmap: Bitmap?, tint: Color, private val de
         }
     }
     override fun draw(canvas: Canvas) {
-        val radius=16*density
         if(image != null) canvas.drawRoundRect(area,radius,radius,imagePaint)
         canvas.drawRoundRect(area,radius,radius,tintPaint)
         canvas.drawRoundRect(area,radius,radius,rim)
     }
+    override fun getOutline(outline: Outline) { outline.setRoundRect(bounds,radius) }
     override fun setAlpha(alpha: Int) { /* The translucent layers have fixed contrast-safe alpha. */ }
     override fun setColorFilter(colorFilter: ColorFilter?) { }
     @Deprecated("Deprecated in Android") override fun getOpacity(): Int = PixelFormat.TRANSLUCENT

@@ -81,24 +81,25 @@ private fun GlassLabel(text: String, modifier: Modifier) {
 }
 
 /** Small software blur works on Android 10/11 too, without reloading the thumbnail. */
-internal fun blurThumbnail(source: Bitmap): Bitmap {
-    val scale=minOf(1f,320f/max(source.width,source.height))
+internal fun blurThumbnail(source: Bitmap, maxEdge: Int = 320, passes: Int = 2): Bitmap {
+    require(maxEdge > 0 && passes > 0)
+    val scale=minOf(1f,maxEdge.toFloat()/max(source.width,source.height))
     val width=(source.width*scale).roundToInt().coerceAtLeast(1)
     val height=(source.height*scale).roundToInt().coerceAtLeast(1)
     val small=Bitmap.createScaledBitmap(source,width,height,true)
     val pixels=IntArray(width*height)
     small.getPixels(pixels,0,width,0,0,width,height)
     if(small !== source) small.recycle()
-    blurThumbnailPixels(pixels,width,height)
+    blurThumbnailPixels(pixels,width,height,passes)
     return Bitmap.createBitmap(pixels,width,height,Bitmap.Config.ARGB_8888)
 }
 
-internal fun blurThumbnailPixels(pixels: IntArray,width: Int,height: Int) {
-    require(width > 0 && height > 0 && pixels.size == width*height)
+internal fun blurThumbnailPixels(pixels: IntArray,width: Int,height: Int, passes: Int = 2) {
+    require(width > 0 && height > 0 && pixels.size == width*height && passes > 0)
     val scratch=IntArray(pixels.size)
     val radius=3
     // Separable box blur; fixed work per pixel and no per-pixel allocation.
-    repeat(2) {
+    repeat(passes) {
         for(horizontal in listOf(true,false)) {
             val input=if(horizontal) pixels else scratch
             val output=if(horizontal) scratch else pixels

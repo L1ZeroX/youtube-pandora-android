@@ -14,7 +14,6 @@ import android.graphics.Paint
 import android.graphics.PixelFormat
 import android.graphics.RectF
 import android.graphics.Shader
-import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.IBinder
 import android.provider.Settings
@@ -80,7 +79,8 @@ class BubbleService : Service() {
     private var start: Button? = null
     private var cancel: Button? = null
     private var clipboardStatus: TextView? = null
-    private var panelBackground: GradientDrawable? = null
+    private var panelArtwork: Bitmap? = null
+    private var panelColor: androidx.compose.ui.graphics.Color? = null
     private val panelButtons=mutableListOf<Button>()
     private var palette=bubblePalette()
     private var artwork: Bitmap? = null
@@ -139,6 +139,7 @@ class BubbleService : Service() {
         val url=video?.let { it.thumbnail.ifBlank { youtubeThumbnail(it.url) } }.orEmpty()
         if(url == artworkUrl) return
         artworkUrl=url; artworkJob?.cancel(); palette=bubblePalette(); artwork=null
+        panelArtwork=null; panelColor=null; refreshPanelBackground()
         if(url.isBlank()) return
         artworkJob=scope.launch {
             var bitmap: Bitmap? = null
@@ -151,9 +152,13 @@ class BubbleService : Service() {
                 if(bitmap != null) break
                 if(attempt < 2) delay(1500L*(attempt+1))
             }
+            val glass=withContext(Dispatchers.Default) {
+                bitmap?.let { blurThumbnail(it,maxEdge=96,passes=6) to libraryThumbnailColor(it) }
+            }
             // A slow response from a previous queue item must not recolor the current one.
             if(artworkUrl == url) {
                 artwork=bitmap
+                panelArtwork=glass?.first; panelColor=glass?.second; refreshPanelBackground()
                 palette=bitmap?.let { bubblePalette(accentColor(it,true)) } ?: bubblePalette()
                 bubble?.update(lastState,palette,artwork); updatePanel()
             }
@@ -205,7 +210,6 @@ class BubbleService : Service() {
         val (width,height)=bounds()
         val container=LinearLayout(this).apply {
             orientation=LinearLayout.VERTICAL; setPadding(dp(16),dp(12),dp(16),dp(12))
-            background=GradientDrawable().apply { setColor(palette.surface.toArgb()); cornerRadius=dp(22).toFloat(); panelBackground=this }
         }
         val header=LinearLayout(this)
         header.addView(text(18f).apply { text="DL管理パネル" },LinearLayout.LayoutParams(0,-2,1f))
@@ -276,6 +280,7 @@ class BubbleService : Service() {
             }
         }.apply {
             addView(container); isFillViewport=true; isFocusableInTouchMode=true
+            background=panelGlassBackground(); clipToOutline=true
             setOnTouchListener { _,event ->
                 if(event.actionMasked == MotionEvent.ACTION_OUTSIDE) { hidePanel(); true } else false
             }
@@ -293,7 +298,6 @@ class BubbleService : Service() {
         val s=lastState
         updateQueue(s)
         title?.text=bubbleVideo(s)?.title ?: "待機キュー ${s.videos.count { it.selected && it.status != "完了" }} 件"
-        panelBackground?.setColor(palette.surface.toArgb())
         val accent=palette.accent.toArgb()
         val buttonTints=ColorStateList(arrayOf(intArrayOf(android.R.attr.state_enabled),intArrayOf()),intArrayOf(accent,palette.track.toArgb()))
         (panelButtons+queueDeletes).forEach { it.backgroundTintList=buttonTints; it.setTextColor(ColorStateList(arrayOf(intArrayOf(android.R.attr.state_enabled),intArrayOf()),intArrayOf(Color.WHITE,0xFFBBBBBB.toInt()))) }
@@ -306,8 +310,9 @@ class BubbleService : Service() {
         artworkSettings?.isEnabled=!s.busy
         formatHint?.text=if(s.busy) "DL中・一時停止中は形式変更とキュー削除をロックします。変更する場合はキャンセルしてください。"
             else "選んだ形式で待機キューを保存します。削除は一覧のみで、保存済みファイルは残ります。"
-        progress?.progressTintList=ColorStateList.valueOf(palette.ring.toArgb())
-        progress?.indeterminateTintList=ColorStateList.valueOf(palette.ring.toArgb())
+        val progressColor=artworkGlassAccent(panelColor).toArgb()
+        progress?.progressTintList=ColorStateList.valueOf(progressColor)
+        progress?.indeterminateTintList=ColorStateList.valueOf(progressColor)
         progress?.progressBackgroundTintList=ColorStateList.valueOf(palette.track.toArgb())
         phase?.text=(if(s.paused) "一時停止中" else s.message)+"\n処理済み ${s.done} / ${s.total} 件"
         val fraction=s.progress?.takeIf { it.isFinite() }?.coerceIn(0f,1f)
@@ -355,10 +360,13 @@ class BubbleService : Service() {
         clipboard.close()
         panel?.let { runCatching { windows.removeView(it) } }; panel=null; panelParams=null
         title=null; phase=null; progress=null; metrics=null; queue=null; pause=null; cancel=null; start=null
-        clipboardStatus=null; panelBackground=null; panelButtons.clear()
+        clipboardStatus=null; panelButtons.clear()
         queueRows=null; queueSnapshot=null; renderedPage=-1; queuePage=0; queueDeletes.clear()
         previousPage=null; nextPage=null; mp4=null; mp3=null; formatHint=null; artworkSettings=null
     }
+    private fun panelGlassBackground()=ArtworkGlassDrawable(panelArtwork,artworkGlassTint(panelColor),
+        resources.displayMetrics.density,strongFrost=true)
+    private fun refreshPanelBackground() { panel?.background=panelGlassBackground() }
     private fun hide() { hidePanel(); bubble?.let { runCatching { windows.removeView(it) } }; bubble=null; bubbleParams=null }
     private fun failed(error: Throwable) {
         BubbleRuntime.error.value="バブルを表示できませんでした。「他のアプリの上に表示」の許可を確認してください。"

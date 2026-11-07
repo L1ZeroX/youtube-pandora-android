@@ -2,6 +2,7 @@ package io.github.l1zerox.pandora
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Outline
 import android.view.View
 import android.widget.TextView
 import androidx.compose.ui.graphics.Color
@@ -18,12 +19,13 @@ class ArtworkGlassRenderTest {
         val source=Bitmap.createBitmap(48,48,Bitmap.Config.ARGB_8888).apply { eraseColor(android.graphics.Color.WHITE) }
         val blurred=blurThumbnail(source)
         try {
-            for(width in listOf(64,320)) {
-                val target=Bitmap.createBitmap(width,48,Bitmap.Config.ARGB_8888).apply { eraseColor(android.graphics.Color.WHITE) }
+            for((width,height) in listOf(64 to 48,320 to 48,340 to 500)) for(strong in listOf(false,true)) {
+                val target=Bitmap.createBitmap(width,height,Bitmap.Config.ARGB_8888).apply { eraseColor(android.graphics.Color.WHITE) }
                 try {
-                    val glass=ArtworkGlassDrawable(blurred,artworkGlassTint(Color.White),1f)
-                    glass.setBounds(0,0,width,48); glass.draw(Canvas(target))
-                    assertTrue(libraryContrast(Color.White,Color(target.getPixel(width/2,24))) >= 4.5f)
+                    val glass=ArtworkGlassDrawable(blurred,artworkGlassTint(Color.White),1f,strongFrost=strong)
+                    glass.setBounds(0,0,width,height); glass.draw(Canvas(target))
+                    assertTrue(libraryContrast(Color.White,Color(target.getPixel(width/2,height/2))) >= 4.5f)
+                    val outline=Outline(); glass.getOutline(outline); assertFalse(outline.isEmpty)
                     assertEquals(android.graphics.Color.WHITE,source.getPixel(24,24))
                 } finally { target.recycle() }
             }
