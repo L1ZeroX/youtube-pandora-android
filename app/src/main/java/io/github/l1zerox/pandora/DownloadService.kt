@@ -48,7 +48,7 @@ class DownloadService : Service() {
                 engine?.pause()
             }
             "RESUME" -> if(state.paused && job == null && batch != null) launchOperation("DOWNLOAD",resuming=true)
-            "FETCH", "DOWNLOAD", "UPDATE" -> if(job == null && !state.busy) {
+            "FETCH", "REFRESH", "DOWNLOAD", "UPDATE" -> if(job == null && !state.busy) {
                 batch=if(action == "DOWNLOAD") DownloadBatch(state.preferences,state.videos,intent.getBooleanExtra("retry",false)) else null
                 launchOperation(action,intent.getStringExtra("urls").orEmpty())
             }
@@ -76,14 +76,14 @@ class DownloadService : Service() {
                 processor.init()
                 when(operation) {
                     "UPDATE" -> { processor.update(); message="yt-dlpを更新しました。" }
-                    "FETCH" -> {
+                    "FETCH", "REFRESH" -> {
                         val urls=validUrls(input); require(urls.isNotEmpty()) { "URLを入力してください。" }
                         var failures=0
                         for(url in urls) {
                             processor.check()
                             try {
-                                val found=processor.discover(url,Store.state.value.preferences.playlists)
-                                Store.state.update { s -> s.copy(videos=(s.videos+found).distinctBy { mediaIdentity(it.url) }) }
+                                val found=processor.discover(url,operation != "REFRESH" && Store.state.value.preferences.playlists)
+                                Store.state.update { s -> s.copy(videos=mergeDiscoveredVideos(s.videos,found)) }
                                 Store.save()
                             } catch(e: Exception) { processor.check(); AppLog.error("情報取得",e); failures++; message=e.message.orEmpty() }
                         }
@@ -123,7 +123,7 @@ class DownloadService : Service() {
             try {
                 if(!video.resolved) {
                     val resolved=processor.discover(video.url,false).firstOrNull() ?: error("動画情報を取得できませんでした。")
-                    video=resolved.copy(key=video.key,selected=video.selected)
+                    video=video.withMetadata(resolved)
                     val updated=video
                     Store.edit(video.key) { updated.copy(status="ダウンロード中") }; Store.save()
                 }

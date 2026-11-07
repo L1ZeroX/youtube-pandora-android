@@ -31,7 +31,6 @@ import coil.size.Scale
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.update
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -84,9 +83,6 @@ class BubbleService : Service() {
     private var artwork: Bitmap? = null
     private var artworkUrl=""
     private var artworkJob: Job? = null
-    private val previews=SharedPreviewLoader(scope,::fetchSharedPreview,{ video,preview ->
-        Store.state.update { it.withSharedPreview(video,preview) }; Store.save()
-    },{ AppLog.error("共有プレビュー",it) })
     private val clipboard by lazy {
         BubbleClipboard(this,{
             Store.state.value.preferences.let { it.bubble && it.bubbleClipboard } &&
@@ -114,7 +110,6 @@ class BubbleService : Service() {
         scope.launch {
             combine(Store.state,BubbleRuntime.foreground) { state,_ -> state }.collect { state ->
                 lastState=state
-                previews.update(state.videos)
                 render()
             }
         }

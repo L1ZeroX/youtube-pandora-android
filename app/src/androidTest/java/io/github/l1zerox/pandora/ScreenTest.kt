@@ -14,6 +14,18 @@ import java.io.File
 
 class ScreenTest {
     @get:Rule val screen = createAndroidComposeRule<MainActivity>()
+    @Test fun durationUpdatesInsideAnAlreadyOpenVideoPreview() {
+        val original=Store.state.value
+        val video=Video("duration-test","https://example.com/duration","Duration test","Example")
+        try {
+            screen.runOnIdle { AppUpdates.dismiss(); Store.state.value=ScreenState(videos=listOf(video)) }
+            screen.onNodeWithText("Duration test").performClick()
+            screen.onNodeWithText("動画情報を再取得").assertIsDisplayed()
+            screen.runOnIdle { Store.edit(video.key) { it.copy(duration=153.0) } }
+            screen.onNodeWithText("Example · 2:33 · 待機中").assertIsDisplayed()
+            screen.onNodeWithText("動画情報を再取得").assertDoesNotExist()
+        } finally { screen.runOnIdle { Store.state.value=original; Store.save() } }
+    }
     @Test fun mp3ArtworkChoicePersistsAndLocksDuringDownload() {
         val original=Store.state.value
         try {

@@ -5,6 +5,31 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SharedPreviewTest {
+    @Test fun existingTitleDoesNotPreventFetchingMissingDuration() = runBlocking {
+        val item=video.copy(title="Already loaded",resolved=true)
+        var result=ScreenState(videos=listOf(item))
+        val loader=SharedPreviewLoader(this,{ error("Title lookup is unnecessary") },
+            { source,p -> result=result.withSharedPreview(source,p) },fetchDuration={153.0})
+        loader.update(result.videos); yield()
+        assertEquals(153.0,result.videos.single().duration!!,0.0)
+        assertEquals("Already loaded",result.videos.single().title)
+    }
+    @Test fun durationLookupDoesNotDelayTitleAndThumbnail() = runBlocking {
+        val release=CompletableDeferred<Unit>()
+        var result=ScreenState(videos=listOf(video))
+        val loader=SharedPreviewLoader(this,{preview},
+            { source,p -> result=result.withSharedPreview(source,p) },fetchDuration={release.await(); 153.0})
+        loader.update(result.videos); yield()
+        assertEquals(preview.title,result.videos.single().title)
+        assertNull(result.videos.single().duration)
+        loader.update(result.videos)
+        release.complete(Unit); yield()
+        assertEquals(153.0,result.videos.single().duration!!,0.0)
+    }
+    @Test fun latePreviewDoesNotOverwriteTheDurationFoundByTheDownloader() {
+        val state=ScreenState(videos=listOf(video.copy(duration=153.25,resolved=true)))
+        assertEquals(state,state.withSharedPreview(video,preview.copy(duration=153.0)))
+    }
     private val video=appendSharedVideos(emptyList(),"https://youtu.be/AbCd_12-345").single()
     private val preview=SharedPreview("Shared video title","https://i.ytimg.com/vi/AbCd_12-345/hqdefault.jpg")
 

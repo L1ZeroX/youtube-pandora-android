@@ -93,7 +93,8 @@ class Engine(private val context: Context, private val progress: (String, Float?
         val thumbnails = json.optJSONArray("thumbnails")
         val thumb = json.optString("thumbnail").ifBlank { thumbnails?.optJSONObject((thumbnails.length()-1).coerceAtLeast(0))?.optString("url") ?: "" }
         return Video("${site.lowercase()}:${videoId.ifBlank { url }}",url,json.optString("title","タイトル不明"),site,
-            json.optDouble("duration").takeIf { it.isFinite() && it >= 0 },thumb)
+            parsedDuration(json.optString("duration")) ?: parsedDuration(json.optString("duration_string")),thumb,
+            resolved=json.optString("_type") !in listOf("url","url_transparent"))
     }
     fun download(video: Video, preferences: Preferences, workspace: File? = null): String {
         val work = (workspace ?: File(context.cacheDir, "download-${UUID.randomUUID()}")).apply { mkdirs() }
@@ -116,7 +117,13 @@ class Engine(private val context: Context, private val progress: (String, Float?
             val list = (0 until streams.length()).map { streams.getJSONObject(it) }
             val visual = list.firstOrNull { it.optString("codec_type") == "video" && it.optJSONObject("disposition")?.optInt("attached_pic") != 1 }
             val audio = list.firstOrNull { it.optString("codec_type") == "audio" }
-            val duration = metadata.optJSONObject("format")?.optString("duration")?.toDoubleOrNull() ?: video.duration ?: 0.0
+            val duration = parsedDuration(metadata.optJSONObject("format")?.optString("duration"))
+                ?: parsedDuration(audio?.optString("duration")) ?: parsedDuration(visual?.optString("duration"))
+                ?: positiveDuration(video.duration) ?: 0.0
+            if(duration > 0) {
+                Store.edit(video.key) { if(mediaIdentity(it.url) == mediaIdentity(video.url)) it.copy(duration=duration) else it }
+                Store.save()
+            }
             val output = File(work, "output.${preferences.format.lowercase()}")
             AppLog.info("動画解析","映像=${visual?.optString("codec_name")} / ${visual?.optInt("width")}x${visual?.optInt("height")} / fps=${visual?.optString("avg_frame_rate")} (nominal=${visual?.optString("r_frame_rate")}) / 音声=${audio?.optString("codec_name")} / 時間=$duration 秒")
             val args = conversionInputArgs(source.absolutePath).toMutableList()

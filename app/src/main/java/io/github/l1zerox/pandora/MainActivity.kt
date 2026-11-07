@@ -240,12 +240,18 @@ fun PandoraScreen(artworkRequested: Boolean = false, onArtworkClosed: ()->Unit =
         if(logs) LogDialog { logs=false }
         if(!s.busy && !settings && !logs && !artworkRequested && preview == null && error.isEmpty() && pending == null &&
             (updateState.release != null || updateState.message.isNotEmpty())) UpdateDialog(updateState) { AppUpdates.dismiss() }
-        preview?.let { video ->
+        preview?.let { selected ->
+            val video=s.videos.firstOrNull { it.key == selected.key } ?: selected
             var thumbnailTone by remember(video.thumbnail) { mutableStateOf<Color?>(null) }
             AlertDialog(onDismissRequest={preview=null},title={TintBadge(video.title,color=thumbnailTone,maxLines=3)},text={
             Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)) {
                 if(video.thumbnail.isNotBlank()) TintedThumbnail(video.thumbnail,Modifier.fillMaxWidth().height(170.dp).clip(RoundedCornerShape(16.dp)),ContentScale.Fit) { thumbnailTone=it }
                 Text("${video.site} · ${durationText(video.duration)} · ${video.status}")
+                if(positiveDuration(video.duration) == null) TextButton(enabled=!s.busy,onClick={
+                    runCatching { ContextCompat.startForegroundService(context,Intent(context,DownloadService::class.java)
+                        .setAction("REFRESH").putExtra("urls",video.url)) }
+                        .onSuccess { preview=null }.onFailure { error="動画情報を更新できませんでした: ${it.message}" }
+                }) { Text("動画情報を再取得") }
                 if(video.error.isNotBlank()) {
                     SelectionContainer { Text(video.error,fontSize=12.sp,color=colors.error) }
                     val clipboard = LocalClipboardManager.current

@@ -26,6 +26,7 @@ class RuntimeTest {
         return output
     }
     @Test fun downloadsAndConvertsSyntheticMedia() {
+        val originalState=Store.state.value
         YoutubeDL.init(context); FFmpeg.init(context)
         val fixture = File(context.cacheDir,"fixture.mp4")
         native("libffmpeg.so",listOf("-y","-f","lavfi","-i","color=c=blue:s=320x180:r=30","-f","lavfi","-i","sine=frequency=440:sample_rate=44100","-t","2","-c:v","libx264","-pix_fmt","yuv420p","-c:a","aac","-movflags","+faststart",fixture.absolutePath))
@@ -53,7 +54,12 @@ class RuntimeTest {
             val video = engine.discover(url,false).single()
             assertTrue(video.title.isNotBlank())
             for(p in listOf(Preferences(),Preferences(fps="24fps"),Preferences(format="MP3"))) {
-                val uri = Uri.parse(engine.download(video,p)); saved += uri
+                val missingDuration=video.copy(duration=null)
+                Store.state.value=ScreenState(videos=listOf(missingDuration))
+                val uri = Uri.parse(engine.download(missingDuration,p)); saved += uri
+                assertTrue("Probed duration must be saved back to the queue",Store.state.value.videos.single().duration!! in 1.8..2.4)
+                Store.init(context)
+                assertTrue("Probed duration must survive reloading the queue",Store.state.value.videos.single().duration!! in 1.8..2.4)
                 // Check the media is published to the collection used by gallery/music apps.
                 assertEquals("downloads",uri.pathSegments[1])
                 context.contentResolver.query(uri,arrayOf(MediaStore.MediaColumns.RELATIVE_PATH,
@@ -86,6 +92,7 @@ class RuntimeTest {
                 copy.delete()
             }
         } finally {
+            Store.state.value=originalState; Store.save()
             saved.forEach { context.contentResolver.delete(it,null,null) }
             server.close(); executor.shutdownNow(); fixture.delete()
         }
