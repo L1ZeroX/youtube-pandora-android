@@ -51,9 +51,12 @@ internal fun libraryPalette(source: Color?, dark: Boolean): LibraryPalette {
 }
 
 /** Keep the existing RGB palette; only increase opacity when wallpaper would obscure text. */
-internal fun libraryGlassTint(palette: LibraryPalette, backgrounds: List<Color> = listOf(Color.Black,Color.White)): Color {
-    for(step in 0..18) {
-        val tint=palette.surface.copy(alpha=(.55f+step*.025f).coerceAtMost(1f))
+internal fun libraryPanelTransparency(value: Float): Float = if(value.isFinite()) value.coerceIn(0f,.85f) else .45f
+
+internal fun libraryGlassTint(palette: LibraryPalette, backgrounds: List<Color> = listOf(Color.Black,Color.White), transparency: Float = .45f): Color {
+    val alpha=1-libraryPanelTransparency(transparency)
+    for(step in 0..34) {
+        val tint=palette.surface.copy(alpha=(alpha+step*.025f).coerceAtMost(1f))
         if(backgrounds.all { backdrop ->
             val background=tint.compositeOver(backdrop)
             libraryContrast(palette.content,background) >= 4.5f && libraryContrast(palette.detail,background) >= 4.5f

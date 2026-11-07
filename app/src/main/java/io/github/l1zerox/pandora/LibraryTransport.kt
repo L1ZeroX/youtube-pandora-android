@@ -18,7 +18,7 @@ internal fun LibrarySeekBar(uri: String, playback: LibraryPlayback, palette: Lib
     val duration=playback.duration
     val fraction=drag ?: if(duration > 0) playback.position.toFloat()/duration else 0f
     val accent=remember(source,palette,backdrop) {
-        val tint=libraryGlassTint(palette,backdrop.contrastColors)
+        val tint=libraryGlassTint(palette,backdrop.contrastColors,backdrop.transparency)
         (0..20).asSequence().map { lerp(source ?: palette.content,palette.content,it/20f) }
             .first { color -> backdrop.contrastColors.all { libraryContrast(color,tint.compositeOver(it)) >= 3f } }
     }

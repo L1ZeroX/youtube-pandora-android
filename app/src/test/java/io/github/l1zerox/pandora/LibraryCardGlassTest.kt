@@ -10,6 +10,31 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class LibraryCardGlassTest {
+    @Test fun transparencyControlChangesOpacityWhileProtectingTextContrast() {
+        for(dark in listOf(false,true)) for(source in listOf(Color.Black,Color.White,Color.Red,Color.Blue)) {
+            val palette=libraryPalette(source,dark)
+            val backgrounds=listOf(Color.Black,Color.White)
+            assertEquals(1f,libraryGlassTint(palette,backgrounds,0f).alpha,0f)
+            for(value in listOf(.25f,.45f,.85f)) {
+                val tint=libraryGlassTint(palette,backgrounds,value)
+                // sRGB Color stores alpha in 8 bits, so allow one quantization step.
+                assertTrue(tint.alpha >= 1-value-1f/255f)
+                assertEquals(palette.surface.red,tint.red,0f)
+                for(background in backgrounds) {
+                    assertTrue(libraryContrast(palette.content,tint.compositeOver(background)) >= 4.5f)
+                    assertTrue(libraryContrast(palette.detail,tint.compositeOver(background)) >= 4.5f)
+                }
+            }
+        }
+        val palette=libraryPalette(Color.Blue,true)
+        assertTrue(libraryGlassTint(palette,listOf(Color.Black),.6f).alpha < libraryGlassTint(palette,listOf(Color.Black),.2f).alpha)
+    }
+    @Test fun invalidSettingsAreBoundedAndOldInstallsKeepTheirAppearance() {
+        assertEquals(.45f,Preferences().libraryGlass,0f); assertEquals(10,Preferences().libraryBlur)
+        assertEquals(.45f,libraryPanelTransparency(Float.NaN),0f)
+        assertEquals(0f,libraryPanelTransparency(-1f),0f)
+        assertEquals(.85f,libraryPanelTransparency(2f),0f)
+    }
     @Test fun actualDarkWallpaperAllowsMoreTransparencyWhileKeepingTextReadable() {
         val backgrounds=listOf(Color(0xFF152030),Color(0xFF354050))
         for(source in listOf(Color.Black,Color.Red,Color.Blue)) {

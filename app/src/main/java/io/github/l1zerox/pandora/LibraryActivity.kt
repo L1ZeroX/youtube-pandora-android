@@ -73,13 +73,14 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
     val dark=preferences.dark
     val wallpaper by rememberWallpaper(preferences.wallpaper)
     var wallpaperBounds by remember { mutableStateOf(Rect.Zero) }
-    val frostedWallpaper by produceState<Bitmap?>(null,wallpaper) {
-        value=null
+    val frostedWallpaper by produceState<Bitmap?>(null,wallpaper,preferences.libraryBlur) {
         val image=wallpaper
-        if(image != null) value=withContext(Dispatchers.Default) { blurThumbnail(image,maxEdge=80,passes=10) }
+        val strength=preferences.libraryBlur.coerceIn(0,20)
+        value=if(image == null || strength == 0) image
+            else withContext(Dispatchers.Default) { blurThumbnail(image,maxEdge=80,passes=strength) }
     }
-    val backdrop=remember(frostedWallpaper,wallpaperBounds,preferences.opacity,dark) {
-        LibraryBackdrop(frostedWallpaper,wallpaperBounds,preferences.opacity,appBackgroundColor(dark))
+    val backdrop=remember(frostedWallpaper,wallpaperBounds,preferences.opacity,dark,preferences.libraryGlass) {
+        LibraryBackdrop(frostedWallpaper,wallpaperBounds,preferences.opacity,appBackgroundColor(dark),preferences.libraryGlass)
     }
     val context=LocalContext.current
     val scope=rememberCoroutineScope()
@@ -90,6 +91,7 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
     var error by remember { mutableStateOf("") }
     var filter by rememberSaveable { mutableStateOf("すべて") }
     var search by rememberSaveable { mutableStateOf("") }
+    var appearance by rememberSaveable { mutableStateOf(false) }
     val playback by PlaybackRuntime.state.collectAsStateWithLifecycle()
     val transport=rememberLibraryPlayback()
     fun openPlayer(uri: String? = null) {
@@ -159,8 +161,10 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
                 }
             }
             OutlinedTextField(search,{search=it},Modifier.fillMaxWidth(),singleLine=true,label={Text("タイトルで検索")})
-            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp),verticalAlignment=Alignment.CenterVertically) {
                 listOf("すべて","動画","音楽").forEach { option -> FilterChip(selected=filter == option,onClick={filter=option},label={Text(option)}) }
+                Spacer(Modifier.weight(1f))
+                TextButton(onClick={appearance=!appearance}) { Text(if(appearance) "調整終了" else "表示調整",fontSize=12.sp) }
             }
             if(playback.uri.isNotBlank()) Surface(color=Color.Transparent,contentColor=playingPalette.content,
                 shape=RoundedCornerShape(16.dp),modifier=Modifier.fillMaxWidth().libraryCardGlass(playingPalette,backdrop)) {
@@ -180,6 +184,15 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
             }
             }
             LazyColumn(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(10.dp),contentPadding=PaddingValues(vertical=8.dp)) {
+                if(appearance) item(key="library-appearance") {
+                    Surface(shape=RoundedCornerShape(16.dp),color=if(hasWallpaper) headerTint else colors.surface,
+                        contentColor=if(hasWallpaper) Color.White else colors.onSurface) {
+                        Column(Modifier.padding(12.dp)) {
+                            Text("動画・音楽パネル",fontWeight=FontWeight.Bold)
+                            LibraryAppearanceControls(preferences,Store::preferences)
+                        }
+                    }
+                }
                 items(visible,key={it.uri}) { item ->
                     LibraryCard(item,dark,backdrop,transport) {
                         openPlayer(item.uri)

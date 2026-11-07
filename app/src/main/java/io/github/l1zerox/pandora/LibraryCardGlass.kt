@@ -21,9 +21,12 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
-internal data class LibraryBackdrop(val bitmap: Bitmap?, val bounds: Rect, val opacity: Float, val base: Color) {
+internal data class LibraryBackdrop(val bitmap: Bitmap?, val bounds: Rect, val opacity: Float, val base: Color,
+    val transparency: Float = .45f) {
     // Check the actual blurred wallpaper extremes, including the sheen, instead of assuming a white wall.
     val contrastColors: List<Color> by lazy {
+        // An unblurred full-size image may contain sharp bright/dark edges. Use conservative bounds.
+        if(bitmap != null && maxOf(bitmap.width,bitmap.height) > 512) return@lazy listOf(Color.Black,Color.White)
         val colors=mutableListOf(base)
         bitmap?.let { image ->
             val pixels=IntArray(image.width*image.height)
@@ -50,7 +53,7 @@ internal fun libraryBackdropPlacement(image: IntSize, viewport: Rect, cardPositi
 internal fun Modifier.libraryCardGlass(palette: LibraryPalette, backdrop: LibraryBackdrop): Modifier {
     var position by remember { mutableStateOf(Offset.Zero) }
     val image=remember(backdrop.bitmap) { backdrop.bitmap?.asImageBitmap() }
-    val tint=remember(palette,backdrop) { libraryGlassTint(palette,backdrop.contrastColors) }
+    val tint=remember(palette,backdrop) { libraryGlassTint(palette,backdrop.contrastColors,backdrop.transparency) }
     return clip(RoundedCornerShape(16.dp)).onGloballyPositioned { position=it.positionInWindow() }.drawWithCache {
         val placement=image?.takeIf { backdrop.bounds.width > 0 && backdrop.bounds.height > 0 }?.let {
             libraryBackdropPlacement(IntSize(it.width,it.height),backdrop.bounds,position)

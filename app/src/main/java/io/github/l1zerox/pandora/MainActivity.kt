@@ -174,7 +174,7 @@ fun PandoraScreen(artworkRequested: Boolean = false, onArtworkClosed: ()->Unit =
                             Spacer(Modifier.height(12.dp))
                             Text("ダウンロード",fontSize=32.sp,fontWeight=FontWeight.Bold)
                             Text("お気に入りを、いつでも。",fontSize=13.sp,color=colors.onSurfaceVariant)
-                            OutlinedButton(onClick={context.startActivity(Intent(context,LibraryActivity::class.java))},
+                            Button(onClick={context.startActivity(Intent(context,LibraryActivity::class.java))},
                                 modifier=Modifier.fillMaxWidth().padding(top=12.dp)) { Text("ライブラリー · 動画と音楽を再生") }
                         }
                     }
@@ -290,6 +290,8 @@ fun PandoraScreen(artworkRequested: Boolean = false, onArtworkClosed: ()->Unit =
                     Text("背景",fontWeight=FontWeight.Bold)
                     Button(onClick={backgroundSettings=true}) { Text("背景をプレビュー・調整") }
                     Text("画像・透明度・ぼかしを調整します。",fontSize=12.sp)
+                    Text("ライブラリーのパネル",fontWeight=FontWeight.Bold)
+                    LibraryAppearanceControls(p,Store::preferences)
                     BubbleSettings(p)
                     OutlinedButton(onClick={settings=false; start("UPDATE")},enabled=!s.busy) { Text("yt-dlpを更新") }
                     OutlinedButton(onClick={settings=false;logs=true}) { Text("処理ログを見る") }
