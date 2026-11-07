@@ -44,6 +44,12 @@ internal fun BubbleSettings(p: Preferences) {
         })
     }
     Text("他のアプリを開いている間も進捗を表示します。タップで管理パネル、ドラッグで移動できます。",fontSize=12.sp)
+    Row(verticalAlignment=Alignment.CenterVertically) {
+        Text("パネルを開くとコピーしたYouTube URLを追加",Modifier.weight(1f))
+        Switch(p.bubbleClipboard,{ Store.preferences(Store.state.value.preferences.copy(bubbleClipboard=it)) })
+    }
+    Text("URLをコピーしてバブルをタップすると自動追加します。Androidの制限により、他のアプリを操作中の常時監視はできません。同じ動画は重複追加しません。",fontSize=12.sp)
+    Text("バブル・ゲージ・パネルの色は動画のサムネイルに合わせます。DL中は処理中の動画、待機中は最後に追加した選択済みの動画を優先します。",fontSize=12.sp)
     if(p.bubble && !permission) {
         Text("表示許可が必要です。Androidの設定画面で許可してください。",fontSize=12.sp)
         OutlinedButton(onClick={requestOverlay()}) { Text("表示許可の設定を開く") }

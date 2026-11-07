@@ -4,6 +4,7 @@ import android.app.*
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
+import android.content.res.ColorStateList
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -17,6 +18,11 @@ import android.view.*
 import android.widget.*
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.toBitmap
+import androidx.compose.ui.graphics.toArgb
+import coil.imageLoader
+import coil.request.ImageRequest
+import coil.request.SuccessResult
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
@@ -52,6 +58,18 @@ class BubbleService : Service() {
     private var pause: Button? = null
     private var start: Button? = null
     private var cancel: Button? = null
+    private var clipboardStatus: TextView? = null
+    private var panelBackground: GradientDrawable? = null
+    private val panelButtons=mutableListOf<Button>()
+    private var palette=bubblePalette()
+    private var artworkUrl=""
+    private var artworkJob: Job? = null
+    private val clipboard by lazy {
+        BubbleClipboard(this,{
+            BuildConfig.BETA && Store.state.value.preferences.let { it.bubble && it.bubbleClipboard } &&
+                panel?.hasWindowFocus() == true && !getSystemService(KeyguardManager::class.java).isKeyguardLocked
+        },{ clipboardStatus?.text=it })
+    }
     private var lastState=ScreenState()
     private val positions by lazy { getSharedPreferences("bubble-window",MODE_PRIVATE) }
     override fun onBind(intent: Intent?): IBinder? = null
@@ -86,9 +104,28 @@ class BubbleService : Service() {
             hide(); stopSelf(); return
         }
         if(BubbleRuntime.foreground.value || getSystemService(KeyguardManager::class.java).isKeyguardLocked) { hide(); return }
+        updateArtwork()
         if(bubble == null) showBubble()
-        bubble?.update(lastState)
+        bubble?.update(lastState,palette)
         updatePanel()
+    }
+    private fun updateArtwork() {
+        val video=bubbleVideo(lastState)
+        val url=video?.let { it.thumbnail.ifBlank { youtubeThumbnail(it.url) } }.orEmpty()
+        if(url == artworkUrl) return
+        artworkUrl=url; artworkJob?.cancel(); palette=bubblePalette()
+        if(url.isBlank()) return
+        artworkJob=scope.launch {
+            val tone=try {
+                val result=imageLoader.execute(ImageRequest.Builder(this@BubbleService).data(url).size(96,96).allowHardware(false).build())
+                (result as? SuccessResult)?.drawable?.toBitmap(48,48)?.let { accentColor(it,true) }
+            } catch(e: CancellationException) { throw e } catch(_: Exception) { null }
+            // A slow response from a previous queue item must not recolor the current one.
+            if(artworkUrl == url) {
+                palette=tone?.let(::bubblePalette) ?: bubblePalette()
+                bubble?.update(lastState,palette); updatePanel()
+            }
+        }
     }
     private fun bounds(): Pair<Int,Int> {
         if(Build.VERSION.SDK_INT >= 30) return windows.currentWindowMetrics.bounds.let { it.width() to it.height() }
@@ -130,12 +167,13 @@ class BubbleService : Service() {
     private fun text(size: Float=14f)=TextView(this).apply { setTextColor(Color.WHITE); textSize=size; setPadding(0,dp(4),0,dp(4)) }
     private fun button(label: String, action: ()->Unit)=Button(this).apply {
         text=label; isAllCaps=false; textSize=13f; setOnClickListener { action() }
+        panelButtons.add(this)
     }
     private fun showPanel() {
         val (width,height)=bounds()
         val container=LinearLayout(this).apply {
             orientation=LinearLayout.VERTICAL; setPadding(dp(16),dp(12),dp(16),dp(12))
-            background=GradientDrawable().apply { setColor(Color.rgb(27,30,39)); cornerRadius=dp(22).toFloat() }
+            background=GradientDrawable().apply { setColor(palette.surface.toArgb()); cornerRadius=dp(22).toFloat(); panelBackground=this }
         }
         val header=LinearLayout(this)
         header.addView(text(18f).apply { text="DL管理パネル" },LinearLayout.LayoutParams(0,-2,1f))
@@ -152,21 +190,66 @@ class BubbleService : Service() {
         container.addView(actions)
         start=button("待機キューをダウンロード") { command("DOWNLOAD") }.also { container.addView(it) }
         queue=text().also { container.addView(it) }
+        clipboardStatus=text(12f).apply {
+            text=if(lastState.preferences.bubbleClipboard) "コピーしたYouTube URLを確認します…" else "クリップボードの自動追加はオフです。"
+        }.also { container.addView(it) }
         container.addView(text(12f).apply { text="YouTubeの「共有」→「Youtube Pandora!」でキューに追加できます。ゲージは現在の処理の進捗です。" })
         container.addView(button("アプリを開く") {
             runCatching { startActivity(Intent(this,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)) }.onFailure(::failed)
         })
         container.addView(button("バブルを終了") { Store.preferences(Store.state.value.preferences.copy(bubble=false)); stopSelf() })
-        val view=ScrollView(this).apply { addView(container); isFillViewport=true }
+        val view=object: ScrollView(this) {
+            private var backDispatcher: android.window.OnBackInvokedDispatcher? = null
+            private var backCallback: android.window.OnBackInvokedCallback? = null
+            override fun onAttachedToWindow() {
+                super.onAttachedToWindow()
+                if(Build.VERSION.SDK_INT >= 33) {
+                    backDispatcher=findOnBackInvokedDispatcher()
+                    backCallback=android.window.OnBackInvokedCallback { hidePanel() }.also {
+                        backDispatcher?.registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_OVERLAY,it)
+                    }
+                }
+            }
+            override fun onDetachedFromWindow() {
+                if(Build.VERSION.SDK_INT >= 33) backCallback?.let { backDispatcher?.unregisterOnBackInvokedCallback(it) }
+                backCallback=null; backDispatcher=null
+                super.onDetachedFromWindow()
+            }
+            override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
+                super.onWindowFocusChanged(hasWindowFocus); clipboard.focusChanged(hasWindowFocus)
+            }
+            override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+                if(event.keyCode == KeyEvent.KEYCODE_BACK) {
+                    if(event.action == KeyEvent.ACTION_UP) hidePanel()
+                    return true
+                }
+                return super.dispatchKeyEvent(event)
+            }
+        }.apply {
+            addView(container); isFillViewport=true; isFocusableInTouchMode=true
+            setOnTouchListener { _,event ->
+                if(event.actionMasked == MotionEvent.ACTION_OUTSIDE) { hidePanel(); true } else false
+            }
+        }
         val p=params(minOf(dp(340),width-dp(16)).coerceAtLeast(1),minOf(dp(500),(height*.7f).roundToInt()).coerceAtLeast(1)).apply {
+            // Only the explicitly opened panel takes focus. The small bubble never does.
+            flags=WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM or WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
+            softInputMode=WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
             x=((bubbleParams?.x ?: 0)-width/2).coerceAtLeast(0); y=(bubbleParams?.y ?: 0)+dp(72); clamp(this)
         }
-        runCatching { windows.addView(view,p); panel=view; panelParams=p; updatePanel() }.onFailure(::failed)
+        runCatching { windows.addView(view,p); panel=view; panelParams=p; view.requestFocus(); updatePanel() }.onFailure(::failed)
     }
     private fun updatePanel() {
         if(panel == null) return
         val s=lastState
-        title?.text=s.videos.firstOrNull { it.key == s.current }?.title ?: "待機キュー ${s.videos.count { it.selected && it.status != "完了" }} 件"
+        title?.text=bubbleVideo(s)?.title ?: "待機キュー ${s.videos.count { it.selected && it.status != "完了" }} 件"
+        panelBackground?.setColor(palette.surface.toArgb())
+        val accent=palette.accent.toArgb()
+        val buttonTints=ColorStateList(arrayOf(intArrayOf(android.R.attr.state_enabled),intArrayOf()),intArrayOf(accent,palette.track.toArgb()))
+        panelButtons.forEach { it.backgroundTintList=buttonTints; it.setTextColor(ColorStateList(arrayOf(intArrayOf(android.R.attr.state_enabled),intArrayOf()),intArrayOf(Color.WHITE,0xFFBBBBBB.toInt()))) }
+        progress?.progressTintList=ColorStateList.valueOf(palette.ring.toArgb())
+        progress?.indeterminateTintList=ColorStateList.valueOf(palette.ring.toArgb())
+        progress?.progressBackgroundTintList=ColorStateList.valueOf(palette.track.toArgb())
         phase?.text=(if(s.paused) "一時停止中" else s.message)+"\n処理済み ${s.done} / ${s.total} 件"
         val fraction=s.progress?.takeIf { it.isFinite() }?.coerceIn(0f,1f)
         progress?.isIndeterminate=s.busy && fraction == null && !s.paused
@@ -187,8 +270,10 @@ class BubbleService : Service() {
         }.onFailure { AppLog.error("バブル操作",it); Toast.makeText(this,"アプリを開いて再度操作してください。",Toast.LENGTH_LONG).show() }
     }
     private fun hidePanel() {
+        clipboard.close()
         panel?.let { runCatching { windows.removeView(it) } }; panel=null; panelParams=null
         title=null; phase=null; progress=null; metrics=null; queue=null; pause=null; cancel=null; start=null
+        clipboardStatus=null; panelBackground=null; panelButtons.clear()
     }
     private fun hide() { hidePanel(); bubble?.let { runCatching { windows.removeView(it) } }; bubble=null; bubbleParams=null }
     private fun failed(error: Throwable) {
@@ -204,21 +289,22 @@ private class ProgressBubble @JvmOverloads constructor(context: Context, private
     private val ring=RectF()
     private val icon=ContextCompat.getDrawable(context,R.drawable.ic_pandora)
     private var state=ScreenState()
+    private var palette=bubblePalette()
     init { isClickable=true; isFocusable=true; importantForAccessibility=IMPORTANT_FOR_ACCESSIBILITY_YES }
-    fun update(value: ScreenState) {
-        state=value; contentDescription="Pandora DL管理パネルを開く。${if(value.paused) "一時停止中" else value.message}"
+    fun update(value: ScreenState, colors: BubblePalette) {
+        state=value; palette=colors; contentDescription="Pandora DL管理パネルを開く。${if(value.paused) "一時停止中" else value.message}"
         invalidate()
     }
     override fun performClick(): Boolean { super.performClick(); open(); return true }
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         val size=minOf(width,height).toFloat(); val center=size/2
-        paint.style=Paint.Style.FILL; paint.color=Color.rgb(28,33,46)
+        paint.style=Paint.Style.FILL; paint.color=palette.surface.toArgb()
         canvas.drawCircle(center,center,center-3,paint)
         paint.style=Paint.Style.STROKE; paint.strokeWidth=size*.065f; paint.strokeCap=Paint.Cap.ROUND
         ring.set(size*.075f,size*.075f,size*.925f,size*.925f)
-        paint.color=Color.rgb(67,76,96); canvas.drawOval(ring,paint)
-        paint.color=if(state.paused) Color.rgb(255,193,71) else Color.rgb(67,136,255)
+        paint.color=palette.track.toArgb(); canvas.drawOval(ring,paint)
+        paint.color=palette.ring.toArgb()
         val fraction=state.progress?.takeIf { it.isFinite() }?.coerceIn(0f,1f)
         if(fraction != null) canvas.drawArc(ring,-90f,fraction*360,false,paint)
         else if(state.busy && !state.paused) {

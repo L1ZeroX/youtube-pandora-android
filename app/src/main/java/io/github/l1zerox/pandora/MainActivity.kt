@@ -315,7 +315,7 @@ private fun Choice(title: String, value: String, options: List<String>, enabled:
     }
 }
 
-private fun accentColor(bitmap: Bitmap, dark: Boolean): Color {
+internal fun accentColor(bitmap: Bitmap, dark: Boolean): Color {
     var best = floatArrayOf(215f,.6f,.7f); var score = -1f
     val hsv = FloatArray(3)
     val buckets = mutableMapOf<Int,Pair<Int,Int>>()

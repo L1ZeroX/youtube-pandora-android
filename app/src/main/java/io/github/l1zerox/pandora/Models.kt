@@ -14,7 +14,8 @@ data class Video(val key: String, val url: String, val title: String, val site: 
 data class Preferences(val format: String = "MP4", val quality: String = "1080p以下",
     val audio: String = "192kbps", val fps: String = "元のまま", val dark: Boolean = true,
     val playlists: Boolean = false, val wallpaper: String = "", val opacity: Float = .35f,
-    val glass: Float = .35f, val blur: Float = 18f, val bubble: Boolean = false)
+    val glass: Float = .35f, val blur: Float = 18f, val bubble: Boolean = false,
+    val bubbleClipboard: Boolean = true)
 data class ScreenState(val videos: List<Video> = emptyList(), val busy: Boolean = false,
     val message: String = "URLを貼り付けて情報を取得してください。", val progress: Float? = null,
     val detail: String = "", val current: String = "", val done: Int = 0, val total: Int = 0,
@@ -55,7 +56,7 @@ object Store {
         val preferences = Preferences(p.optString("format", "MP4"), p.optString("quality", "1080p以下"),
             p.optString("audio", "192kbps"), p.optString("fps", "元のまま"), p.optBoolean("dark", true),
             p.optBoolean("playlists"), p.optString("wallpaper"), p.optDouble("opacity", .35).toFloat().coerceIn(0f,1f),
-            p.optDouble("glass", .35).toFloat().coerceIn(0f,.85f), p.optDouble("blur", 18.0).toFloat().coerceIn(0f,40f),p.optBoolean("bubble"))
+            p.optDouble("glass", .35).toFloat().coerceIn(0f,.85f), p.optDouble("blur", 18.0).toFloat().coerceIn(0f,40f),p.optBoolean("bubble"),p.optBoolean("bubbleClipboard",true))
         val videos = runCatching {
             val array = JSONArray(data.getString("queue", "[]"))
             (0 until array.length()).map { index ->
@@ -96,7 +97,7 @@ object Store {
         val s = state.value; val p = s.preferences
         val config = JSONObject().put("format",p.format).put("quality",p.quality).put("audio",p.audio).put("fps",p.fps)
             .put("dark",p.dark).put("playlists",p.playlists).put("wallpaper",p.wallpaper)
-            .put("opacity",p.opacity).put("glass",p.glass).put("blur",p.blur).put("bubble",p.bubble)
+            .put("opacity",p.opacity).put("glass",p.glass).put("blur",p.blur).put("bubble",p.bubble).put("bubbleClipboard",p.bubbleClipboard)
         val videos = JSONArray()
         s.videos.forEach { v -> videos.put(JSONObject().put("key",v.key).put("url",v.url).put("title",v.title)
             .put("site",v.site).put("duration",v.duration).put("thumbnail",v.thumbnail).put("selected",v.selected)

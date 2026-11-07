@@ -96,7 +96,7 @@ internal fun mediaIdentity(url: String): String {
 internal fun appendSharedVideos(videos: List<Video>, text: String): List<Video> {
     val identities=videos.map { mediaIdentity(it.url) }.toMutableSet()
     val added=sharedUrls(text).filter { identities.add(mediaIdentity(it)) }.map { url ->
-        Video("shared:${mediaIdentity(url)}",url,url,site=URI(url).host.orEmpty(),resolved=false)
+        Video("shared:${mediaIdentity(url)}",url,url,site=URI(url).host.orEmpty(),thumbnail=youtubeThumbnail(url),resolved=false)
     }
     return videos+added
 }
