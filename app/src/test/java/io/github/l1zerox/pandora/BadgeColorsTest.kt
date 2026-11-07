@@ -2,10 +2,18 @@ package io.github.l1zerox.pandora
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.compositeOver
 import org.junit.Assert.*
 import org.junit.Test
 
 class BadgeColorsTest {
+    @Test fun translucentLabelsRemainReadableOverBrightThumbnails() {
+        for(red in 0..255 step 51) for(green in 0..255 step 51) for(blue in 0..255 step 51) {
+            val tint=readableGlassTint(Color(red,green,blue))
+            assertEquals(.68f,tint.alpha,.005f)
+            assertTrue(1.05f/(tint.compositeOver(Color.White).luminance()+.05f) >= 4.5f)
+        }
+    }
     @Test fun imageTintsKeepWhiteTextReadableAndSectionHeadingsDarker() {
         for(red in 0..255 step 51) for(green in 0..255 step 51) for(blue in 0..255 step 51) {
             val source=Color(red,green,blue,80)

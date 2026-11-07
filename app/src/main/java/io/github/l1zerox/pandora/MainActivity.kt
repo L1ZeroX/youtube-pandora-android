@@ -348,14 +348,16 @@ internal fun TintBadge(text: String, modifier: Modifier = Modifier, color: Color
 }
 
 @Composable
-private fun TintedThumbnail(url: String, modifier: Modifier, scale: ContentScale, onTone: (Color?)->Unit) {
+private fun TintedThumbnail(url: String, modifier: Modifier, scale: ContentScale,
+                            onBitmap: (Bitmap?)->Unit = {}, onTone: (Color?)->Unit) {
     val context = LocalContext.current
     // Reuse Coil's display request/cache; software pixels can safely be sampled.
     val request = remember(context,url) { ImageRequest.Builder(context).data(url).allowHardware(false).build() }
     AsyncImage(request,"サムネイル",modifier,contentScale=scale,
         onSuccess={ state ->
             onTone(runCatching { readableBadgeColor(accentColor(state.result.drawable.toBitmap(48,48),true)) }.getOrNull())
-        },onError={onTone(null)})
+            onBitmap(runCatching { state.result.drawable.toBitmap() }.getOrNull())
+        },onError={onTone(null);onBitmap(null)})
 }
 
 
@@ -363,6 +365,7 @@ private fun TintedThumbnail(url: String, modifier: Modifier, scale: ContentScale
 private fun VideoPanel(video: Video, image: Boolean, glass: Float, busy: Boolean, onPreview: ()->Unit) {
     var tone by remember(video.thumbnail) { mutableStateOf<Color?>(null) }
     var thumbnailFailed by remember(video.thumbnail) { mutableStateOf(false) }
+    var thumbnailBitmap by remember(video.thumbnail) { mutableStateOf<Bitmap?>(null) }
     val colors=MaterialTheme.colorScheme
     Panel(image,glass) {
         Row {
@@ -378,11 +381,9 @@ private fun VideoPanel(video: Video, image: Boolean, glass: Float, busy: Boolean
                     .background(colors.surfaceVariant).clickable(onClick=onPreview).testTag("thumbnail-${video.key}")) {
                     Text(if(video.thumbnail.isBlank() || thumbnailFailed) "サムネイルを取得できません" else "サムネイルを読み込み中…",Modifier.align(Alignment.Center).padding(12.dp),
                         color=colors.onSurfaceVariant,fontSize=12.sp)
-                    if(video.thumbnail.isNotBlank()) TintedThumbnail(video.thumbnail,Modifier.fillMaxSize(),ContentScale.Crop) { tone=it; thumbnailFailed=it == null }
-                    Row(Modifier.fillMaxWidth().align(Alignment.TopCenter).padding(8.dp),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
-                        TintBadge(video.site.ifBlank { "サイト不明" },color=tone,maxLines=1,modifier=Modifier.weight(1f))
-                        TintBadge(durationText(video.duration),color=tone,maxLines=1)
-                    }
+                    if(video.thumbnail.isNotBlank()) TintedThumbnail(video.thumbnail,Modifier.fillMaxSize(),ContentScale.Crop,
+                        onBitmap={thumbnailBitmap=it}) { tone=it; thumbnailFailed=it == null }
+                    ThumbnailGlassLabels(video.site.ifBlank { "サイト不明" },durationText(video.duration),thumbnailBitmap,tone,Modifier.matchParentSize())
                 }
                 Text(video.status,fontSize=12.sp,color=if(video.status == "失敗") colors.error else colors.onSurfaceVariant)
                 if(video.status == "失敗") Text(video.error.ifBlank { "タップして詳細を確認" },
