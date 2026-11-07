@@ -38,12 +38,14 @@ internal object BubbleRuntime {
     val foreground=MutableStateFlow(false)
     val permission=MutableStateFlow(false)
     val error=MutableStateFlow("")
-    fun sync(context: Context) {
+    fun sync(context: Context): Boolean {
         permission.value=Settings.canDrawOverlays(context)
         if(BuildConfig.BETA && Store.state.value.preferences.bubble && permission.value) {
-            runCatching { ContextCompat.startForegroundService(context,Intent(context,BubbleService::class.java)) }
+            return runCatching { ContextCompat.startForegroundService(context,Intent(context,BubbleService::class.java)) }
                 .onFailure { error.value="バブルを開始できませんでした。アプリを開いて再度お試しください。"; AppLog.error("バブル開始",it) }
+                .isSuccess
         } else context.stopService(Intent(context,BubbleService::class.java))
+        return false
     }
 }
 
@@ -59,6 +61,16 @@ class BubbleService : Service() {
     private var phase: TextView? = null
     private var metrics: TextView? = null
     private var queue: TextView? = null
+    private var queueRows: LinearLayout? = null
+    private var queueSnapshot: List<Video>? = null
+    private var queuePage=0
+    private var renderedPage=-1
+    private var previousPage: Button? = null
+    private var nextPage: Button? = null
+    private val queueDeletes=mutableListOf<Button>()
+    private var mp4: Button? = null
+    private var mp3: Button? = null
+    private var formatHint: TextView? = null
     private var progress: ProgressBar? = null
     private var pause: Button? = null
     private var start: Button? = null
@@ -173,9 +185,9 @@ class BubbleService : Service() {
         runCatching { windows.addView(view,p); bubble=view; bubbleParams=p }.onFailure(::failed)
     }
     private fun text(size: Float=14f)=TextView(this).apply { setTextColor(Color.WHITE); textSize=size; setPadding(0,dp(4),0,dp(4)) }
-    private fun button(label: String, action: ()->Unit)=Button(this).apply {
+    private fun button(label: String, register: Boolean = true, action: ()->Unit)=Button(this).apply {
         text=label; isAllCaps=false; textSize=13f; setOnClickListener { action() }
-        panelButtons.add(this)
+        if(register) panelButtons.add(this)
     }
     private fun showPanel() {
         val (width,height)=bounds()
@@ -191,6 +203,13 @@ class BubbleService : Service() {
         phase=text().also { container.addView(it) }
         progress=ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal).also { it.max=100; container.addView(it,LinearLayout.LayoutParams(-1,dp(12))) }
         metrics=text().also { container.addView(it) }
+        container.addView(text(14f).apply { text="保存形式" })
+        val formats=LinearLayout(this)
+        mp4=button("MP4 動画") { Store.downloadFormat("MP4") }
+        mp3=button("MP3 音声") { Store.downloadFormat("MP3") }
+        formats.addView(mp4,LinearLayout.LayoutParams(0,-2,1f)); formats.addView(mp3,LinearLayout.LayoutParams(0,-2,1f))
+        container.addView(formats)
+        formatHint=text(12f).also { container.addView(it) }
         val actions=LinearLayout(this)
         pause=button("一時停止") { command(if(Store.state.value.paused) "RESUME" else "PAUSE") }
         cancel=button("キャンセル") { command("CANCEL") }
@@ -198,6 +217,12 @@ class BubbleService : Service() {
         container.addView(actions)
         start=button("待機キューをダウンロード") { command("DOWNLOAD") }.also { container.addView(it) }
         queue=text().also { container.addView(it) }
+        queueRows=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }.also { container.addView(it) }
+        val pages=LinearLayout(this)
+        previousPage=button("前の8件") { queuePage--; updatePanel() }
+        nextPage=button("次の8件") { queuePage++; updatePanel() }
+        pages.addView(previousPage,LinearLayout.LayoutParams(0,-2,1f)); pages.addView(nextPage,LinearLayout.LayoutParams(0,-2,1f))
+        container.addView(pages)
         clipboardStatus=text(12f).apply {
             text=if(lastState.preferences.bubbleClipboard) "コピーしたYouTube URLを確認します…" else "クリップボードの自動追加はオフです。"
         }.also { container.addView(it) }
@@ -250,11 +275,18 @@ class BubbleService : Service() {
     private fun updatePanel() {
         if(panel == null) return
         val s=lastState
+        updateQueue(s)
         title?.text=bubbleVideo(s)?.title ?: "待機キュー ${s.videos.count { it.selected && it.status != "完了" }} 件"
         panelBackground?.setColor(palette.surface.toArgb())
         val accent=palette.accent.toArgb()
         val buttonTints=ColorStateList(arrayOf(intArrayOf(android.R.attr.state_enabled),intArrayOf()),intArrayOf(accent,palette.track.toArgb()))
-        panelButtons.forEach { it.backgroundTintList=buttonTints; it.setTextColor(ColorStateList(arrayOf(intArrayOf(android.R.attr.state_enabled),intArrayOf()),intArrayOf(Color.WHITE,0xFFBBBBBB.toInt()))) }
+        (panelButtons+queueDeletes).forEach { it.backgroundTintList=buttonTints; it.setTextColor(ColorStateList(arrayOf(intArrayOf(android.R.attr.state_enabled),intArrayOf()),intArrayOf(Color.WHITE,0xFFBBBBBB.toInt()))) }
+        mp4?.text=if(s.preferences.format == "MP4") "✓ MP4 動画" else "MP4 動画"
+        mp3?.text=if(s.preferences.format == "MP3") "✓ MP3 音声" else "MP3 音声"
+        mp4?.isEnabled=!s.busy; mp3?.isEnabled=!s.busy
+        mp4?.isSelected=s.preferences.format == "MP4"; mp3?.isSelected=s.preferences.format == "MP3"
+        formatHint?.text=if(s.busy) "DL中・一時停止中は形式変更とキュー削除をロックします。変更する場合はキャンセルしてください。"
+            else "選んだ形式で待機キューを保存します。削除は一覧のみで、保存済みファイルは残ります。"
         progress?.progressTintList=ColorStateList.valueOf(palette.ring.toArgb())
         progress?.indeterminateTintList=ColorStateList.valueOf(palette.ring.toArgb())
         progress?.progressBackgroundTintList=ColorStateList.valueOf(palette.track.toArgb())
@@ -266,10 +298,33 @@ class BubbleService : Service() {
         pause?.text=if(s.paused) "再開" else "一時停止"
         pause?.isEnabled=s.busy && s.operation == "DOWNLOAD" && !s.stopping
         cancel?.isEnabled=s.busy && !s.stopping
+        start?.text="待機キューを${s.preferences.format}でダウンロード"
         start?.isEnabled=!s.busy && s.videos.any { it.selected && it.status != "完了" }
-        val pending=s.videos.filter { it.selected && it.status != "完了" }
-        queue?.text=pending.take(6).joinToString("\n",prefix="キュー\n") { "${it.status} · ${it.title.take(70)}" }+
-            if(pending.size > 6) "\nほか ${pending.size-6} 件" else ""
+    }
+    private fun updateQueue(s: ScreenState) {
+        val rows=queueRows ?: return
+        val pageCount=((s.videos.size+7)/8).coerceAtLeast(1)
+        queuePage=queuePage.coerceIn(0,pageCount-1)
+        queue?.text=if(s.videos.isEmpty()) "キューは空です。" else "キュー ${s.videos.size} 件 · ${queuePage+1} / $pageCount ページ"
+        if(queueSnapshot != s.videos || renderedPage != queuePage) {
+            queueSnapshot=s.videos; renderedPage=queuePage
+            rows.removeAllViews(); queueDeletes.clear()
+            for(video in s.videos.drop(queuePage*8).take(8)) {
+                val row=LinearLayout(this).apply { gravity=Gravity.CENTER_VERTICAL }
+                row.addView(text(13f).apply {
+                    text="${video.status}${if(video.selected) "" else "（対象外）"}\n${video.title}"
+                    maxLines=3; ellipsize=android.text.TextUtils.TruncateAt.END
+                },LinearLayout.LayoutParams(0,-2,1f))
+                val remove=button("削除",register=false) { Store.removeQueueVideo(video.key) }.apply {
+                    contentDescription="キューから削除: ${video.title}"
+                }
+                queueDeletes.add(remove); row.addView(remove); rows.addView(row)
+            }
+        }
+        queueDeletes.forEach { it.isEnabled=!s.busy }
+        previousPage?.visibility=if(pageCount > 1) View.VISIBLE else View.GONE
+        nextPage?.visibility=if(pageCount > 1) View.VISIBLE else View.GONE
+        previousPage?.isEnabled=queuePage > 0; nextPage?.isEnabled=queuePage < pageCount-1
     }
     private fun command(action: String) {
         runCatching {
@@ -282,6 +337,8 @@ class BubbleService : Service() {
         panel?.let { runCatching { windows.removeView(it) } }; panel=null; panelParams=null
         title=null; phase=null; progress=null; metrics=null; queue=null; pause=null; cancel=null; start=null
         clipboardStatus=null; panelBackground=null; panelButtons.clear()
+        queueRows=null; queueSnapshot=null; renderedPage=-1; queuePage=0; queueDeletes.clear()
+        previousPage=null; nextPage=null; mp4=null; mp3=null; formatHint=null
     }
     private fun hide() { hidePanel(); bubble?.let { runCatching { windows.removeView(it) } }; bubble=null; bubbleParams=null }
     private fun failed(error: Throwable) {

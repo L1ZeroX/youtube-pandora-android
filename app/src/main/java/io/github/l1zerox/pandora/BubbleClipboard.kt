@@ -7,6 +7,7 @@ import android.content.Context
 internal class BubbleClipboard(context: Context, private val canRead: ()->Boolean, private val message: (String)->Unit) {
     private val clipboard=context.getSystemService(ClipboardManager::class.java)
     private var listening=false
+    private var lastImport: Pair<Long,List<String>>? = null
     private val listener=ClipboardManager.OnPrimaryClipChangedListener { read() }
     fun focusChanged(focused: Boolean) {
         val enabled=focused && canRead()
@@ -29,9 +30,16 @@ internal class BubbleClipboard(context: Context, private val canRead: ()->Boolea
             }
             val urls=clipboardYoutubeUrls(text)
             if(urls.isEmpty()) { message("コピーしたYouTube動画のURLはありません。"); return }
+            val token=clip.description.timestamp to urls.map(::mediaIdentity)
             val existing=Store.state.value.videos.map { mediaIdentity(it.url) }.toSet()
-            if(urls.all { mediaIdentity(it) in existing }) { message("コピーした動画は追加済みです。"); return }
+            if(urls.all { mediaIdentity(it) in existing }) {
+                lastImport=token; message("コピーした動画は追加済みです。"); return
+            }
+            if(lastImport == token) {
+                message("このコピーは確認済みです。追加し直す場合は再コピーまたは共有してください。"); return
+            }
             val added=Store.receiveShare(urls.joinToString("\n"))
+            lastImport=token
             message("コピーしたYouTube動画を $added 件追加しました。")
         } catch(_: Exception) {
             message("コピー内容を読み取れません。YouTubeの共有から追加してください。")

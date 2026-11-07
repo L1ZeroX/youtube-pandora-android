@@ -53,6 +53,14 @@ class BubbleClipboardTest {
             }
             instrumentation.waitForIdleSync()
             assertEquals("Closed panel must not consume clipboard changes",1,Store.state.value.videos.size)
+            scenario.onActivity {
+                gate!!.focusChanged(true)
+                assertEquals(2,Store.state.value.videos.size)
+                val added=Store.state.value.videos.last()
+                Store.removeQueueVideo(added.key)
+                gate!!.focusChanged(false); gate!!.focusChanged(true)
+                assertEquals("Deleting an item must not reimport the same clipboard on reopen",1,Store.state.value.videos.size)
+            }
         } finally {
             scenario.onActivity {
                 gate?.close()

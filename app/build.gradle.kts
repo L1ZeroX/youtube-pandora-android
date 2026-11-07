@@ -12,7 +12,7 @@ android {
         minSdk = 29
         targetSdk = 36
         versionCode = 16
-        versionName = if(betaBuild) "0.4.0-beta.3" else "0.3.1"
+        versionName = if(betaBuild) "0.4.0-beta.4" else "0.3.1"
         buildConfigField("boolean", "BETA", betaBuild.toString())
         manifestPlaceholders["appLabel"] = "Youtube Pandora!"
         manifestPlaceholders["bubbleEnabled"] = betaBuild.toString()

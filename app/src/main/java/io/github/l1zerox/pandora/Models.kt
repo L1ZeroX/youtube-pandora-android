@@ -44,6 +44,12 @@ fun saveRelativePath(format: String): String = "Download/YoutubePandora!/${if(fo
 fun ScreenState.withoutSelectedVideos(): ScreenState =
     if(busy || videos.none { it.selected }) this else copy(videos=videos.filterNot { it.selected },
         message="${videos.count { it.selected }}件を一覧から削除しました。")
+internal fun ScreenState.withDownloadFormat(format: String): ScreenState =
+    if(busy || format !in listOf("MP4","MP3") || preferences.format == format) this
+    else copy(preferences=preferences.copy(format=format))
+internal fun ScreenState.withoutQueueVideo(key: String): ScreenState =
+    if(busy || videos.none { it.key == key }) this
+    else copy(videos=videos.filterNot { it.key == key },message="キューから削除しました。保存済みファイルは残っています。")
 fun safeName(value: String): String = value.replace(Regex("[\\\\/:*?\"<>|\\p{Cntrl}]"), "_").trim().take(150).ifBlank { "video" }
 
 object Store {
@@ -83,6 +89,8 @@ object Store {
     fun edit(key: String, transform: (Video) -> Video) { state.update { s -> s.copy(videos=s.videos.map { if(it.key == key) transform(it) else it }) } }
     fun preferences(p: Preferences) { state.update { it.copy(preferences=p) }; save() }
     fun removeSelected() { state.update { it.withoutSelectedVideos() }; save() }
+    fun downloadFormat(format: String) { state.update { it.withDownloadFormat(format) }; save() }
+    fun removeQueueVideo(key: String) { state.update { it.withoutQueueVideo(key) }; save() }
     fun receiveShare(text: String): Int {
         var added=0
         state.update { s ->
