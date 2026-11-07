@@ -8,7 +8,7 @@ PC版assets/app.icoの256px PNGを画素変換せず抽出してpc_app_icon.png�
 
 単体テストで判別タグの条件、通常音声・旧ファイルの誤表示防止、動画／ショートのフィルターを検証。端末テストでは同梱FFmpegによるMP4生成からメタデータ読み込み・キャッシュ・再追加の検証を追加したが、端末未接続のためコンパイル確認のみ。新しいカード表示とホーム画面のアイコンの実機確認は未実施。v0.4.13の自動吹き替えダウンロードはユーザー端末で成功の報告あり。
 
-単体テスト150件成功、Debug Lintエラー0。PCのFFmpegで映像・音声入りMP4を生成し、ffprobeで判別タグの保存を確認。APKのアイコンPNGがPC版ICO内のPNGとバイト単位で一致することを確認。
+単体テスト150件成功、Debug・Release Lintエラー0。PCのFFmpegで映像・音声入りMP4を生成し、ffprobeで判別タグの保存を確認。ソースのアイコンPNGがPC版ICO内のPNGとバイト単位で一致することを確認。APK内ではAAPTが完全透明部分のRGBを正規化するが、アルファ値と見える画素は元画像と一致する。v0.4.13との署名一致を確認。
 
 参照: [FFmpegのメタデータ設定](https://www.ffmpeg.org/ffmpeg.html)、[AndroidのMP4メタデータ読み込み](https://android.googlesource.com/platform/frameworks/av/+/jb-release/media/libstagefright/MPEG4Extractor.cpp)。
 
