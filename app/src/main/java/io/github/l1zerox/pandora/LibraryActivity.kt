@@ -12,6 +12,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
@@ -82,6 +83,8 @@ class LibraryActivity : ComponentActivity() {
 internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
     val dark=preferences.dark
     val wallpaper by rememberWallpaper(preferences.wallpaper)
+    val wallpaperAccent=remember(wallpaper,dark) { readableBadgeColor(wallpaper?.let { accentColor(it,dark) } ?: Color(0xFF4388FF)) }
+    val headerAccent by animateColorAsState(wallpaperAccent,label="library-header-accent")
     var wallpaperBounds by remember { mutableStateOf(Rect.Zero) }
     val frostedWallpaper by produceState<Bitmap?>(null,wallpaper,preferences.libraryBlur) {
         val image=wallpaper
@@ -164,11 +167,7 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
             MaterialTheme(colorScheme=if(hasWallpaper) colors.copy(primary=Color.White,onSurface=Color.White,
                 onSurfaceVariant=Color.White,outline=Color.White.copy(alpha=.7f)) else colors) {
             Column(Modifier.padding(12.dp)) {
-            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                TextButton(onClick=onBack) { Text("戻る") }
-                Text("ライブラリー",Modifier.weight(1f),fontSize=24.sp,fontWeight=FontWeight.Bold)
-                TextButton(onClick={error=""; refresh++},enabled=!loading) { Text("更新") }
-            }
+            LibraryHeader(headerAccent,loading,onBack,onRefresh={error=""; refresh++})
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically) {
                 Text("保存した動画と音楽",fontSize=13.sp)
                 OutlinedButton(onClick={picker.launch(arrayOf("video/*","audio/*"))},enabled=!importing) {
@@ -179,7 +178,7 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
                 OutlinedTextField(search,{search=it},Modifier.fillMaxWidth().focusRequester(searchFocus),singleLine=true,
                     label={Text("タイトルで検索")},keyboardOptions=KeyboardOptions(imeAction=ImeAction.Search),
                     keyboardActions=KeyboardActions(onSearch={focusManager.clearFocus(); keyboard?.hide()}))
-                LaunchedEffect(Unit) { searchFocus.requestFocus(); keyboard?.show() }
+                LaunchedEffect(Unit) { if(!appearance) { searchFocus.requestFocus(); keyboard?.show() } }
             }
             FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
                 listOf("すべて","動画","音楽","ショート").forEach { option -> FilterChip(selected=filter == option,onClick={filter=option},label={Text(option)}) }
@@ -187,7 +186,7 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
                     if(searchExpanded) { search=""; focusManager.clearFocus(); keyboard?.hide() }
                     searchExpanded=!searchExpanded
                 }) { Text(if(searchExpanded) "検索を閉じる" else "検索") }
-                TextButton(onClick={appearance=!appearance}) { Text(if(appearance) "調整終了" else "表示調整",fontSize=12.sp) }
+                OutlinedButton(onClick={focusManager.clearFocus(); keyboard?.hide(); appearance=true}) { Text("表示調整") }
             }
             if(playback.uri.isNotBlank()) Surface(color=Color.Transparent,contentColor=playingPalette.content,
                 shape=RoundedCornerShape(16.dp),modifier=Modifier.fillMaxWidth().libraryCardGlass(playingPalette,backdrop)) {
@@ -207,15 +206,6 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
             }
             }
             LazyColumn(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(10.dp),contentPadding=PaddingValues(vertical=8.dp)) {
-                if(appearance) item(key="library-appearance") {
-                    Surface(shape=RoundedCornerShape(16.dp),color=if(hasWallpaper) headerTint else colors.surface,
-                        contentColor=if(hasWallpaper) Color.White else colors.onSurface) {
-                        Column(Modifier.padding(12.dp)) {
-                            Text("動画・音楽パネル",fontWeight=FontWeight.Bold)
-                            LibraryAppearanceControls(preferences,Store::preferences)
-                        }
-                    }
-                }
                 items(visible,key={it.uri}) { item ->
                     LibraryCard(item,dark,backdrop,transport,onDelete={if(!importing) deletion=item}) {
                         openPlayer(item.uri)
@@ -225,7 +215,9 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
         }
     }
     }
-    UpdatePrompt(allowed=deletion == null && !importing && error.isBlank())
+    if(appearance) LibraryAppearanceDialog(wallpaper,preferences,playingEntry ?: visible.firstOrNull(),headerAccent,colors,
+        onChange=Store::preferences,onDismiss={appearance=false})
+    UpdatePrompt(allowed=!appearance && deletion == null && !importing && error.isBlank())
     deletion?.let { entry -> key(entry.uri) {
         LibraryDeleteDialog(entry,onDismiss={deletion=null},onRemoved={
             entries=entries.filterNot { it.uri == entry.uri }; refresh++
