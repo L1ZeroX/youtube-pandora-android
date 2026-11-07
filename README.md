@@ -4,7 +4,7 @@ Windows版と別プロジェクトのAndroid用アプリです。Android 10以�
 
 ## インストール
 
-**[通常版APK v0.3.1](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.3.1/YoutubePandora-Android-v0.3.1.apk)** / **[バブル試験版 v0.4.0-beta.2](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.4.0-beta.2/YoutubePandora-Android-v0.4.0-beta.2.apk)**
+**[通常版APK v0.3.1](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.3.1/YoutubePandora-Android-v0.3.1.apk)** / **[バブル試験版 v0.4.0-beta.3](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.4.0-beta.3/YoutubePandora-Android-v0.4.0-beta.3.apk)**
 
 [リリース一覧・更新情報](https://github.com/L1ZeroX/youtube-pandora-android/releases) / [Windows版](https://github.com/L1ZeroX/media-downloader)
 
@@ -121,7 +121,7 @@ GPL-3.0。依存ライブラリーとネイティブツールのライセンス�
 
 ## APK統合とバブル試験機能
 
-通常版とベータ版は同じ `io.github.l1zerox.pandora`・同じ署名鍵を使い、設定・背景・キューを共有します。v0.3.1とv0.4.0-beta.2はversionCode 16で、アンインストールせず相互に上書きインストールできます。beta.2から戻すときは通常版v0.3.1以降を使ってください。フレーム補間も通常版へ統合しました。ダウンロード・変換が終わってから切り替えてください。
+通常版とベータ版は同じ `io.github.l1zerox.pandora`・同じ署名鍵を使い、設定・背景・キューを共有します。v0.3.1とv0.4.0-beta.2 / beta.3はversionCode 16で、アンインストールせず相互に上書きインストールできます。beta.2以降から戻すときは通常版v0.3.1以降を使ってください。フレーム補間も通常版へ統合しました。ダウンロード・変換が終わってから切り替えてください。
 
 旧ベータ版v0.3.0-beta.3以前は `io.github.l1zerox.pandora.beta` という別アプリです。そこから統合版を入れると通常版側へインストールされます。旧ベータ版の設定・キューはAndroidのアプリ分離により自動移行できません。既存の通常版の設定・キューを引き継ぎます。旧ベータ版のデータを確認してから整理してください。端末のDownloadフォルダーに保存済みの動画は残ります。
 
@@ -149,3 +149,7 @@ Android 10以降の[クリップボード制限](https://developer.android.com/a
 端末がロック中のときはバブルを隠します。他アプリが重ね表示を禁止している画面や、OSがアプリを終了した場合は表示できません。Androidのバックグラウンド処理時間上限に達した場合は処理を終了し、アプリから再開します。途中ファイルはアプリのキャッシュ領域に置くため、OSによるキャッシュ削除後は取得からやり直します。
 
 技術資料: [Androidのオーバーレイウィンドウ](https://developer.android.com/reference/android/view/WindowManager.LayoutParams#TYPE_APPLICATION_OVERLAY)、[フォアグラウンドサービスの種類](https://developer.android.com/develop/background-work/services/fgs/service-types)、[Android 15の起動制限](https://developer.android.com/about/versions/15/behavior-changes-15)。
+
+### beta.3：バブル中央のサムネイル
+
+バブル中央に、配色の元になっている動画のサムネイルを円形表示します。縦横比を保って中央を切り抜き、外周には進捗ゲージを表示。DL中の割合・一時停止マークは画像の下部に小さな黒いラベルで重ねます。画像取得前・取得失敗・キューが空のときは標準アイコンになります。

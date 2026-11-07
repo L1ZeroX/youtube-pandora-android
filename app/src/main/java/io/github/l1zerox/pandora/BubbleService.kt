@@ -6,10 +6,14 @@ import android.content.Intent
 import android.content.res.Configuration
 import android.content.res.ColorStateList
 import android.graphics.Canvas
+import android.graphics.Bitmap
+import android.graphics.BitmapShader
 import android.graphics.Color
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.PixelFormat
 import android.graphics.RectF
+import android.graphics.Shader
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.IBinder
@@ -23,6 +27,7 @@ import androidx.compose.ui.graphics.toArgb
 import coil.imageLoader
 import coil.request.ImageRequest
 import coil.request.SuccessResult
+import coil.size.Scale
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
@@ -62,6 +67,7 @@ class BubbleService : Service() {
     private var panelBackground: GradientDrawable? = null
     private val panelButtons=mutableListOf<Button>()
     private var palette=bubblePalette()
+    private var artwork: Bitmap? = null
     private var artworkUrl=""
     private var artworkJob: Job? = null
     private val clipboard by lazy {
@@ -106,24 +112,26 @@ class BubbleService : Service() {
         if(BubbleRuntime.foreground.value || getSystemService(KeyguardManager::class.java).isKeyguardLocked) { hide(); return }
         updateArtwork()
         if(bubble == null) showBubble()
-        bubble?.update(lastState,palette)
+        bubble?.update(lastState,palette,artwork)
         updatePanel()
     }
     private fun updateArtwork() {
         val video=bubbleVideo(lastState)
         val url=video?.let { it.thumbnail.ifBlank { youtubeThumbnail(it.url) } }.orEmpty()
         if(url == artworkUrl) return
-        artworkUrl=url; artworkJob?.cancel(); palette=bubblePalette()
+        artworkUrl=url; artworkJob?.cancel(); palette=bubblePalette(); artwork=null
         if(url.isBlank()) return
         artworkJob=scope.launch {
-            val tone=try {
-                val result=imageLoader.execute(ImageRequest.Builder(this@BubbleService).data(url).size(96,96).allowHardware(false).build())
-                (result as? SuccessResult)?.drawable?.toBitmap(48,48)?.let { accentColor(it,true) }
+            val bitmap=try {
+                val result=imageLoader.execute(ImageRequest.Builder(this@BubbleService).data(url)
+                    .size(dp(96),dp(96)).scale(Scale.FILL).allowHardware(false).build())
+                (result as? SuccessResult)?.drawable?.toBitmap()
             } catch(e: CancellationException) { throw e } catch(_: Exception) { null }
             // A slow response from a previous queue item must not recolor the current one.
             if(artworkUrl == url) {
-                palette=tone?.let(::bubblePalette) ?: bubblePalette()
-                bubble?.update(lastState,palette); updatePanel()
+                artwork=bitmap
+                palette=bitmap?.let { bubblePalette(accentColor(it,true)) } ?: bubblePalette()
+                bubble?.update(lastState,palette,artwork); updatePanel()
             }
         }
     }
@@ -286,15 +294,34 @@ class BubbleService : Service() {
 
 private class ProgressBubble @JvmOverloads constructor(context: Context, private val open: ()->Unit = {}): View(context) {
     private val paint=Paint(Paint.ANTI_ALIAS_FLAG)
+    private val imagePaint=Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    private val imageMatrix=Matrix()
     private val ring=RectF()
+    private val badge=RectF()
     private val icon=ContextCompat.getDrawable(context,R.drawable.ic_pandora)
     private var state=ScreenState()
     private var palette=bubblePalette()
+    private var thumbnail: Bitmap? = null
     init { isClickable=true; isFocusable=true; importantForAccessibility=IMPORTANT_FOR_ACCESSIBILITY_YES }
-    fun update(value: ScreenState, colors: BubblePalette) {
-        state=value; palette=colors; contentDescription="Pandora DL管理パネルを開く。${if(value.paused) "一時停止中" else value.message}"
+    fun update(value: ScreenState, colors: BubblePalette, bitmap: Bitmap?) {
+        if(thumbnail !== bitmap) {
+            thumbnail=bitmap
+            imagePaint.shader=bitmap?.let { BitmapShader(it,Shader.TileMode.CLAMP,Shader.TileMode.CLAMP) }
+            positionThumbnail()
+        }
+        state=value; palette=colors; contentDescription="Pandora DL管理パネルを開く。${bubbleVideo(value)?.title.orEmpty()}。${if(value.paused) "一時停止中" else value.message}"
         invalidate()
     }
+    private fun positionThumbnail() {
+        val bitmap=thumbnail ?: return
+        val size=minOf(width,height).toFloat()
+        if(size <= 0) return
+        val scale=size*.72f/minOf(bitmap.width,bitmap.height)
+        imageMatrix.setScale(scale,scale)
+        imageMatrix.postTranslate((size-bitmap.width*scale)/2,(size-bitmap.height*scale)/2)
+        imagePaint.shader?.setLocalMatrix(imageMatrix)
+    }
+    override fun onSizeChanged(w: Int,h: Int,oldw: Int,oldh: Int) { super.onSizeChanged(w,h,oldw,oldh); positionThumbnail() }
     override fun performClick(): Boolean { super.performClick(); open(); return true }
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
@@ -310,9 +337,18 @@ private class ProgressBubble @JvmOverloads constructor(context: Context, private
         else if(state.busy && !state.paused) {
             canvas.drawArc(ring,(android.os.SystemClock.uptimeMillis()%1800)/5f,85f,false,paint); postInvalidateDelayed(80)
         }
-        icon?.setBounds((size*.29f).roundToInt(),(size*.22f).roundToInt(),(size*.71f).roundToInt(),(size*.64f).roundToInt())
-        icon?.draw(canvas)
-        paint.style=Paint.Style.FILL; paint.color=Color.WHITE; paint.textAlign=Paint.Align.CENTER; paint.textSize=size*.17f
-        canvas.drawText(if(state.paused) "Ⅱ" else fraction?.let { "${(it*100).roundToInt()}%" } ?: "DL",center,size*.81f,paint)
+        if(thumbnail != null) canvas.drawCircle(center,center,size*.36f,imagePaint)
+        else {
+            icon?.setBounds((size*.29f).roundToInt(),(size*.22f).roundToInt(),(size*.71f).roundToInt(),(size*.64f).roundToInt())
+            icon?.draw(canvas)
+        }
+        if(state.busy || thumbnail == null) {
+            val label=if(state.paused) "Ⅱ" else fraction?.let { "${(it*100).roundToInt()}%" } ?: "DL"
+            paint.style=Paint.Style.FILL; paint.textAlign=Paint.Align.CENTER; paint.textSize=size*.16f
+            val halfWidth=paint.measureText(label)/2+size*.055f
+            badge.set(center-halfWidth,size*.64f,center+halfWidth,size*.85f)
+            paint.color=0xDD000000.toInt(); canvas.drawRoundRect(badge,size*.08f,size*.08f,paint)
+            paint.color=Color.WHITE; canvas.drawText(label,center,size*.805f,paint)
+        }
     }
 }
