@@ -9,10 +9,32 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
+
+@Composable
+internal fun LibraryAppearanceButton(accent: Color, onClick: ()->Unit) {
+    OutlinedIconButton(onClick=onClick,modifier=Modifier.size(48.dp).semantics {
+        contentDescription="表示調整"
+    },colors=IconButtonDefaults.outlinedIconButtonColors(containerColor=accent,contentColor=Color.White)) {
+        val color=LocalContentColor.current
+        Canvas(Modifier.size(22.dp)) {
+            val stroke=2.dp.toPx()
+            val radius=3.dp.toPx()
+            listOf(7f,15f,9f).forEachIndexed { row, knob ->
+                val y=(4+row*7).dp.toPx()
+                val x=knob.dp.toPx()
+                drawLine(color,Offset(1.dp.toPx(),y),Offset(x-radius,y),stroke,StrokeCap.Round)
+                drawLine(color,Offset(x+radius,y),Offset(size.width-1.dp.toPx(),y),stroke,StrokeCap.Round)
+                drawCircle(color,radius,Offset(x,y),style=Stroke(stroke))
+            }
+        }
+    }
+}
 
 @Composable
 internal fun LibraryLayoutButton(layout: LibraryLayout, accent: Color, onOpen: ()->Unit, onSelect: (LibraryLayout)->Unit) {

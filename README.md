@@ -4,9 +4,11 @@ Windows版と別プロジェクトのAndroid用アプリです。Android 10以�
 
 ## インストール
 
-**[正式版APK v0.4.20](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.4.20/YoutubePandora-Android-v0.4.20.apk)**（ライブラリー・再生・PiPを統合済み）
+**[正式版APK v0.4.21](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.4.21/YoutubePandora-Android-v0.4.21.apk)**（ライブラリー・再生・PiPを統合済み）
 
 ライブラリー試験版の機能は正式版v0.4.6へ統合しました。
+
+v0.4.21では「表示調整」をスライダー形のアイコンボタンに変更し、レイアウトボタンの隣へ配置しました。同じ大きさ・背景画像に合わせた色で表示します。検索ボタンは「検索 🔎」になりました。
 
 v0.4.20ではライブラリーの検索・表示調整ボタンの右端に、レイアウト切り替えボタンを追加しました。従来の「標準リスト」に加えて「コンパクト」「2列グリッド」「3列グリッド」「大きいサムネイル」を選べます。「表示調整」でもプレビューを見ながら変更できます。選択は自動保存し、サムネイルの配色・透過・ぼかしと再生・削除操作を引き継ぎます。
 

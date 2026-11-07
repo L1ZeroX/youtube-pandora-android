@@ -187,9 +187,9 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
                     OutlinedButton(onClick={
                         if(searchExpanded) { search=""; focusManager.clearFocus(); keyboard?.hide() }
                         searchExpanded=!searchExpanded
-                    }) { Text(if(searchExpanded) "検索を閉じる" else "検索") }
-                    OutlinedButton(onClick={focusManager.clearFocus(); keyboard?.hide(); appearance=true}) { Text("表示調整") }
+                    }) { Text(if(searchExpanded) "検索を閉じる" else "検索 🔎") }
                 }
+                LibraryAppearanceButton(headerAccent) { focusManager.clearFocus(); keyboard?.hide(); appearance=true }
                 LibraryLayoutButton(layout,headerAccent,onOpen={focusManager.clearFocus(); keyboard?.hide()},
                     onSelect={Store.preferences(preferences.copy(libraryLayout=it.id))})
             }
