@@ -6,7 +6,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Rect
-import android.graphics.drawable.BitmapDrawable
+import android.graphics.Bitmap
 import android.os.Build
 import android.os.Bundle
 import android.util.Rational
@@ -26,6 +26,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.Lifecycle
 import androidx.media3.common.MediaItem
@@ -35,6 +37,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import androidx.media3.ui.PlayerView
+import androidx.media3.ui.AspectRatioFrameLayout
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -45,16 +48,20 @@ import kotlin.math.roundToInt
 
 @androidx.annotation.OptIn(UnstableApi::class)
 class PlayerActivity : ComponentActivity() {
-    private var controller: MediaController? = null
+    private var controller by mutableStateOf<MediaController?>(null)
     private var future: ListenableFuture<MediaController>? = null
     private var playerView: PlayerView? = null
     private var loadJob: Job? = null
     private var artJob: Job? = null
     private var artworkUri=""
     private var artworkColor by mutableStateOf<Color?>(null)
+    private var artwork by mutableStateOf<Bitmap?>(null)
     private var title by mutableStateOf("読み込み中…")
     private var video by mutableStateOf(false)
     private var inPip by mutableStateOf(false)
+    private var landscape by mutableStateOf(false)
+    private var appliedFullscreen: Boolean? = null
+    internal val videoFullscreen get() = video && landscape && !inPip
     private var error by mutableStateOf("")
     private var connected by mutableStateOf(false)
     private var requestedUri: String? = null
@@ -68,6 +75,7 @@ class PlayerActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        landscape=resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
         WindowCompat.getInsetsController(window,window.decorView).apply {
             isAppearanceLightStatusBars=false; isAppearanceLightNavigationBars=false
         }
@@ -77,8 +85,12 @@ class PlayerActivity : ComponentActivity() {
         onBackPressedDispatcher.addCallback(this) { closePlayerScreen() }
         setContent {
             MaterialTheme(colorScheme=darkColorScheme()) {
-                Column(Modifier.fillMaxSize().background(Color.Black).then(if(inPip) Modifier else Modifier.safeDrawingPadding())) {
-                    if(!inPip) {
+                if(!video && !inPip) {
+                    MusicPlayerScreen(controller,title,artwork,artworkColor,error,
+                        onBack={closePlayerScreen()},onStop={controller?.stop(); controller?.clearMediaItems(); closePlayerScreen()})
+                } else {
+                Column(Modifier.fillMaxSize().background(Color.Black).then(if(inPip || videoFullscreen) Modifier else Modifier.safeDrawingPadding())) {
+                    if(!inPip && !videoFullscreen) {
                         Row(Modifier.fillMaxWidth().padding(horizontal=12.dp,vertical=8.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                             PlaybackColorGlass(artworkColor) {
                                 TextButton(onClick={closePlayerScreen()},colors=ButtonDefaults.textButtonColors(contentColor=Color.White)) { Text("戻る") }
@@ -95,23 +107,30 @@ class PlayerActivity : ComponentActivity() {
                         PlaybackColorGlass(artworkColor,Modifier.fillMaxWidth().padding(horizontal=12.dp)) {
                             Text(title,Modifier.padding(horizontal=14.dp,vertical=10.dp),color=Color.White,maxLines=2,overflow=TextOverflow.Ellipsis)
                         }
-                        if(!video) Text("画面を閉じても音楽を再生します。",Modifier.padding(horizontal=16.dp),color=Color.LightGray)
                         if(error.isNotBlank()) Text(error,Modifier.padding(16.dp),color=MaterialTheme.colorScheme.error)
                     }
+                    if(videoFullscreen && error.isNotBlank())
+                        Text(error,Modifier.padding(16.dp),color=MaterialTheme.colorScheme.error)
                     AndroidView(factory={ context ->
                         PlayerView(context).also { view ->
                             view.player=controller
+                            view.resizeMode=AspectRatioFrameLayout.RESIZE_MODE_FIT
                             view.setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
                             view.setShowNextButton(true); view.setShowPreviousButton(true)
                             stylePlaybackControls(view,artworkColor)
                             view.addOnLayoutChangeListener { _,_,_,_,_,_,_,_,_ -> updatePip() }
                             playerView=view
                         }
-                    },modifier=Modifier.weight(1f).fillMaxWidth(),update={ view ->
+                    },modifier=Modifier.weight(1f).fillMaxWidth(),onRelease={ view ->
+                        view.player=null
+                        if(playerView === view) playerView=null
+                    },update={ view ->
                         view.player=controller
+                        view.keepScreenOn=video && controller?.isPlaying == true
                         view.useController=!inPip
                         if(inPip) view.hideController()
                     })
+                }
                 }
             }
         }
@@ -172,12 +191,13 @@ class PlayerActivity : ComponentActivity() {
         val player=controller ?: return
         title=player.mediaMetadata.title?.toString() ?: "プレーヤー"
         video=player.currentMediaItem?.mediaMetadata?.extras?.getBoolean("video") == true
+        updateWindowMode()
         error=player.playerError?.let { "再生できません。ファイルの場所・アクセス権、対応形式を確認してください。" }.orEmpty()
-        playerView?.keepScreenOn=player.isPlaying
+        playerView?.keepScreenOn=video && player.isPlaying
         val uri=player.currentMediaItem?.mediaId.orEmpty()
         if(uri != artworkUri) {
             artworkUri=uri; artJob?.cancel(); playerView?.defaultArtwork=null
-            artworkColor=null
+            artworkColor=null; artwork=null
             playerView?.let { stylePlaybackControls(it,null) }
             val isVideo=video
             if(uri.isNotBlank()) artJob=lifecycleScope.launch {
@@ -185,7 +205,7 @@ class PlayerActivity : ComponentActivity() {
                 val color=withContext(Dispatchers.Default) { art?.let { libraryThumbnailColor(it) } }
                 if(artworkUri == uri) {
                     artworkColor=color
-                    if(!isVideo && art != null) playerView?.defaultArtwork=BitmapDrawable(resources,art)
+                    artwork=art
                     playerView?.let { stylePlaybackControls(it,artworkColor) }
                 }
             }
@@ -221,8 +241,29 @@ class PlayerActivity : ComponentActivity() {
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode,newConfig)
         inPip=isInPictureInPictureMode
+        landscape=newConfig.orientation == Configuration.ORIENTATION_LANDSCAPE
+        updateWindowMode()
         if(inPip) BubbleRuntime.leave(this)
         else if(lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) BubbleRuntime.enter(this)
+    }
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        landscape=newConfig.orientation == Configuration.ORIENTATION_LANDSCAPE
+        updateWindowMode()
+    }
+    private fun updateWindowMode(force: Boolean = false) {
+        if(inPip) { appliedFullscreen=null; return }
+        val fullscreen=videoFullscreen
+        if(!force && appliedFullscreen == fullscreen) return
+        appliedFullscreen=fullscreen
+        WindowCompat.getInsetsController(window,window.decorView).apply {
+            systemBarsBehavior=WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            if(fullscreen) hide(WindowInsetsCompat.Type.systemBars()) else show(WindowInsetsCompat.Type.systemBars())
+        }
+    }
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if(hasFocus) updateWindowMode(force=true)
     }
     private fun closePlayerScreen() {
         if(supportsPip) runCatching { setPictureInPictureParams(pipParams(false)) }

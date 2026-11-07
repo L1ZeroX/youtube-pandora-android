@@ -5,6 +5,10 @@ import android.content.ComponentName
 import android.content.ContentValues
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.pm.ActivityInfo
+import android.content.res.Configuration
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import android.net.Uri
 import android.os.SystemClock
 import android.provider.MediaStore
@@ -142,6 +146,15 @@ class LibraryPlaybackTest {
             }
             val controller=future!!.get(10,TimeUnit.SECONDS)
             waitFor { controller.currentMediaItem?.mediaId == uri.toString() && controller.playbackState == Player.STATE_READY && controller.currentPosition > 250 }
+            val music=MusicPlayback(controller)
+            instrumentation.runOnMainSync { music.refresh(queueChanged=true); music.toggle() }
+            waitFor { !controller.playWhenReady }
+            instrumentation.runOnMainSync { music.seek(uri.toString(),.25f) }
+            waitFor { controller.currentPosition in 7000..8000 }
+            instrumentation.runOnMainSync { music.shuffle(); music.repeat() }
+            waitFor { controller.shuffleModeEnabled && controller.repeatMode == Player.REPEAT_MODE_ALL }
+            instrumentation.runOnMainSync { music.shuffle(); music.repeat(); music.repeat(); music.toggle() }
+            waitFor { controller.isPlaying && !controller.shuffleModeEnabled && controller.repeatMode == Player.REPEAT_MODE_OFF }
             scenario.close()
             waitFor { controller.isPlaying && controller.currentPosition > 750 }
             instrumentation.runOnMainSync { library.connect() }
@@ -188,6 +201,13 @@ class LibraryPlaybackTest {
             var activity: PlayerActivity? = null
             scenario.onActivity {
                 activity=it
+                it.requestedOrientation=ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            }
+            waitFor { activity?.resources?.configuration?.orientation == Configuration.ORIENTATION_LANDSCAPE && activity?.videoFullscreen == true && controller.isPlaying }
+            waitFor { activity?.let { ViewCompat.getRootWindowInsets(it.window.decorView)?.isVisible(WindowInsetsCompat.Type.statusBars()) == false } == true }
+            scenario.onActivity { it.requestedOrientation=ActivityInfo.SCREEN_ORIENTATION_PORTRAIT }
+            waitFor { activity?.resources?.configuration?.orientation == Configuration.ORIENTATION_PORTRAIT && activity?.videoFullscreen == false && controller.isPlaying }
+            scenario.onActivity {
                 assertTrue(it.enterPictureInPictureMode(PictureInPictureParams.Builder().build()))
             }
             waitFor { activity?.isInPictureInPictureMode == true && controller.isPlaying }

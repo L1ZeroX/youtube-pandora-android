@@ -5,6 +5,8 @@ import android.graphics.Canvas
 import android.graphics.Outline
 import android.view.View
 import android.widget.TextView
+import android.widget.ImageView
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.Color
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.DefaultTimeBar
@@ -37,6 +39,9 @@ class ArtworkGlassRenderTest {
         instrumentation.runOnMainSync {
             val view=PlayerView(instrumentation.targetContext)
             stylePlaybackControls(view,Color.Blue)
+            assertEquals(playbackAccent(Color.Blue).toArgb(),view.findViewById<ImageView>(MediaUiR.id.exo_play_pause).imageTintList!!.defaultColor)
+            stylePlaybackControls(view,Color.Red)
+            assertEquals(playbackAccent(Color.Red).toArgb(),view.findViewById<ImageView>(MediaUiR.id.exo_play_pause).imageTintList!!.defaultColor)
             assertTrue(view.findViewById<View>(MediaUiR.id.exo_bottom_bar).background is ArtworkGlassDrawable)
             assertNull(view.findViewById<DefaultTimeBar>(MediaUiR.id.exo_progress).background)
             val image=Bitmap.createBitmap(200,48,Bitmap.Config.ARGB_8888)
