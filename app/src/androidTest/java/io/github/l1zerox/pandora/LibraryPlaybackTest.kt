@@ -59,21 +59,20 @@ class LibraryPlaybackTest {
         }
     }
 
-    @Test fun betaComponentsAndPipAreDeclaredOnlyForTheBetaBuild() {
+    @Test fun libraryComponentsAndPipAreEnabledInBothChannels() {
         val flags=PackageManager.MATCH_DISABLED_COMPONENTS
         val library=context.packageManager.getActivityInfo(ComponentName(context,LibraryActivity::class.java),flags)
         val player=context.packageManager.getActivityInfo(ComponentName(context,PlayerActivity::class.java),flags)
         val service=context.packageManager.getServiceInfo(ComponentName(context,PlaybackService::class.java),flags)
-        assertEquals(BuildConfig.BETA,library.enabled)
-        assertEquals(BuildConfig.BETA,player.enabled)
-        assertEquals(BuildConfig.BETA,service.enabled)
+        assertTrue(library.enabled)
+        assertTrue(player.enabled)
+        assertTrue(service.enabled)
         // FLAG_SUPPORTS_PICTURE_IN_PICTURE = 0x400000 (ActivityInfo constant is hidden on some SDKs).
         assertTrue(player.flags and 0x400000 != 0)
         assertFalse(player.exported); assertFalse(service.exported)
     }
 
     @Test fun musicPlaybackSurvivesClosingItsScreenAndRespondsToPauseResumeStop() {
-        assumeTrue(BuildConfig.BETA)
         YoutubeDL.init(context); FFmpeg.init(context)
         val file=File(context.cacheDir,"library-silence.mp3")
         val process=NativeRuntime.command(context,"libffmpeg.so",listOf("-y","-f","lavfi","-i","anullsrc=r=44100:cl=stereo","-t","30","-c:a","libmp3lame",file.absolutePath)).start()
@@ -116,7 +115,7 @@ class LibraryPlaybackTest {
     }
 
     @Test fun videoContinuesInPipAndPausesWhenItsWindowCloses() {
-        assumeTrue(BuildConfig.BETA && context.packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE))
+        assumeTrue(context.packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE))
         YoutubeDL.init(context); FFmpeg.init(context)
         val file=File(context.cacheDir,"library-pip.mp4")
         val process=NativeRuntime.command(context,"libffmpeg.so",listOf("-y","-f","lavfi","-i","color=c=blue:s=320x180:r=24",

@@ -11,12 +11,11 @@ android {
         applicationId = "io.github.l1zerox.pandora"
         minSdk = 29
         targetSdk = 36
-        // Keep this beta install-compatible with its v0.4.5 base in both directions.
-        versionCode = 26
-        versionName = if(betaBuild) "0.4.6-beta.7" else "0.4.5"
+        // Promote the library beta while preserving the application ID and signing key.
+        versionCode = 27
+        versionName = if(betaBuild) "0.4.6-beta.7" else "0.4.6"
         buildConfigField("boolean", "BETA", betaBuild.toString())
         manifestPlaceholders["appLabel"] = "Youtube Pandora!"
-        manifestPlaceholders["libraryEnabled"] = betaBuild.toString()
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

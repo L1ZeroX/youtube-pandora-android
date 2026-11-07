@@ -26,11 +26,11 @@
                 <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
-        <activity android:name=".LibraryActivity" android:exported="false" android:enabled="${libraryEnabled}" />
-        <activity android:name=".PlayerActivity" android:exported="false" android:enabled="${libraryEnabled}"
+        <activity android:name=".LibraryActivity" android:exported="false" />
+        <activity android:name=".PlayerActivity" android:exported="false"
             android:launchMode="singleTask" android:supportsPictureInPicture="true"
             android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation" />
-        <service android:name=".PlaybackService" android:exported="false" android:enabled="${libraryEnabled}"
+        <service android:name=".PlaybackService" android:exported="false"
             android:foregroundServiceType="mediaPlayback">
             <intent-filter><action android:name="androidx.media3.session.MediaSessionService" /></intent-filter>
         </service>

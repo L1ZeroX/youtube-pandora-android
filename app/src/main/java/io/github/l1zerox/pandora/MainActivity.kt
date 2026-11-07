@@ -174,7 +174,7 @@ fun PandoraScreen(artworkRequested: Boolean = false, onArtworkClosed: ()->Unit =
                             Spacer(Modifier.height(12.dp))
                             Text("ダウンロード",fontSize=32.sp,fontWeight=FontWeight.Bold)
                             Text("お気に入りを、いつでも。",fontSize=13.sp,color=colors.onSurfaceVariant)
-                            if(BuildConfig.BETA) OutlinedButton(onClick={context.startActivity(Intent(context,LibraryActivity::class.java))},
+                            OutlinedButton(onClick={context.startActivity(Intent(context,LibraryActivity::class.java))},
                                 modifier=Modifier.fillMaxWidth().padding(top=12.dp)) { Text("ライブラリー · 動画と音楽を再生") }
                         }
                     }

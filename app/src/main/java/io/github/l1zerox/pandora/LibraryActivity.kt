@@ -49,7 +49,6 @@ import kotlinx.coroutines.launch
 class LibraryActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if(!BuildConfig.BETA) { finish(); return }
         enableEdgeToEdge()
         setContent {
             val state by Store.state.collectAsStateWithLifecycle()

@@ -67,7 +67,6 @@ class PlayerActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if(!BuildConfig.BETA) { finish(); return }
         enableEdgeToEdge()
         WindowCompat.getInsetsController(window,window.decorView).apply {
             isAppearanceLightStatusBars=false; isAppearanceLightNavigationBars=false

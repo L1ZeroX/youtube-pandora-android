@@ -4,6 +4,12 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ReleaseVersionTest {
+    @Test fun libraryPromotionUpgradesBothChannelsWithoutOfferingArchivedBeta() {
+        val releases=listOf(release("0.4.5",preview=false),release("0.4.6-beta.7"),release("0.4.6",preview=false))
+        for(installed in listOf("0.4.5","0.4.6-beta.7"))
+            assertEquals("0.4.6",newestRelease(releases,installed,unifiedOnly=true)!!.version)
+        assertNull(newestRelease(releases,"0.4.6",beta=true,offer=true,unifiedOnly=true))
+    }
     @Test fun libraryBetaCanBeSelectedFromItsBaseAndReturnOnExplicitRequest() {
         val releases=listOf(release("0.4.5",preview=false),release("0.4.6-beta.1"))
         assertEquals("0.4.6-beta.1",newestRelease(releases,"0.4.5",beta=true,offer=true)!!.version)
