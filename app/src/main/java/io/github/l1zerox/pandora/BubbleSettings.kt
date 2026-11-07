@@ -30,7 +30,7 @@ internal fun BubbleSettings(p: Preferences) {
             .onFailure { BubbleRuntime.error.value="Androidの設定から「他のアプリの上に表示」を許可してください。" }
     }
     val notifications=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { requestOverlay() }
-    Text("バブル（ベータ機能）",fontWeight=FontWeight.Bold)
+    Text("バブル",fontWeight=FontWeight.Bold)
     Row(verticalAlignment=Alignment.CenterVertically) {
         Text("最小化するとバブルを表示",Modifier.weight(1f))
         Switch(p.bubble,{ enabled ->

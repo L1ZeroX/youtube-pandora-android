@@ -14,6 +14,25 @@ import java.io.File
 
 class ScreenTest {
     @get:Rule val screen = createAndroidComposeRule<MainActivity>()
+    @Test fun promotedFeaturesAreAvailableInTheDefaultReleaseChannel() {
+        val original=Store.state.value
+        try {
+            val service=screen.activity.packageManager.getServiceInfo(
+                android.content.ComponentName(screen.activity,BubbleService::class.java),0)
+            org.junit.Assert.assertTrue(service.enabled)
+            screen.runOnIdle {
+                AppUpdates.dismiss()
+                Store.state.value=ScreenState(busy=true,operation="DOWNLOAD")
+            }
+            screen.onNodeWithText("一時停止").assertIsEnabled()
+            screen.runOnIdle { Store.state.update { it.copy(paused=true) } }
+            screen.onNodeWithText("再開").assertIsEnabled()
+            screen.onNodeWithText("キャンセル").assertIsEnabled()
+            screen.runOnIdle { Store.state.value=ScreenState() }
+            screen.onNodeWithText("環境設定").performClick()
+            screen.onNodeWithText("最小化するとバブルを表示").performScrollTo().assertIsDisplayed()
+        } finally { screen.runOnIdle { Store.state.value=original; Store.save() } }
+    }
     @Test fun backgroundPreviewReflectsAdjustmentsAndPreservesSettingsOnClose() {
         val original=Store.state.value
         val fixture=File(screen.activity.filesDir,"preview-test.png")

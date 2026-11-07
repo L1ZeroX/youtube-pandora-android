@@ -41,7 +41,7 @@ internal object BubbleRuntime {
     val error=MutableStateFlow("")
     fun sync(context: Context): Boolean {
         permission.value=Settings.canDrawOverlays(context)
-        if(BuildConfig.BETA && Store.state.value.preferences.bubble && permission.value) {
+        if(Store.state.value.preferences.bubble && permission.value) {
             return runCatching { ContextCompat.startForegroundService(context,Intent(context,BubbleService::class.java)) }
                 .onFailure { error.value="バブルを開始できませんでした。アプリを開いて再度お試しください。"; AppLog.error("バブル開始",it) }
                 .isSuccess
@@ -88,7 +88,7 @@ class BubbleService : Service() {
     },{ AppLog.error("共有プレビュー",it) })
     private val clipboard by lazy {
         BubbleClipboard(this,{
-            BuildConfig.BETA && Store.state.value.preferences.let { it.bubble && it.bubbleClipboard } &&
+            Store.state.value.preferences.let { it.bubble && it.bubbleClipboard } &&
                 panel?.hasWindowFocus() == true && !getSystemService(KeyguardManager::class.java).isKeyguardLocked
         },{ clipboardStatus?.text=it })
     }
@@ -126,7 +126,7 @@ class BubbleService : Service() {
         return START_NOT_STICKY
     }
     private fun render() {
-        if(!BuildConfig.BETA || !Store.state.value.preferences.bubble || !Settings.canDrawOverlays(this)) {
+        if(!Store.state.value.preferences.bubble || !Settings.canDrawOverlays(this)) {
             hide(); stopSelf(); return
         }
         updateArtwork()

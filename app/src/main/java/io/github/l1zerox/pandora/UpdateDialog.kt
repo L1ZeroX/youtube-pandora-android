@@ -26,7 +26,7 @@ internal fun UpdateDialog(state: UpdateState, dismiss: ()->Unit) {
             if(release != null) {
                 Text("現在 ${BuildConfig.VERSION_NAME} → ${release.version}${if(release.preview) "（試用版）" else ""}")
                 Text(release.notes,fontSize=13.sp)
-                Text("統合版は通常版・ベータ版とも同じアプリとして上書きインストールし、設定・キューを引き継ぎます。ダウンロード処理を終了してからAPKを開いてください。ベータ版のバブル機能は通常版では無効になります。",fontSize=12.sp)
+                Text("統合版は通常版・ベータ版とも同じアプリとして上書きインストールし、設定・キューを引き継ぎます。ダウンロード処理を終了してからAPKを開いてください。リリース版v0.4.0以降でもバブルを利用できます。",fontSize=12.sp)
                 TextButton(onClick={open(release.pageUrl)}) { Text("GitHubで更新内容を見る") }
             } else Text(state.message)
             if(browserError.isNotBlank()) Text(browserError,color=MaterialTheme.colorScheme.error)

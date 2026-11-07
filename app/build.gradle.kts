@@ -11,11 +11,10 @@ android {
         applicationId = "io.github.l1zerox.pandora"
         minSdk = 29
         targetSdk = 36
-        versionCode = 20
-        versionName = if(betaBuild) "0.4.0-beta.8" else "0.3.5"
+        versionCode = 21
+        versionName = if(betaBuild) "0.4.1-beta.1" else "0.4.0"
         buildConfigField("boolean", "BETA", betaBuild.toString())
         manifestPlaceholders["appLabel"] = "Youtube Pandora!"
-        manifestPlaceholders["bubbleEnabled"] = betaBuild.toString()
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

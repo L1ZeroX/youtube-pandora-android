@@ -15,7 +15,6 @@ import org.junit.Test
 
 class BubbleOverlayTest {
     @Test fun minimizedActivityShowsOverlayPanelAndClosingBubbleKeepsDownloadState() {
-        assumeTrue(BuildConfig.BETA)
         val instrumentation=InstrumentationRegistry.getInstrumentation()
         val context=instrumentation.targetContext
         val automation=instrumentation.uiAutomation

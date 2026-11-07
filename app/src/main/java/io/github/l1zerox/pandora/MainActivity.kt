@@ -150,11 +150,11 @@ fun PandoraScreen() {
                         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                             OutlinedButton(onClick={start("DOWNLOAD",true)},enabled=!s.busy && s.videos.any { it.status == "失敗" }) { Text("再試行") }
                             if(s.busy) {
-                                if(BuildConfig.BETA && s.operation == "DOWNLOAD") Button(
+                                if(s.operation == "DOWNLOAD") Button(
                                     onClick={context.startService(Intent(context,DownloadService::class.java).setAction(if(s.paused) "RESUME" else "PAUSE"))},
                                     enabled=!s.stopping,modifier=Modifier.weight(1f)) { Text(if(s.paused) "再開" else "一時停止") }
                                 Button(onClick={context.startService(Intent(context,DownloadService::class.java).setAction("STOP"))},
-                                    enabled=!s.stopping,modifier=Modifier.weight(1f)) { Text(if(BuildConfig.BETA) "キャンセル" else "停止") }
+                                    enabled=!s.stopping,modifier=Modifier.weight(1f)) { Text("キャンセル") }
                             }
                             else Button(onClick={start("DOWNLOAD")},enabled=s.videos.any { it.selected && it.status != "完了" },modifier=Modifier.weight(1f).height(48.dp)) { Text("ダウンロード") }
                         }
@@ -166,7 +166,7 @@ fun PandoraScreen() {
                         Column(Modifier.padding(top=16.dp,bottom=10.dp)) {
                             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                                 Text(if(BuildConfig.BETA) "ベータ版" else "Android版",fontSize=12.sp,modifier=Modifier.weight(1f))
-                                if(BuildConfig.BETA && p.bubble && android.provider.Settings.canDrawOverlays(context)) TextButton(
+                                if(p.bubble && android.provider.Settings.canDrawOverlays(context)) TextButton(
                                     onClick={ (context as? android.app.Activity)?.moveTaskToBack(true) }) { Text("バブルへ") }
                                 TextButton(onClick={settings=true}) { Text("環境設定") }
                             }
@@ -276,7 +276,7 @@ fun PandoraScreen() {
                     Text("背景",fontWeight=FontWeight.Bold)
                     Button(onClick={backgroundSettings=true}) { Text("背景をプレビュー・調整") }
                     Text("仕上がりを見ながら、画像・透明度・パネルの透過率・ぼかしを調整できます。",fontSize=12.sp)
-                    if(BuildConfig.BETA) BubbleSettings(p)
+                    BubbleSettings(p)
                     OutlinedButton(onClick={settings=false; start("UPDATE")},enabled=!s.busy) { Text("yt-dlpを更新") }
                     OutlinedButton(onClick={settings=false;logs=true}) { Text("処理ログを見る") }
                     Text("アプリの更新 · 現在 ${BuildConfig.VERSION_NAME}")

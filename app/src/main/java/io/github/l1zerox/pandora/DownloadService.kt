@@ -43,11 +43,11 @@ class DownloadService : Service() {
                     }
                 } else stopSelf()
             }
-            "PAUSE" -> if(BuildConfig.BETA && state.operation == "DOWNLOAD" && job != null && !state.stopping && !state.paused) {
+            "PAUSE" -> if(state.operation == "DOWNLOAD" && job != null && !state.stopping && !state.paused) {
                 Store.state.update { it.copy(stopping=true,message="一時停止しています…") }
                 engine?.pause()
             }
-            "RESUME" -> if(BuildConfig.BETA && state.paused && job == null && batch != null) launchOperation("DOWNLOAD",resuming=true)
+            "RESUME" -> if(state.paused && job == null && batch != null) launchOperation("DOWNLOAD",resuming=true)
             "FETCH", "DOWNLOAD", "UPDATE" -> if(job == null && !state.busy) {
                 batch=if(action == "DOWNLOAD") DownloadBatch(state.preferences,state.videos,intent.getBooleanExtra("retry",false)) else null
                 launchOperation(action,intent.getStringExtra("urls").orEmpty())
@@ -164,7 +164,7 @@ class DownloadService : Service() {
         val builder=NotificationCompat.Builder(this,"downloads").setSmallIcon(R.drawable.ic_pandora).setContentTitle("Youtube Pandora!")
             .setContentText(text).setOngoing(true).setOnlyAlertOnce(true).setContentIntent(open)
             .setProgress(100,((value ?: 0f)*100).toInt(),value == null)
-        if(BuildConfig.BETA && Store.state.value.operation == "DOWNLOAD") {
+        if(Store.state.value.operation == "DOWNLOAD") {
             val paused=Store.state.value.paused
             builder.addAction(0,if(paused) "再開" else "一時停止",action(if(paused) "RESUME" else "PAUSE",2))
         }
