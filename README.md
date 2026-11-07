@@ -4,7 +4,7 @@ Windows版と別プロジェクトのAndroid用アプリです。Android 10以�
 
 ## インストール
 
-**[通常版APK v0.3.3](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.3.3/YoutubePandora-Android-v0.3.3.apk)** / **[バブル試験版 v0.4.0-beta.6](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.4.0-beta.6/YoutubePandora-Android-v0.4.0-beta.6.apk)**
+**[通常版APK v0.3.4](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.3.4/YoutubePandora-Android-v0.3.4.apk)** / **[バブル試験版 v0.4.0-beta.7](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.4.0-beta.7/YoutubePandora-Android-v0.4.0-beta.7.apk)**
 
 [リリース一覧・更新情報](https://github.com/L1ZeroX/youtube-pandora-android/releases) / [Windows版](https://github.com/L1ZeroX/media-downloader)
 
@@ -121,7 +121,7 @@ GPL-3.0。依存ライブラリーとネイティブツールのライセンス�
 
 ## APK統合とバブル試験機能
 
-通常版とベータ版は同じ `io.github.l1zerox.pandora`・同じ署名鍵を使い、設定・背景・キューを共有します。今回のv0.3.3とv0.4.0-beta.6はversionCode 18で、アンインストールせず相互に上書きインストールできます。beta.6から戻すときは通常版v0.3.3以降を使ってください。フレーム補間も通常版へ統合しました。ダウンロード・変換が終わってから切り替えてください。
+通常版とベータ版は同じ `io.github.l1zerox.pandora`・同じ署名鍵を使い、設定・背景・キューを共有します。今回のv0.3.4とv0.4.0-beta.7はversionCode 19で、アンインストールせず相互に上書きインストールできます。beta.7から戻すときは通常版v0.3.4以降を使ってください。フレーム補間も通常版へ統合しました。ダウンロード・変換が終わってから切り替えてください。
 
 旧ベータ版v0.3.0-beta.3以前は `io.github.l1zerox.pandora.beta` という別アプリです。そこから統合版を入れると通常版側へインストールされます。旧ベータ版の設定・キューはAndroidのアプリ分離により自動移行できません。既存の通常版の設定・キューを引き継ぎます。旧ベータ版のデータを確認してから整理してください。端末のDownloadフォルダーに保存済みの動画は残ります。
 
@@ -169,3 +169,7 @@ DLパネルの「保存形式」でMP4動画／MP3音声を選べます。アプ
 ### v0.3.3 / beta.6：サムネイル上のラベル
 
 サイト名は文字幅に合うサイズにし、再生時間とともに半透明の背景へ変更しました。ラベルの内側だけに、元画像の位置に合わせた軽いぼかしを描画します。ぼかし用画像は表示中のサムネイルを再利用し、最大320pxに縮小してバックグラウンドで処理します。文字をぼかさず、明るい画像上でも白文字が読める濃さに調整します。
+
+### v0.3.4 / beta.7：ロゴ単体のコンパクト表示
+
+タイトルロゴの白い角丸パネルと余白を外し、元の透過PNGをそのまま表示します。以前の約半分の大きさ（上限幅210dp）で中央に配置し、メイン画面と背景プレビューの両方へ反映します。
