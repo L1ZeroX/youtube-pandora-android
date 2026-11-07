@@ -18,8 +18,9 @@ internal object LibraryMetadata {
         }.getOrNull()
         val cache=context.getSharedPreferences("library_metadata",Context.MODE_PRIVATE)
         val saved=runCatching { JSONObject(cache.getString(entry.uri,null) ?: "") }.getOrNull()
-        if(version != null && saved?.optString("revision") == version) return entry.copy(
+        if(version != null && saved?.optString("revision") == version && saved.has("autoDubbed")) return entry.copy(
             width=saved.optInt("width"),height=saved.optInt("height"),
+            autoDubbed=entry.video && saved.optBoolean("autoDubbed"),
             durationMs=entry.durationMs.takeIf { it > 0 } ?: saved.optLong("duration"))
         return runCatching {
             MediaMetadataRetriever().use { retriever ->
@@ -29,11 +30,12 @@ internal object LibraryMetadata {
                     retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: 0,
                     retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull() ?: 0)
                 val duration=retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()?.coerceAtLeast(0) ?: 0
+                val autoDubbed=entry.video && isAutoDubbedMetadata(retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_GENRE))
                 if(version != null && (if(entry.video) size.first > 0 else duration > 0)) {
                     cache.edit().putString(entry.uri,JSONObject().put("revision",version).put("width",size.first)
-                        .put("height",size.second).put("duration",duration).toString()).apply()
+                        .put("height",size.second).put("duration",duration).put("autoDubbed",autoDubbed).toString()).apply()
                 }
-                entry.copy(width=size.first,height=size.second,durationMs=entry.durationMs.takeIf { it > 0 } ?: duration)
+                entry.copy(width=size.first,height=size.second,durationMs=entry.durationMs.takeIf { it > 0 } ?: duration,autoDubbed=autoDubbed)
             }
         }.getOrDefault(entry)
     }

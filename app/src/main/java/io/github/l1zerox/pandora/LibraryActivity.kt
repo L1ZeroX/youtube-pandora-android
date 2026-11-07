@@ -235,6 +235,10 @@ internal fun LibraryCard(entry: LibraryEntry, dark: Boolean, backdrop: LibraryBa
                 Text(entry.title,maxLines=2,overflow=TextOverflow.Ellipsis,fontWeight=FontWeight.SemiBold,color=palette.content)
                 Text(entry.category + if(entry.durationMs > 0) " · ${durationText(entry.durationMs/1000.0)}" else "",
                     fontSize=12.sp,color=palette.detail)
+                entry.dubbingLabel?.let { label ->
+                    Text(label,fontSize=12.sp,fontWeight=FontWeight.SemiBold,color=palette.content,
+                        modifier=Modifier.padding(top=4.dp))
+                }
             }
             Column(horizontalAlignment=Alignment.CenterHorizontally) {
                 LibraryPlayButton(entry.uri,playback,palette,onClick)

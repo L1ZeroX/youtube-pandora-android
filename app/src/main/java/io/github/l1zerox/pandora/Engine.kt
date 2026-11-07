@@ -184,6 +184,7 @@ class Engine(private val context: Context, private val progress: (String, Float?
                 args += if(audio?.optString("codec_name") == "aac") listOf("-c:a","copy") else listOf("-c:a","aac","-b:a","192k")
                 args += listOf("-movflags","+faststart")
                 if(selectedAudio?.usesJapanese == true && audio != null) args += listOf("-metadata:s:a:0","language=jpn")
+                args += autoDubbedMetadataArgs(selectedAudio,audio != null)
             }
             val conversionDetail = if(interpolating) "フレーム補間中（CPU・60fps）" else "${preferences.format} 変換中"
             progress("変換中", null, conversionDetail)

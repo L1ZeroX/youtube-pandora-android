@@ -15,8 +15,8 @@ import kotlinx.coroutines.CancellationException
 
 internal val LibraryEntrySaver=listSaver<LibraryEntry?,String>(
     save={ item -> if(item == null) emptyList() else listOf(item.uri,item.title,item.mime,item.durationMs.toString(),
-        item.added.toString(),item.imported.toString(),item.width.toString(),item.height.toString()) },
-    restore={ if(it.isEmpty()) null else LibraryEntry(it[0],it[1],it[2],it[3].toLong(),it[4].toLong(),it[5].toBoolean(),it[6].toInt(),it[7].toInt()) })
+        item.added.toString(),item.imported.toString(),item.width.toString(),item.height.toString(),item.autoDubbed.toString()) },
+    restore={ if(it.isEmpty()) null else LibraryEntry(it[0],it[1],it[2],it[3].toLong(),it[4].toLong(),it[5].toBoolean(),it[6].toInt(),it[7].toInt(),it.getOrNull(8).toBoolean()) })
 
 @Composable
 internal fun LibraryDeleteDialog(entry: LibraryEntry, onDismiss: ()->Unit, onRemoved: ()->Unit) {

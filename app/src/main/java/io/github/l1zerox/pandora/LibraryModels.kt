@@ -2,10 +2,11 @@ package io.github.l1zerox.pandora
 
 internal data class LibraryEntry(val uri: String, val title: String, val mime: String,
     val durationMs: Long = 0, val added: Long = 0, val imported: Boolean = false,
-    val width: Int = 0, val height: Int = 0) {
+    val width: Int = 0, val height: Int = 0, val autoDubbed: Boolean = false) {
     val video: Boolean get() = mime.startsWith("video/")
     val short: Boolean get() = video && width > 0 && height > width
     val category: String get() = if(!video) "音楽" else if(short) "ショート" else "動画"
+    val dubbingLabel: String? get() = if(video && autoDubbed) "オートダビング版" else null
 }
 
 /** Metadata dimensions describe the encoded frame; classify its displayed orientation. */
