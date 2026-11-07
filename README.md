@@ -6,7 +6,7 @@ Windows版と別プロジェクトのAndroid用アプリです。Android 10以�
 
 **[正式版APK v0.4.5](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.4.5/YoutubePandora-Android-v0.4.5.apk)**（ベータ版の機能を統合済み）
 
-**[ライブラリー試験版 v0.4.6-beta.2](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.4.6-beta.2/YoutubePandora-Android-v0.4.6-beta.2.apk)**（正式版v0.4.5をベースに動画・音楽再生を追加）
+**[ライブラリー試験版 v0.4.6-beta.3](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.4.6-beta.3/YoutubePandora-Android-v0.4.6-beta.3.apk)**（正式版v0.4.5をベースに動画・音楽再生を追加）
 
 [リリース一覧・更新情報](https://github.com/L1ZeroX/youtube-pandora-android/releases) / [Windows版](https://github.com/L1ZeroX/media-downloader)
 
@@ -25,6 +25,8 @@ v0.1.2から上記の保存先を使います。Android標準のダウンロー�
 ## 機能
 
 ### ベータ版のライブラリー
+
+v0.4.6-beta.3では、ライブラリーにもダウンロード画面と同じ背景画像・透明度・ぼかしを適用します。画像の読み込みと描画は共通処理です。検索・操作部分は、背景上でも文字を読みやすくする半透明パネルで表示します。再生画面の戻る／停止・タイトル・時間表示・シークバーには、サムネイルをぼかした半透明の背景を使います。動画・アートワーク本体は鮮明なまま表示します。PiP中は操作パネルを表示しません。
 
 v0.4.6-beta.2から、各カードはサムネイル／アルバムアートに合わせた配色になります。再生中・一時停止中の画像に合わせて上部の表示・操作色も切り替わります。背景と文字のコントラストを確保し、黒・白・グレーの画像は無彩色を維持します。ダーク／ライト両方でタイトル・時間・再生アイコンを読みやすくします。
 

@@ -50,11 +50,11 @@ internal fun libraryPalette(source: Color?, dark: Boolean): LibraryPalette {
 }
 
 /** Active artwork also tints controls; all active text pairs retain at least 4.5:1 contrast. */
-internal fun libraryColorScheme(source: Color?, dark: Boolean): ColorScheme {
+internal fun libraryColorScheme(source: Color?, dark: Boolean, backgroundOverride: Color? = null): ColorScheme {
     val base=if(dark) darkColorScheme() else lightColorScheme()
-    if(source == null) return base
+    if(source == null) return base.copy(background=backgroundOverride ?: base.background)
     val palette=libraryPalette(source,dark)
-    val background=lerp(source.copy(alpha=1f),if(dark) Color.Black else Color.White,.96f)
+    val background=backgroundOverride ?: lerp(source.copy(alpha=1f),if(dark) Color.Black else Color.White,.96f)
     val foreground=libraryTextColor(background)
     var primary=source.copy(alpha=1f)
     repeat(32) { if(libraryContrast(primary,background) < 4.5f) primary=lerp(primary,foreground,.12f) }

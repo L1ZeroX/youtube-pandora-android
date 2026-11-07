@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -54,7 +55,7 @@ class LibraryActivity : ComponentActivity() {
                 }
             }
             MaterialTheme(colorScheme=if(state.preferences.dark) darkColorScheme() else lightColorScheme()) {
-                LibraryScreen(state.preferences.dark) { finish() }
+                LibraryScreen(state.preferences) { finish() }
             }
         }
     }
@@ -64,7 +65,9 @@ class LibraryActivity : ComponentActivity() {
 }
 
 @Composable
-internal fun LibraryScreen(dark: Boolean, onBack: ()->Unit) {
+internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
+    val dark=preferences.dark
+    val wallpaper by rememberWallpaper(preferences.wallpaper)
     val context=LocalContext.current
     val scope=rememberCoroutineScope()
     var entries by remember { mutableStateOf(emptyList<LibraryEntry>()) }
@@ -110,9 +113,19 @@ internal fun LibraryScreen(dark: Boolean, onBack: ()->Unit) {
     }
     val playingColor=remember(playingArtwork) { playingArtwork?.let { libraryThumbnailColor(it) } }
     val playingPalette=remember(playingColor,dark) { libraryPalette(playingColor,dark) }
-    MaterialTheme(colorScheme=remember(playingColor,dark) { libraryColorScheme(playingColor,dark) }) {
-    Scaffold { padding ->
+    val colors=remember(playingColor,dark) { libraryColorScheme(playingColor,dark,appBackgroundColor(dark)) }
+    MaterialTheme(colorScheme=colors) {
+    Box(Modifier.fillMaxSize()) {
+    WallpaperLayer(wallpaper,preferences,Modifier.fillMaxSize())
+    Scaffold(containerColor=Color.Transparent) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).imePadding().padding(horizontal=16.dp)) {
+            val hasWallpaper=wallpaper != null
+            val headerTint=readableGlassTint(appSurfaceColor(dark)).let { it.copy(alpha=maxOf(it.alpha,1-preferences.glass)) }
+            Surface(shape=RoundedCornerShape(20.dp),color=if(hasWallpaper) headerTint else colors.surface,
+                contentColor=if(hasWallpaper) Color.White else colors.onSurface) {
+            MaterialTheme(colorScheme=if(hasWallpaper) colors.copy(primary=Color.White,onSurface=Color.White,
+                onSurfaceVariant=Color.White,outline=Color.White.copy(alpha=.7f)) else colors) {
+            Column(Modifier.padding(12.dp)) {
             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                 TextButton(onClick=onBack) { Text("戻る") }
                 Text("ライブラリー",Modifier.weight(1f),fontSize=24.sp,fontWeight=FontWeight.Bold)
@@ -133,9 +146,12 @@ internal fun LibraryScreen(dark: Boolean, onBack: ()->Unit) {
                 border=BorderStroke(1.dp,playingPalette.content.copy(alpha=.3f))) {
                 Text("${if(playback.playing) "再生中" else "一時停止"} · ${playback.title}",maxLines=1,overflow=TextOverflow.Ellipsis)
             }
-            if(error.isNotBlank()) Text(error,color=MaterialTheme.colorScheme.error,fontSize=13.sp)
+            if(error.isNotBlank()) Text(error,color=if(hasWallpaper) Color.White else MaterialTheme.colorScheme.error,fontSize=13.sp)
             if(loading) LinearProgressIndicator(Modifier.fillMaxWidth())
             if(visible.isEmpty() && !loading) Text(if(entries.isEmpty()) "保存した動画・音楽がここに表示されます。" else "該当するファイルはありません。",Modifier.padding(vertical=24.dp))
+            }
+            }
+            }
             LazyColumn(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(10.dp),contentPadding=PaddingValues(vertical=8.dp)) {
                 items(visible,key={it.uri}) { item ->
                     LibraryCard(item,dark) {
@@ -144,6 +160,7 @@ internal fun LibraryScreen(dark: Boolean, onBack: ()->Unit) {
                 }
             }
         }
+    }
     }
     }
 }

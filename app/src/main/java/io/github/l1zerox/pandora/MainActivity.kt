@@ -118,23 +118,12 @@ fun PandoraScreen(artworkRequested: Boolean = false, onArtworkClosed: ()->Unit =
         } catch(e: Exception) { error = e.message ?: "開始できませんでした。"; AppLog.error("処理開始",e) }
     }
     LaunchedEffect(s.incomingUrl) { if(s.incomingUrl.isNotEmpty()) { text = s.incomingUrl; Store.state.update { it.copy(incomingUrl="") } } }
-    val bitmap by produceState<Bitmap?>(null,p.wallpaper) {
-        value = withContext(Dispatchers.IO) {
-            runCatching {
-                val file = File(p.wallpaper)
-                if(!file.isFile) null else ImageDecoder.decodeBitmap(ImageDecoder.createSource(file)) { decoder, info, _ ->
-                    val scale = (max(info.size.width,info.size.height) / 1600f).coerceAtLeast(1f)
-                    decoder.setTargetSize((info.size.width/scale).toInt(),(info.size.height/scale).toInt())
-                    decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-                }
-            }.getOrNull()
-        }
-    }
+    val bitmap by rememberWallpaper(p.wallpaper)
     val accent = remember(bitmap,p.dark) { readableBadgeColor(bitmap?.let { accentColor(it,p.dark) } ?: Color(0xFF4388FF)) }
     val animatedAccent by animateColorAsState(accent,label="accent")
     val colors = if(p.dark) darkColorScheme(primary=animatedAccent,onPrimary=Color.White,
-        background=Color(0xFF090B10),surface=Color(0xFF191C23)) else lightColorScheme(primary=animatedAccent,onPrimary=Color.White,
-        background=Color(0xFFF3F4F6),surface=Color.White)
+        background=appBackgroundColor(true),surface=appSurfaceColor(true)) else lightColorScheme(primary=animatedAccent,onPrimary=Color.White,
+        background=appBackgroundColor(false),surface=appSurfaceColor(false))
     MaterialTheme(colorScheme=colors) {
         Box(Modifier.fillMaxSize().background(colors.background)) {
             WallpaperLayer(bitmap,p,Modifier.fillMaxSize())
