@@ -4,9 +4,11 @@ Windows版と別プロジェクトのAndroid用アプリです。Android 10以�
 
 ## インストール
 
-**[正式版APK v0.4.15](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.4.15/YoutubePandora-Android-v0.4.15.apk)**（ライブラリー・再生・PiPを統合済み）
+**[正式版APK v0.4.16](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.4.16/YoutubePandora-Android-v0.4.16.apk)**（ライブラリー・再生・PiPを統合済み）
 
 ライブラリー試験版の機能は正式版v0.4.6へ統合しました。
+
+v0.4.16ではダウンロード見出し下の説明文を削除し、「環境設定」とバブルのボタンを「リンクを追加」と同じ塗りつぶし・背景画像に合わせた配色へ統一しました。
 
 v0.4.15では、バブル・音楽再生でプロセスが残っていても画面復帰時に更新を再確認します（自動確認は成功後5分間隔、手動確認は制限なし）。通信失敗時の再試行とライブラリー・再生画面での通知に対応しました。ライブラリー上部の再生プレビューのバーだけ細くし、サムネイル付きカード内のバーは維持しました。旧版で更新通知が出ない場合は上記APKから直接更新できます。
 

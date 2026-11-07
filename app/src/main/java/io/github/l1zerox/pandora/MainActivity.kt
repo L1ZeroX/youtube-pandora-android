@@ -162,19 +162,18 @@ fun PandoraScreen(artworkRequested: Boolean = false, onArtworkClosed: ()->Unit =
                 LazyColumn(Modifier.fillMaxSize().padding(padding).imePadding(),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
                     item {
                         Column(Modifier.padding(top=16.dp,bottom=10.dp)) {
-                            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                                 Text(if(BuildConfig.BETA) "ベータ版" else "Android版",fontSize=12.sp,modifier=Modifier.weight(1f))
                                 if(p.bubble) {
-                                    if(bubblePermission) TextButton(
+                                    if(bubblePermission) Button(contentPadding=PaddingValues(horizontal=12.dp,vertical=8.dp),
                                         onClick={ (context as? android.app.Activity)?.moveTaskToBack(true) }) { Text("バブルへ") }
-                                    else TextButton(onClick={settings=true}) { Text("バブルの表示許可") }
+                                    else Button(onClick={settings=true},contentPadding=PaddingValues(horizontal=12.dp,vertical=8.dp)) { Text("バブルの表示許可") }
                                 }
-                                TextButton(onClick={settings=true}) { Text("環境設定") }
+                                Button(onClick={settings=true},contentPadding=PaddingValues(horizontal=12.dp,vertical=8.dp)) { Text("環境設定") }
                             }
                             TitleLogo(Modifier.align(Alignment.CenterHorizontally))
                             Spacer(Modifier.height(12.dp))
                             Text("ダウンロード",fontSize=32.sp,fontWeight=FontWeight.Bold)
-                            Text("お気に入りを、いつでも。",fontSize=13.sp,color=colors.onSurfaceVariant)
                             Button(onClick={context.startActivity(Intent(context,LibraryActivity::class.java))},
                                 modifier=Modifier.fillMaxWidth().padding(top=12.dp)) { Text("ライブラリー · 動画と音楽を再生") }
                         }
