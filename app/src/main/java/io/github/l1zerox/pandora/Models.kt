@@ -17,7 +17,8 @@ data class Preferences(val format: String = "MP4", val quality: String = "1080p�
     val playlists: Boolean = false, val wallpaper: String = "", val opacity: Float = .35f,
     val glass: Float = .35f, val blur: Float = 18f, val bubble: Boolean = true,
     val bubbleClipboard: Boolean = true, val artworkMode: String = "サムネイル", val artworkImage: String = "",
-    val libraryGlass: Float = .45f, val libraryBlur: Int = 10, val preferJapaneseAudio: Boolean = false)
+    val libraryGlass: Float = .45f, val libraryBlur: Int = 10, val preferJapaneseAudio: Boolean = false,
+    val libraryLayout: String = "standard")
 data class ScreenState(val videos: List<Video> = emptyList(), val busy: Boolean = false,
     val message: String = "URLを貼り付けて情報を取得してください。", val progress: Float? = null,
     val detail: String = "", val current: String = "", val done: Int = 0, val total: Int = 0,
@@ -67,7 +68,8 @@ object Store {
             p.optBoolean("playlists"), p.optString("wallpaper"), p.optDouble("opacity", .35).toFloat().coerceIn(0f,1f),
             p.optDouble("glass", .35).toFloat().coerceIn(0f,.85f), p.optDouble("blur", 18.0).toFloat().coerceIn(0f,40f),p.optBoolean("bubble",true),p.optBoolean("bubbleClipboard",true),
             p.optString("artworkMode","サムネイル").takeIf { it in listOf("サムネイル","ギャラリー","なし") } ?: "サムネイル",p.optString("artworkImage"),
-            libraryPanelTransparency(p.optDouble("libraryGlass",.45).toFloat()),p.optInt("libraryBlur",10).coerceIn(0,20),p.optBoolean("preferJapaneseAudio",false))
+            libraryPanelTransparency(p.optDouble("libraryGlass",.45).toFloat()),p.optInt("libraryBlur",10).coerceIn(0,20),p.optBoolean("preferJapaneseAudio",false),
+            LibraryLayout.fromId(p.optString("libraryLayout")).id)
         val videos = runCatching {
             val array = JSONArray(data.getString("queue", "[]"))
             (0 until array.length()).map { index ->
@@ -115,6 +117,7 @@ object Store {
             .put("artworkMode",p.artworkMode).put("artworkImage",p.artworkImage)
             .put("libraryGlass",p.libraryGlass).put("libraryBlur",p.libraryBlur)
             .put("preferJapaneseAudio",p.preferJapaneseAudio)
+            .put("libraryLayout",LibraryLayout.fromId(p.libraryLayout).id)
         val videos = JSONArray()
         s.videos.forEach { v -> videos.put(JSONObject().put("key",v.key).put("url",v.url).put("title",v.title)
             .put("site",v.site).put("duration",v.duration).put("thumbnail",v.thumbnail).put("selected",v.selected)

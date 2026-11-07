@@ -54,7 +54,8 @@ class LibraryAppearanceDialogTest {
         screen.setContent { MaterialTheme {
             LibraryAppearanceDialog(bitmap,preferences,null,Color(0xFF225599),darkColorScheme(),{preferences=it},{dismissed=true})
         } }
-        screen.onNodeWithContentDescription("ライブラリーパネルの透過").performSemanticsAction(SemanticsActions.SetProgress) { it(.7f) }
+        screen.onNodeWithContentDescription("ライブラリーパネルの透過").performScrollTo()
+            .performSemanticsAction(SemanticsActions.SetProgress) { it(.7f) }
         screen.onNodeWithContentDescription("ライブラリーパネルのぼかし").performScrollTo()
             .performSemanticsAction(SemanticsActions.SetProgress) { it(15f) }
         screen.onNodeWithTag("library-appearance-preview")

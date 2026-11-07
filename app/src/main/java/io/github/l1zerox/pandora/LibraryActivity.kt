@@ -13,12 +13,13 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -27,13 +28,10 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
@@ -41,7 +39,6 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -82,6 +79,8 @@ class LibraryActivity : ComponentActivity() {
 @Composable
 internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
     val dark=preferences.dark
+    val layout=LibraryLayout.fromId(preferences.libraryLayout)
+    val gridState=rememberLazyGridState()
     val wallpaper by rememberWallpaper(preferences.wallpaper)
     val wallpaperAccent=remember(wallpaper,dark) { readableBadgeColor(wallpaper?.let { accentColor(it,dark) } ?: Color(0xFF4388FF)) }
     val headerAccent by animateColorAsState(wallpaperAccent,label="library-header-accent")
@@ -182,11 +181,17 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
             }
             FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
                 listOf("すべて","動画","音楽","ショート").forEach { option -> FilterChip(selected=filter == option,onClick={filter=option},label={Text(option)}) }
-                OutlinedButton(onClick={
-                    if(searchExpanded) { search=""; focusManager.clearFocus(); keyboard?.hide() }
-                    searchExpanded=!searchExpanded
-                }) { Text(if(searchExpanded) "検索を閉じる" else "検索") }
-                OutlinedButton(onClick={focusManager.clearFocus(); keyboard?.hide(); appearance=true}) { Text("表示調整") }
+            }
+            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                FlowRow(Modifier.weight(1f),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+                    OutlinedButton(onClick={
+                        if(searchExpanded) { search=""; focusManager.clearFocus(); keyboard?.hide() }
+                        searchExpanded=!searchExpanded
+                    }) { Text(if(searchExpanded) "検索を閉じる" else "検索") }
+                    OutlinedButton(onClick={focusManager.clearFocus(); keyboard?.hide(); appearance=true}) { Text("表示調整") }
+                }
+                LibraryLayoutButton(layout,headerAccent,onOpen={focusManager.clearFocus(); keyboard?.hide()},
+                    onSelect={Store.preferences(preferences.copy(libraryLayout=it.id))})
             }
             if(playback.uri.isNotBlank()) Surface(color=Color.Transparent,contentColor=playingPalette.content,
                 shape=RoundedCornerShape(16.dp),modifier=Modifier.fillMaxWidth().libraryCardGlass(playingPalette,backdrop)) {
@@ -205,9 +210,10 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
             }
             }
             }
-            LazyColumn(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(10.dp),contentPadding=PaddingValues(vertical=8.dp)) {
+            LazyVerticalGrid(columns=GridCells.Fixed(layout.columns),state=gridState,modifier=Modifier.weight(1f),
+                horizontalArrangement=Arrangement.spacedBy(10.dp),verticalArrangement=Arrangement.spacedBy(10.dp),contentPadding=PaddingValues(vertical=8.dp)) {
                 items(visible,key={it.uri}) { item ->
-                    LibraryCard(item,dark,backdrop,transport,onDelete={if(!importing) deletion=item}) {
+                    LibraryCard(item,dark,backdrop,transport,layout,onDelete={if(!importing) deletion=item}) {
                         openPlayer(item.uri)
                     }
                 }
@@ -216,7 +222,7 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
     }
     }
     if(appearance) LibraryAppearanceDialog(wallpaper,preferences,playingEntry ?: visible.firstOrNull(),headerAccent,colors,
-        onChange=Store::preferences,onDismiss={appearance=false})
+        onChange=Store::preferences,onDismiss={appearance=false},previewEntries=visible.take(6))
     UpdatePrompt(allowed=!appearance && deletion == null && !importing && error.isBlank())
     deletion?.let { entry -> key(entry.uri) {
         LibraryDeleteDialog(entry,onDismiss={deletion=null},onRemoved={
@@ -228,7 +234,7 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
 
 @Composable
 internal fun LibraryCard(entry: LibraryEntry, dark: Boolean, backdrop: LibraryBackdrop, playback: LibraryPlayback,
-    onDelete: ()->Unit, onClick: ()->Unit) {
+    layout: LibraryLayout = LibraryLayout.STANDARD, onDelete: ()->Unit, onClick: ()->Unit) {
     val context=LocalContext.current
     val bitmap by produceState<Bitmap?>(null,entry.uri) { value=null; value=LibraryRepository.artwork(context,entry) }
     val source=remember(bitmap) { bitmap?.let { libraryThumbnailColor(it) } }
@@ -237,24 +243,8 @@ internal fun LibraryCard(entry: LibraryEntry, dark: Boolean, backdrop: LibraryBa
     Surface(shape=RoundedCornerShape(16.dp),color=Color.Transparent,contentColor=palette.content,
         border=BorderStroke(1.dp,palette.content.copy(alpha=.25f)),
         modifier=Modifier.fillMaxWidth().libraryCardGlass(palette,backdrop).clickable(onClick=onClick)) {
-        Column(Modifier.padding(12.dp)) {
-        Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-            Box(Modifier.size(80.dp).clip(RoundedCornerShape(10.dp)),contentAlignment=Alignment.Center) {
-                val image=bitmap
-                if(image != null) Image(image.asImageBitmap(),null,Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
-                else Text(if(entry.video) "▶" else "♪",fontSize=32.sp,color=palette.content)
-            }
-            Column(Modifier.weight(1f)) {
-                Text(entry.title,maxLines=2,overflow=TextOverflow.Ellipsis,fontWeight=FontWeight.SemiBold,color=palette.content)
-                Text(entry.category + if(entry.durationMs > 0) " · ${durationText(entry.durationMs/1000.0)}" else "",
-                    fontSize=12.sp,color=palette.detail)
-                entry.dubbingLabel?.let { label ->
-                    Text(label,fontSize=12.sp,fontWeight=FontWeight.SemiBold,color=palette.content,
-                        modifier=Modifier.padding(top=4.dp))
-                }
-            }
-            Column(horizontalAlignment=Alignment.CenterHorizontally) {
-                LibraryPlayButton(entry.uri,playback,palette,onClick)
+        LibraryCardBody(entry,bitmap,palette,layout,
+            play={LibraryPlayButton(entry.uri,playback,palette,onClick)},menu={
                 Box {
                     IconButton(onClick={menu=true},modifier=Modifier.semantics { contentDescription="${entry.title}のメニュー" }) {
                         Text("⋮",fontSize=22.sp,color=palette.content)
@@ -263,9 +253,6 @@ internal fun LibraryCard(entry: LibraryEntry, dark: Boolean, backdrop: LibraryBa
                         DropdownMenuItem(text={Text("削除")},onClick={menu=false; onDelete()})
                     }
                 }
-            }
-        }
-        if(playback.uri == entry.uri) LibrarySeekBar(entry.uri,playback,palette,source,backdrop)
-        }
+            },footer={if(playback.uri == entry.uri) LibrarySeekBar(entry.uri,playback,palette,source,backdrop,compact=layout != LibraryLayout.STANDARD)})
     }
 }

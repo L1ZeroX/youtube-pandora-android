@@ -2,7 +2,6 @@ package io.github.l1zerox.pandora
 
 import android.graphics.Bitmap
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,16 +13,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -34,11 +31,12 @@ import kotlin.math.roundToInt
 
 @Composable
 internal fun LibraryAppearanceDialog(wallpaper: Bitmap?, preferences: Preferences, entry: LibraryEntry?, accent: Color, previewColors: ColorScheme,
-    onChange: (Preferences)->Unit, onDismiss: ()->Unit) {
+    onChange: (Preferences)->Unit, onDismiss: ()->Unit, previewEntries: List<LibraryEntry> = emptyList()) {
     val context=LocalContext.current
-    val artwork by produceState<Bitmap?>(null,entry?.uri) {
-        value=null
-        if(entry != null) value=LibraryRepository.artwork(context,entry)
+    val samples=remember(entry,previewEntries) { (listOfNotNull(entry)+previewEntries).distinctBy { it.uri }.take(6) }
+    val artwork by produceState<Map<String,Bitmap>>(emptyMap(),samples.map { it.uri }) {
+        value=emptyMap()
+        value=buildMap { for(item in samples) LibraryRepository.artwork(context,item)?.let { put(item.uri,it) } }
     }
     val colors=if(preferences.dark) darkColorScheme(primary=accent,onPrimary=Color.White,
         background=appBackgroundColor(true),surface=appSurfaceColor(true))
@@ -55,12 +53,12 @@ internal fun LibraryAppearanceDialog(wallpaper: Bitmap?, preferences: Preference
                     BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
                         if(maxWidth > maxHeight) {
                             Row(Modifier.fillMaxSize(),horizontalArrangement=Arrangement.spacedBy(16.dp)) {
-                                LibraryAppearanceSample(wallpaper,artwork,entry,preferences,previewColors,Modifier.weight(1f).fillMaxHeight())
+                                LibraryAppearanceSample(wallpaper,artwork,samples,preferences,previewColors,Modifier.weight(1f).fillMaxHeight())
                                 LibraryAppearanceMenu(preferences,onChange,Modifier.weight(1f).fillMaxHeight())
                             }
                         } else {
                             Column(Modifier.fillMaxSize(),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-                                LibraryAppearanceSample(wallpaper,artwork,entry,preferences,previewColors,Modifier.weight(1f).fillMaxWidth())
+                                LibraryAppearanceSample(wallpaper,artwork,samples,preferences,previewColors,Modifier.weight(1f).fillMaxWidth())
                                 LibraryAppearanceMenu(preferences,onChange,Modifier.weight(1f).fillMaxWidth())
                             }
                         }
@@ -74,6 +72,7 @@ internal fun LibraryAppearanceDialog(wallpaper: Bitmap?, preferences: Preference
 @Composable
 private fun LibraryAppearanceMenu(preferences: Preferences, onChange: (Preferences)->Unit, modifier: Modifier) {
     Column(modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+        LibraryLayoutChoices(LibraryLayout.fromId(preferences.libraryLayout)) { onChange(preferences.copy(libraryLayout=it.id)) }
         Text("動画・音楽パネル",fontWeight=FontWeight.Bold)
         Text("サムネイルの色を保ったまま、透過とぼかしを調整します。",fontSize=13.sp)
         LibraryAppearanceControls(preferences,onChange)
@@ -82,7 +81,12 @@ private fun LibraryAppearanceMenu(preferences: Preferences, onChange: (Preferenc
 }
 
 @Composable
-private fun LibraryAppearanceSample(wallpaper: Bitmap?, artwork: Bitmap?, entry: LibraryEntry?, p: Preferences, previewColors: ColorScheme, modifier: Modifier) {
+private fun LibraryAppearanceSample(wallpaper: Bitmap?, artwork: Map<String,Bitmap>, entries: List<LibraryEntry>, p: Preferences, previewColors: ColorScheme, modifier: Modifier) {
+    val layout=LibraryLayout.fromId(p.libraryLayout)
+    val samples=entries.ifEmpty { listOf(
+        LibraryEntry("preview-video","動画タイトルのサンプル","video/mp4",204_000),
+        LibraryEntry("preview-music","音楽タイトルのサンプル","audio/mpeg",242_000),
+        LibraryEntry("preview-short","ショートのサンプル","video/mp4",30_000,width=1080,height=1920)) }
     var bounds by remember { mutableStateOf(Rect.Zero) }
     val frosted by produceState<Bitmap?>(wallpaper,wallpaper,p.libraryBlur) {
         val strength=p.libraryBlur.coerceIn(0,20)
@@ -92,8 +96,6 @@ private fun LibraryAppearanceSample(wallpaper: Bitmap?, artwork: Bitmap?, entry:
     val backdrop=remember(frosted,bounds,p.opacity,p.dark,p.libraryGlass) {
         LibraryBackdrop(frosted,bounds,p.opacity,appBackgroundColor(p.dark),p.libraryGlass)
     }
-    val source=remember(artwork) { artwork?.let { libraryThumbnailColor(it) } }
-    val palette=remember(source,p.dark) { libraryPalette(source,p.dark) }
     Column(modifier,verticalArrangement=Arrangement.spacedBy(6.dp)) {
         Text("仕上がりプレビュー",fontSize=14.sp,fontWeight=FontWeight.Bold)
         Box(Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(20.dp)).onGloballyPositioned {
@@ -101,6 +103,7 @@ private fun LibraryAppearanceSample(wallpaper: Bitmap?, artwork: Bitmap?, entry:
             bounds=Rect(position.x,position.y,position.x+it.size.width,position.y+it.size.height)
         }.testTag("library-appearance-preview").clearAndSetSemantics {
             contentDescription="ライブラリーの表示サンプル。パネル透過率 ${(libraryPanelTransparency(p.libraryGlass)*100).roundToInt()}%、ぼかし ${p.libraryBlur.coerceIn(0,20)}"
+            stateDescription=layout.label
         }) {
             WallpaperLayer(wallpaper,p,Modifier.fillMaxSize())
             Column(Modifier.fillMaxSize().padding(12.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)) {
@@ -110,21 +113,21 @@ private fun LibraryAppearanceSample(wallpaper: Bitmap?, artwork: Bitmap?, entry:
                     Text("ライブラリー",Modifier.fillMaxWidth().padding(12.dp),fontSize=20.sp,fontWeight=FontWeight.Bold,
                         textAlign=androidx.compose.ui.text.style.TextAlign.Center)
                 }
-                Surface(shape=RoundedCornerShape(16.dp),color=Color.Transparent,contentColor=palette.content,
-                    border=BorderStroke(1.dp,palette.content.copy(alpha=.25f)),
-                    modifier=Modifier.fillMaxWidth().libraryCardGlass(palette,backdrop)) {
-                    Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-                        Box(Modifier.size(80.dp).clip(RoundedCornerShape(10.dp)),contentAlignment=Alignment.Center) {
-                            if(artwork != null) Image(artwork.asImageBitmap(),null,Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
-                            else Text(if(entry?.video != false) "▶" else "♪",fontSize=32.sp)
+                for(row in samples.take(if(layout.columns > 1) 6 else 2).chunked(layout.columns)) {
+                    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp)) {
+                        row.forEach { entry ->
+                            val image=artwork[entry.uri]
+                            val source=remember(image) { image?.let { libraryThumbnailColor(it) } }
+                            val palette=remember(source,p.dark) { libraryPalette(source,p.dark) }
+                            Surface(shape=RoundedCornerShape(16.dp),color=Color.Transparent,contentColor=palette.content,
+                                border=BorderStroke(1.dp,palette.content.copy(alpha=.25f)),
+                                modifier=Modifier.weight(1f).libraryCardGlass(palette,backdrop)) {
+                                LibraryCardBody(entry,image,palette,layout,
+                                    play={Box(Modifier.size(48.dp),contentAlignment=Alignment.Center) { Text("▶",fontSize=22.sp) }},
+                                    menu={Box(Modifier.size(48.dp),contentAlignment=Alignment.Center) { Text("⋮",fontSize=22.sp) }})
+                            }
                         }
-                        Column(Modifier.weight(1f)) {
-                            Text(entry?.title ?: "動画タイトルのサンプル",fontWeight=FontWeight.SemiBold,maxLines=2,overflow=TextOverflow.Ellipsis)
-                            Text((entry?.category ?: "動画")+" · "+durationText((entry?.durationMs?.takeIf { it > 0 } ?: 204_000)/1000.0),
-                                fontSize=12.sp,color=palette.detail)
-                            entry?.dubbingLabel?.let { Text(it,fontSize=12.sp) }
-                        }
-                        Text("▶",fontSize=22.sp)
+                        repeat(layout.columns-row.size) { Spacer(Modifier.weight(1f)) }
                     }
                 }
             }
