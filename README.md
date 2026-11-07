@@ -4,7 +4,7 @@ Windows版と別プロジェクトのAndroid用アプリです。Android 10以�
 
 ## インストール
 
-**[正式版APK v0.4.4](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.4.4/YoutubePandora-Android-v0.4.4.apk)**（ベータ版の機能を統合済み）
+**[正式版APK v0.4.5](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.4.5/YoutubePandora-Android-v0.4.5.apk)**（ベータ版の機能を統合済み）
 
 [リリース一覧・更新情報](https://github.com/L1ZeroX/youtube-pandora-android/releases) / [Windows版](https://github.com/L1ZeroX/media-downloader)
 
@@ -121,7 +121,7 @@ GPL-3.0。依存ライブラリーとネイティブツールのライセンス�
 
 ## APK統合とバブル機能
 
-通常版とベータ版は同じ `io.github.l1zerox.pandora`・同じ署名鍵を使い、設定・背景・キューを共有します。正式版v0.4.4はversionCode 25で、通常版v0.3.5・ベータ版v0.4.0-beta.8（versionCode 20）から上書き更新できます。ベータ版のバブル・先読み・一時停止／再開を正式版でも利用できます。フレーム補間も通常版へ統合しました。ダウンロード・変換が終わってから切り替えてください。
+通常版とベータ版は同じ `io.github.l1zerox.pandora`・同じ署名鍵を使い、設定・背景・キューを共有します。正式版v0.4.5はversionCode 26で、通常版v0.3.5・ベータ版v0.4.0-beta.8（versionCode 20）から上書き更新できます。ベータ版のバブル・先読み・一時停止／再開を正式版でも利用できます。フレーム補間も通常版へ統合しました。ダウンロード・変換が終わってから切り替えてください。
 
 旧ベータ版v0.3.0-beta.3以前は `io.github.l1zerox.pandora.beta` という別アプリです。そこから統合版を入れると通常版側へインストールされます。旧ベータ版の設定・キューはAndroidのアプリ分離により自動移行できません。既存の通常版の設定・キューを引き継ぎます。旧ベータ版のデータを確認してから整理してください。端末のDownloadフォルダーに保存済みの動画は残ります。
 
@@ -199,3 +199,7 @@ YouTubeの共有キューは、バブルの有効／無効にかかわらず再�
 ### v0.4.4：バブルを初期状態でオンに
 
 新規インストール時・バブル設定が未保存の場合はバブルをオンにします。保存済みのオフ設定は維持します。表示権限がない場合は画面上部の「バブルの表示許可」から設定へ進んでください。許可後は「バブルへ」に切り替わります。
+
+### v0.4.5：環境設定の説明を簡略化
+
+バブル操作・URL追加・背景・更新の説明を短くしました。URL追加のタイミングや表示権限、自動保存の案内は残しています。機能や設定値は変更していません。

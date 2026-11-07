@@ -87,7 +87,7 @@ private fun BackgroundControls(
             TextButton(onClick={onChange(p.copy(wallpaper=""))},enabled=!loading && p.wallpaper.isNotBlank()) { Text("背景を解除") }
         }
         if(imageError.isNotBlank()) Text(imageError,color=MaterialTheme.colorScheme.error,fontSize=12.sp)
-        if(!hasImage && !loading) Text("背景画像を選ぶと仕上がりを確認できます。",fontSize=12.sp)
+        if(!hasImage && !loading) Text("画像を選ぶとプレビューできます。",fontSize=12.sp)
         Text("背景の透明度 ${(p.opacity*100).roundToInt()}%")
         Slider(p.opacity,{onChange(p.copy(opacity=it))},enabled=hasImage && !loading,
             modifier=Modifier.testTag("background-opacity"))
@@ -101,7 +101,7 @@ private fun BackgroundControls(
             Text("ダークモード",Modifier.weight(1f))
             Switch(p.dark,{onChange(p.copy(dark=it))})
         }
-        Text("変更はプレビューと実際の画面に反映され、自動保存されます。画像は中央を基準に表示します。",
+        Text("変更は自動保存されます。",
             fontSize=12.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

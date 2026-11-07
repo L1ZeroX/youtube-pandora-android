@@ -298,12 +298,12 @@ fun PandoraScreen(artworkRequested: Boolean = false, onArtworkClosed: ()->Unit =
                     Row(verticalAlignment=Alignment.CenterVertically) { Text("プレイリスト全体を追加",Modifier.weight(1f)); Switch(p.playlists,{Store.preferences(p.copy(playlists=it))},enabled=!s.busy) }
                     Text("背景",fontWeight=FontWeight.Bold)
                     Button(onClick={backgroundSettings=true}) { Text("背景をプレビュー・調整") }
-                    Text("仕上がりを見ながら、画像・透明度・パネルの透過率・ぼかしを調整できます。",fontSize=12.sp)
+                    Text("画像・透明度・ぼかしを調整します。",fontSize=12.sp)
                     BubbleSettings(p)
                     OutlinedButton(onClick={settings=false; start("UPDATE")},enabled=!s.busy) { Text("yt-dlpを更新") }
                     OutlinedButton(onClick={settings=false;logs=true}) { Text("処理ログを見る") }
                     Text("アプリの更新 · 現在 ${BuildConfig.VERSION_NAME}")
-                    Text("起動時にGitHubの公開版・試用版を確認し、新しいバージョンがあると通知します。",fontSize=12.sp)
+                    Text("新しいバージョンは起動時にお知らせします。",fontSize=12.sp)
                     OutlinedButton(enabled=!updateState.checking,onClick={settings=false;AppUpdates.check(manual=true)}) {
                         Text(if(updateState.checking) "確認中…" else "新しいバージョンを確認")
                     }
@@ -313,7 +313,7 @@ fun PandoraScreen(artworkRequested: Boolean = false, onArtworkClosed: ()->Unit =
                     OutlinedButton(enabled=!updateState.checking,onClick={settings=false;AppUpdates.check(manual=true,beta=false,offer=true)}) {
                         Text(if(BuildConfig.BETA) "リリース版に戻す" else "リリース版をダウンロード")
                     }
-                    Text("配信中ライブ・ログイン必須の動画は対象外です。",fontSize=12.sp)
+                    Text("ライブ・ログインが必要な動画は非対応です。",fontSize=12.sp)
                 }
             },confirmButton={TextButton(onClick={settings=false}) { Text("閉じる") }})
         }
