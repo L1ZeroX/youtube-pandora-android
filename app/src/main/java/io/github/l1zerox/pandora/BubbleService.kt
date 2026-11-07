@@ -35,6 +35,7 @@ import kotlin.math.roundToInt
 
 internal object BubbleRuntime {
     val foreground=MutableStateFlow(false)
+    val hideForUpdate=MutableStateFlow(false)
     private val visible=java.util.Collections.newSetFromMap(java.util.WeakHashMap<Activity,Boolean>())
     fun enter(activity: Activity) { visible.add(activity); foreground.value=true }
     fun leave(activity: Activity) { visible.remove(activity); foreground.value=visible.isNotEmpty() }
@@ -111,7 +112,7 @@ class BubbleService : Service() {
             else startForeground(202,notice)
         } catch(e: Exception) { failed(e); return }
         scope.launch {
-            combine(Store.state,BubbleRuntime.foreground) { state,_ -> state }.collect { state ->
+            combine(Store.state,BubbleRuntime.foreground,BubbleRuntime.hideForUpdate) { state,_,_ -> state }.collect { state ->
                 lastState=state
                 render()
             }
@@ -129,7 +130,7 @@ class BubbleService : Service() {
             hide(); stopSelf(); return
         }
         updateArtwork()
-        if(BubbleRuntime.foreground.value || getSystemService(KeyguardManager::class.java).isKeyguardLocked) { hide(); return }
+        if(BubbleRuntime.foreground.value || BubbleRuntime.hideForUpdate.value || getSystemService(KeyguardManager::class.java).isKeyguardLocked) { hide(); return }
         if(bubble == null) showBubble()
         bubble?.update(lastState,palette,artwork)
         updatePanel()

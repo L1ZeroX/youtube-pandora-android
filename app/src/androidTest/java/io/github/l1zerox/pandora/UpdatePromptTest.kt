@@ -20,14 +20,14 @@ class UpdatePromptTest {
             AppUpdates.state.value=UpdateState(release=release)
             Store.state.value=original.copy(busy=true)
             screen.setContent { MaterialTheme { UpdatePrompt(allowed.value) } }
-            screen.onNodeWithText("APKをダウンロード").assertDoesNotExist()
+            screen.onNodeWithText("アプリ内で更新").assertDoesNotExist()
             screen.runOnIdle { allowed.value=true }
-            screen.onNodeWithText("APKをダウンロード").assertDoesNotExist()
+            screen.onNodeWithText("アプリ内で更新").assertDoesNotExist()
             screen.runOnIdle { Store.state.value=original.copy(busy=false) }
             screen.onNodeWithText("表示確認用の更新").assertIsDisplayed()
-            screen.onNodeWithText("APKをダウンロード").assertIsDisplayed()
+            screen.onNodeWithText("アプリ内で更新").assertIsDisplayed()
             screen.onNodeWithText("あとで").performClick()
-            screen.onNodeWithText("APKをダウンロード").assertDoesNotExist()
+            screen.onNodeWithText("アプリ内で更新").assertDoesNotExist()
         } finally { screen.runOnIdle { Store.state.value=original; AppUpdates.state.value=originalUpdate } }
     }
 }

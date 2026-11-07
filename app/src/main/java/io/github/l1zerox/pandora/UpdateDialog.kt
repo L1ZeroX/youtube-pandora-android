@@ -54,13 +54,16 @@ internal fun UpdateDialog(state: UpdateState, dismiss: ()->Unit) {
             if(release != null) {
                 Text("現在 ${BuildConfig.VERSION_NAME} → ${release.version}${if(release.preview) "（試用版）" else ""}")
                 Text(release.notes,fontSize=13.sp)
-                Text("統合版は通常版・ベータ版とも同じアプリとして上書きインストールし、設定・キューを引き継ぎます。ダウンロード処理を終了してからAPKを開いてください。リリース版v0.4.0以降でもバブルを利用できます。",fontSize=12.sp)
+                Text("アプリ内でAPKを取得し、Androidの更新確認画面を開きます。設定・キューは引き継ぎます。",fontSize=12.sp)
                 TextButton(onClick={open(release.pageUrl)}) { Text("GitHubで更新内容を見る") }
             } else Text(state.message)
             if(browserError.isNotBlank()) Text(browserError,color=MaterialTheme.colorScheme.error)
         }
     },confirmButton={
-        if(release != null) TextButton(onClick={open(release.downloadUrl)}) { Text("APKをダウンロード") }
+        if(release != null) TextButton(onClick={
+            runCatching { openAppUpdate(context,release); dismiss() }
+                .onFailure { browserError="更新画面を開けませんでした。${it.message.orEmpty()}" }
+        }) { Text("アプリ内で更新") }
         else TextButton(onClick=dismiss) { Text("閉じる") }
     },dismissButton={ if(release != null) TextButton(onClick=dismiss) { Text("あとで") } })
 }

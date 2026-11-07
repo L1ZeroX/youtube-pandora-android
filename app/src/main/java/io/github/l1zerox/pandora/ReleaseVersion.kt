@@ -10,9 +10,10 @@ internal data class ReleaseVersion(val major: Int, val minor: Int, val patch: In
         }
     }
 }
-internal data class ReleaseAsset(val name: String, val url: String, val uploaded: Boolean)
+internal data class ReleaseAsset(val name: String, val url: String, val uploaded: Boolean, val size: Long = 0, val digest: String = "")
 internal data class ReleaseCandidate(val tag: String, val draft: Boolean, val preview: Boolean, val notes: String, val assets: List<ReleaseAsset>)
-internal data class AppRelease(val version: String, val pageUrl: String, val downloadUrl: String, val notes: String, val preview: Boolean)
+internal data class AppRelease(val version: String, val pageUrl: String, val downloadUrl: String, val notes: String, val preview: Boolean,
+    val size: Long = 0, val digest: String = "")
 
 internal fun unifiedRelease(version: ReleaseVersion): Boolean = if(version.beta == null)
     version >= ReleaseVersion(0,3,0) else version >= ReleaseVersion(0,4,0,1)
@@ -30,8 +31,8 @@ internal fun newestRelease(releases: List<ReleaseCandidate>, current: String, be
         val version=release.tag.removePrefix("v")
         val name="YoutubePandora-Android-v$version.apk"
         val download="$RELEASES_URL/download/${release.tag}/$name"
-        if(release.assets.none { it.name == name && it.uploaded && it.url == download }) return@mapNotNull null
+        val asset=release.assets.firstOrNull { it.name == name && it.uploaded && it.url == download } ?: return@mapNotNull null
         number to AppRelease(version,"$RELEASES_URL/tag/${release.tag}",download,
-            release.notes.ifBlank { "更新内容はリリースページをご確認ください。" }.take(3000),release.preview)
+            release.notes.ifBlank { "更新内容はリリースページをご確認ください。" }.take(3000),release.preview,asset.size,asset.digest)
     }.maxByOrNull { it.first }?.second
 }

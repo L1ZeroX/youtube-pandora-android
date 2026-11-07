@@ -123,4 +123,4 @@ object Store {
             .putString("queue",videos.toString()).apply()
     }
 }
-class PandoraApp : Application() { override fun onCreate() { super.onCreate(); CrashDiagnostics.install(this); AppLog.init(this); Store.init(this); QueuePreviews.start() } }
+class PandoraApp : Application() { override fun onCreate() { super.onCreate(); CrashDiagnostics.install(this); AppLog.init(this); Store.init(this); ApkUpdates.initialize(this); QueuePreviews.start() } }

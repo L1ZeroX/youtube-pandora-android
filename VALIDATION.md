@@ -1,5 +1,17 @@
 # 検証状況
 
+## v0.4.17（2026-11-08）
+
+更新通知から非公開AppUpdateActivityを開く。DownloadManagerでアプリ専用external-files/updates/update.apkへ取得し、IDとリリース情報をSharedPreferencesに保存する。ActivityのSTARTED中だけ状態を照会し、画面回転・プロセス終了後は保存済みIDから復元する。自動インストール開始はRESUMED中だけとし、Androidの確認を省略しない。許可画面の結果はActivity Result APIで受け取る。許可拒否・キャンセルでは取得済みAPKを保持し、再ダウンロードせず再操作できる。バブルの一時非表示を設定し、終了・失敗・画面破棄で解除する。
+
+GitHubの正規APK URLだけを受け付け、公開されたサイズと任意のSHA-256を検証。PackageManagerでパッケージ名・選択したバージョン・versionCodeが現在以上・現在の署名者との完全一致を確認。FileProviderの公開範囲はupdates/だけで、インストーラーへ読み取り権限のみ付与する。古いAPI応答にdigestがない場合もAPKの署名・アプリID・バージョン検査を必須とする。
+
+新規取得・キャンセルは記録されたDownloadManager IDと専用update.apkだけを整理する。更新前versionCodeより現在が新しく、取得対象と同等以上の版がインストール済みの場合は起動時に自動整理する。一般のDownloadフォルダーや保存済みメディアは触らない。既存のブラウザー保存APKは対象外。
+
+単体テストではリリース情報の保存・復元、URL制限、サイズ・SHA-256不一致、署名・アプリID・バージョン不一致、ダウングレード拒否、更新後の整理条件、正しいアセットの検証情報引き継ぎを確認。端末テストにManifestとFileProviderの公開範囲を追加し、更新ポップアップの操作ラベルを更新。端末未接続のため端末テストはコンパイル確認のみ。DownloadManagerの実通信、権限付与からインストールまでの実機確認は未実施。
+
+参照: [DownloadManager.Request](https://developer.android.com/reference/android/app/DownloadManager.Request)、[FileProvider](https://developer.android.com/reference/androidx/core/content/FileProvider)、[インストール許可](https://developer.android.com/reference/android/content/pm/PackageManager#canRequestPackageInstalls())。
+
 ## v0.4.16（2026-11-08）
 
 ダウンロード見出し下の説明文を削除。上部の環境設定・バブルへ・表示許可をMaterial3 Buttonへ変更し、リンク追加と同じMaterialTheme.colorScheme.primary/onPrimaryを使う。壁紙から抽出したreadableBadgeColorとanimateColorAsStateを引き続き共用し、個別の固定色は設定しない。コンパクトな内側余白とボタン間隔を指定する。クリック処理・許可状態による表示切り替えは維持。

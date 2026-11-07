@@ -44,7 +44,7 @@ internal object AppUpdates {
                 val assets=item.optJSONArray("assets") ?: JSONArray()
                 ReleaseCandidate(item.optString("tag_name"),item.optBoolean("draft"),item.optBoolean("prerelease"),item.optString("body"),
                     (0 until assets.length()).mapNotNull { i ->
-                        assets.optJSONObject(i)?.let { ReleaseAsset(it.optString("name"),it.optString("browser_download_url"),it.optString("state") == "uploaded") }
+                        assets.optJSONObject(i)?.let { ReleaseAsset(it.optString("name"),it.optString("browser_download_url"),it.optString("state") == "uploaded",it.optLong("size"),it.optString("digest","")) }
                     })
             }
             return newestRelease(releases,BuildConfig.VERSION_NAME,beta,offer,unifiedOnly=true)

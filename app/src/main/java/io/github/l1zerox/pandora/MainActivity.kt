@@ -93,6 +93,7 @@ fun PandoraScreen(artworkRequested: Boolean = false, onArtworkClosed: ()->Unit =
     var logs by rememberSaveable { mutableStateOf(false) }
     val logSnapshot by AppLog.state.collectAsStateWithLifecycle()
     val updateState by AppUpdates.state.collectAsStateWithLifecycle()
+    val apkUpdate by ApkUpdates.state.collectAsStateWithLifecycle()
     var preview by remember { mutableStateOf<Video?>(null) }
     var error by remember { mutableStateOf("") }
     val clipboard = LocalClipboardManager.current
@@ -305,6 +306,7 @@ fun PandoraScreen(artworkRequested: Boolean = false, onArtworkClosed: ()->Unit =
                     OutlinedButton(onClick={settings=false;logs=true}) { Text("処理ログを見る") }
                     Text("アプリの更新 · 現在 ${BuildConfig.VERSION_NAME}")
                     Text("新しいバージョンは起動時にお知らせします。",fontSize=12.sp)
+                    if(apkUpdate.release != null) OutlinedButton(onClick={settings=false;openAppUpdate(context)}) { Text("アプリの更新状況") }
                     OutlinedButton(enabled=!updateState.checking,onClick={settings=false;AppUpdates.check(manual=true)}) {
                         Text(if(updateState.checking) "確認中…" else "新しいバージョンを確認")
                     }
