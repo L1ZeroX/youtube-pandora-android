@@ -14,7 +14,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -29,10 +28,8 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
@@ -78,6 +75,7 @@ fun PandoraScreen() {
     val p = s.preferences
     var text by rememberSaveable { mutableStateOf("") }
     var settings by rememberSaveable { mutableStateOf(false) }
+    var backgroundSettings by rememberSaveable { mutableStateOf(false) }
     var logs by rememberSaveable { mutableStateOf(false) }
     val logSnapshot by AppLog.state.collectAsStateWithLifecycle()
     val updateState by AppUpdates.state.collectAsStateWithLifecycle()
@@ -126,7 +124,7 @@ fun PandoraScreen() {
         background=Color(0xFFF3F4F6),surface=Color.White)
     MaterialTheme(colorScheme=colors) {
         Box(Modifier.fillMaxSize().background(colors.background)) {
-            bitmap?.let { Image(it.asImageBitmap(),null,Modifier.fillMaxSize().blur(p.blur.dp),contentScale=ContentScale.Crop,alpha=1-p.opacity) }
+            WallpaperLayer(bitmap,p,Modifier.fillMaxSize())
             Scaffold(containerColor=Color.Transparent, contentColor=colors.onBackground, bottomBar={
                 Surface(color=colors.surface.copy(alpha=if(bitmap == null) 1f else 1-p.glass),contentColor=colors.onSurface,shape=RoundedCornerShape(topStart=28.dp,topEnd=28.dp)) {
                     Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
@@ -232,8 +230,12 @@ fun PandoraScreen() {
             }
         },confirmButton={TextButton(onClick={preview=null}) { Text("閉じる") }},dismissButton={TextButton(enabled=!s.busy,onClick={Store.state.update { it.copy(videos=it.videos.filterNot { it.key == video.key }) }; Store.save(); preview=null}) { Text("一覧から削除") }}) }
         if(settings) {
+            var imageLoading by remember { mutableStateOf(false) }
+            var imageError by remember { mutableStateOf("") }
             val pick = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
                 if(uri != null) scope.launch {
+                    imageLoading=true
+                    imageError=""
                     runCatching { withContext(Dispatchers.IO) {
                         val decoded = ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver,uri)) { decoder, info, _ ->
                             val scale = (max(info.size.width,info.size.height)/1600f).coerceAtLeast(1f)
@@ -245,25 +247,20 @@ fun PandoraScreen() {
                         val old = Store.state.value.preferences.wallpaper
                         Store.preferences(Store.state.value.preferences.copy(wallpaper=target.absolutePath))
                         if(old.isNotBlank()) File(old).takeIf { it.parentFile == context.filesDir }?.delete()
-                    } }.onFailure { error="画像を読み込めません: ${it.message}" }
+                    } }.onFailure { imageError="画像を読み込めません: ${it.message}" }
+                    imageLoading=false
                 }
             }
-            AlertDialog(onDismissRequest={settings=false},title={Text("環境設定")},text={
+            if(backgroundSettings) BackgroundPreviewDialog(bitmap,p,imageLoading,imageError,
+                onChange={Store.preferences(it)},onPick={pick.launch(arrayOf("image/*"))},
+                onDismiss={backgroundSettings=false})
+            else AlertDialog(onDismissRequest={settings=false},title={Text("環境設定")},text={
                 Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)) {
                     Row(verticalAlignment=Alignment.CenterVertically) { Text("ダークモード",Modifier.weight(1f)); Switch(p.dark,{Store.preferences(p.copy(dark=it))}) }
                     Row(verticalAlignment=Alignment.CenterVertically) { Text("プレイリスト全体を追加",Modifier.weight(1f)); Switch(p.playlists,{Store.preferences(p.copy(playlists=it))},enabled=!s.busy) }
                     Text("背景",fontWeight=FontWeight.Bold)
-                    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                        Button(onClick={pick.launch(arrayOf("image/*"))}) { Text("画像を選択") }
-                        TextButton(onClick={Store.preferences(p.copy(wallpaper=""))}) { Text("解除") }
-                    }
-                    Text("背景の透明度 ${(p.opacity*100).toInt()}%")
-                    Slider(p.opacity,{Store.preferences(p.copy(opacity=it))})
-                    Text("パネルの透過率 ${(p.glass*100).toInt()}%")
-                    Slider(p.glass,{Store.preferences(p.copy(glass=it))},valueRange=0f..0.85f)
-                    Text("背景のぼかし ${p.blur.toInt()}")
-                    Slider(p.blur,{Store.preferences(p.copy(blur=it))},valueRange=0f..40f)
-                    Text("画像は中央を基準に画面いっぱいに表示します。ボタンの色は画像に合わせます。設定は自動保存されます。",fontSize=12.sp)
+                    Button(onClick={backgroundSettings=true}) { Text("背景をプレビュー・調整") }
+                    Text("仕上がりを見ながら、画像・透明度・パネルの透過率・ぼかしを調整できます。",fontSize=12.sp)
                     OutlinedButton(onClick={settings=false; start("UPDATE")},enabled=!s.busy) { Text("yt-dlpを更新") }
                     OutlinedButton(onClick={settings=false;logs=true}) { Text("処理ログを見る") }
                     Text("アプリの更新 · 現在 ${BuildConfig.VERSION_NAME}")
@@ -285,7 +282,7 @@ fun PandoraScreen() {
 }
 
 @Composable
-private fun Panel(image: Boolean, glass: Float, content: @Composable ColumnScope.()->Unit) {
+internal fun Panel(image: Boolean, glass: Float, content: @Composable ColumnScope.()->Unit) {
     Surface(shape=RoundedCornerShape(24.dp),color=MaterialTheme.colorScheme.surface.copy(alpha=if(image) 1-glass else 1f),contentColor=MaterialTheme.colorScheme.onSurface) {
         Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp),content=content)
     }
@@ -323,7 +320,7 @@ private fun accentColor(bitmap: Bitmap, dark: Boolean): Color {
 
 
 @Composable
-private fun TintBadge(text: String, modifier: Modifier = Modifier, color: Color? = null,
+internal fun TintBadge(text: String, modifier: Modifier = Modifier, color: Color? = null,
                       strong: Boolean = false, maxLines: Int = 2) {
     val standard = readableBadgeColor(color ?: MaterialTheme.colorScheme.primary)
     Surface(modifier=modifier,shape=RoundedCornerShape(16.dp),

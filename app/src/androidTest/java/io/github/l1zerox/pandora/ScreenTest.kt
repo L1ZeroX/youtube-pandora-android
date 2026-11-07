@@ -6,6 +6,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.SemanticsActions
 import kotlinx.coroutines.flow.update
 import org.junit.Rule
 import org.junit.Test
@@ -13,6 +14,46 @@ import java.io.File
 
 class ScreenTest {
     @get:Rule val screen = createAndroidComposeRule<MainActivity>()
+    @Test fun backgroundPreviewReflectsAdjustmentsAndPreservesSettingsOnClose() {
+        val original=Store.state.value
+        val fixture=File(screen.activity.filesDir,"preview-test.png")
+        val image=Bitmap.createBitmap(60,120,Bitmap.Config.ARGB_8888)
+        image.eraseColor(android.graphics.Color.BLUE)
+        fixture.outputStream().use { image.compress(Bitmap.CompressFormat.PNG,100,it) }
+        image.recycle()
+        try {
+            screen.runOnIdle {
+                AppUpdates.dismiss()
+                Store.preferences(original.preferences.copy(wallpaper=fixture.absolutePath))
+            }
+            screen.onNodeWithText("環境設定").performClick()
+            screen.onNodeWithText("背景をプレビュー・調整").performScrollTo().performClick()
+            screen.onNodeWithText("仕上がりプレビュー").assertIsDisplayed()
+            screen.waitUntil(5000) {
+                screen.onAllNodes(hasTestTag("background-opacity") and isEnabled()).fetchSemanticsNodes().isNotEmpty()
+            }
+            screen.onNodeWithTag("background-opacity").performSemanticsAction(SemanticsActions.SetProgress) { it(.86f) }
+            screen.onNodeWithTag("background-glass").performScrollTo().performSemanticsAction(SemanticsActions.SetProgress) { it(.62f) }
+            screen.onNodeWithTag("background-blur").performScrollTo().performSemanticsAction(SemanticsActions.SetProgress) { it(16f) }
+            screen.onNodeWithTag("background-preview").assertIsDisplayed()
+                .assertContentDescriptionEquals("背景の表示サンプル。透明度 86%、パネル透過率 62%、ぼかし 16")
+            screen.onNodeWithText("完了").performClick()
+            screen.onNodeWithText("背景をプレビュー・調整").assertExists()
+            screen.onNodeWithText("背景をプレビュー・調整").performScrollTo().performClick()
+            screen.onNodeWithTag("background-preview").assertContentDescriptionEquals(
+                "背景の表示サンプル。透明度 86%、パネル透過率 62%、ぼかし 16")
+            screen.onNodeWithText("背景を解除").performScrollTo().performClick()
+            screen.waitUntil(5000) {
+                screen.onAllNodes(hasTestTag("background-opacity") and isNotEnabled()).fetchSemanticsNodes().isNotEmpty()
+            }
+            screen.onNodeWithTag("background-preview").assertIsDisplayed()
+            screen.onNodeWithText("完了").performClick()
+            screen.onNodeWithText("閉じる").performClick()
+        } finally {
+            screen.runOnIdle { Store.state.value=original; Store.save() }
+            fixture.delete()
+        }
+    }
     @Test fun addLinkPastesAndPreservesExistingInput() {
         screen.runOnIdle {
             AppUpdates.dismiss()
