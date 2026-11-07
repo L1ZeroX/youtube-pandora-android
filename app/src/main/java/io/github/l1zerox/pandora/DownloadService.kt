@@ -73,7 +73,7 @@ class DownloadService : Service() {
             var message="完了しました。"
             try {
                 AppLog.info("処理開始","$operation / 再開=$resuming")
-                processor.init()
+                processor.init(installBundled=operation != "UPDATE")
                 when(operation) {
                     "UPDATE" -> { processor.update(); message="yt-dlpを更新しました。" }
                     "FETCH", "REFRESH" -> {

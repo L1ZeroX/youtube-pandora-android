@@ -1,15 +1,58 @@
 package io.github.l1zerox.pandora
 
 import java.io.File
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.util.concurrent.CancellationException
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
+import java.util.zip.ZipInputStream
 import org.junit.Assert.*
 import org.junit.Test
 
 class ExtractorRecoveryTest {
     private val url="https://www.youtube.com/watch?v=abcdefghijk"
     private fun forbidden()=IllegalStateException("ERROR: unable to download video data: HTTP Error 403: Forbidden")
+
+    private fun zipapp(prefix: String, version: String = "2026.10.26"): ByteArray {
+        val output=ByteArrayOutputStream()
+        output.write(prefix.toByteArray())
+        ZipOutputStream(output).use {
+            it.putNextEntry(ZipEntry("__main__.py")); it.write("# entry point".toByteArray()); it.closeEntry()
+            it.putNextEntry(ZipEntry("yt_dlp/version.py")); it.write("__version__ = '$version'".toByteArray()); it.closeEntry()
+        }
+        return output.toByteArray()
+    }
+    @Test fun shebangIsSkippedBeforeTheZipStream() {
+        val bytes=zipapp("#!/usr/bin/env python3\n")
+        ZipInputStream(ByteArrayInputStream(bytes)).use { assertNull(it.nextEntry) }
+        assertEquals("2026.10.26",extractorVersion(ByteArrayInputStream(bytes)))
+    }
+    @Test fun regularZipAndCrLfShebangBothWork() {
+        for(prefix in listOf("","#!/usr/bin/env python3\r\n"))
+            assertEquals("2026.10.26",extractorVersion(ByteArrayInputStream(zipapp(prefix))))
+    }
+    @Test fun actualOfficialArtifactPassesVersionAndIndependentDigestChecks() {
+        val file=File("src/main/res/raw/ytdlp")
+        assertTrue("Missing bundled official zipapp",file.isFile)
+        assertEquals(BUNDLED_EXTRACTOR_VERSION,extractorVersion(file))
+        assertTrue(isBundledExtractor(file))
+    }
+    @Test fun invalidOrExcessivePreamblesAreRejected() {
+        for(prefix in listOf("not a zip\n","#!"+"x".repeat(4096)+"\n"))
+            assertNull(extractorVersion(ByteArrayInputStream(zipapp(prefix))))
+    }
+    @Test fun damagedBundleFailsDigestWithoutRelyingOnVersion() {
+        val file=File.createTempFile("extractor-damaged",".zip")
+        try {
+            file.writeBytes(zipapp("#!/usr/bin/env python3\n"))
+            assertEquals(BUNDLED_EXTRACTOR_VERSION,extractorVersion(file))
+            assertFalse(isBundledExtractor(file))
+        } finally { file.delete() }
+    }
+    @Test fun oversizedVersionEntryIsRejected() {
+        assertNull(extractorVersion(ByteArrayInputStream(zipapp("","x".repeat(9000)))))
+    }
 
     @Test fun bundleUpgradesOldInstallsButPreservesEqualAndNewerManualUpdates() {
         assertTrue(shouldInstallExtractor("2025.11.12"))

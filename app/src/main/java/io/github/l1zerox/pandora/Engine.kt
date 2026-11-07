@@ -20,10 +20,10 @@ class Engine(private val context: Context, private val progress: (String, Float?
     @Volatile private var native: Process? = null
     private var recoveryUpdateAttempted = false
     private val id = UUID.randomUUID().toString()
-    fun init() {
+    fun init(installBundled: Boolean = true) {
         AppLog.info("準備","yt-dlp / FFmpegを初期化")
         YoutubeDL.init(context); FFmpeg.init(context); check()
-        BundledExtractor.install(context,::check)
+        if(installBundled) BundledExtractor.install(context,::check)
         AppLog.info("準備","初期化完了 / yt-dlp ${BundledExtractor.version(context) ?: "確認できません"} / QuickJS=${File(context.applicationInfo.nativeLibraryDir,"libqjs.so").exists()} / 空き容量 ${context.filesDir.usableSpace / (1024*1024)} MiB")
     }
     fun check() { control.check() }

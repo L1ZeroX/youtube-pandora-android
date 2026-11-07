@@ -14,7 +14,9 @@ internal object BundledExtractor {
     @Synchronized fun install(context: Context, check: ()->Unit) {
         check()
         val destination=binary(context)
-        if(!shouldInstallExtractor(extractorVersion(destination))) return
+        val version=extractorVersion(destination)
+        if(!shouldInstallExtractor(version)) return
+        if(version == null && destination.isFile && isBundledExtractor(destination,check)) return
         val pending=File.createTempFile("pandora-extractor-",".tmp",destination.parentFile)
         try {
             context.resources.openRawResource(R.raw.ytdlp).use { input ->
@@ -24,7 +26,7 @@ internal object BundledExtractor {
                     output.fd.sync()
                 }
             }
-            require(extractorVersion(pending) == BUNDLED_EXTRACTOR_VERSION) { "同梱yt-dlpの検証に失敗しました。" }
+            require(isBundledExtractor(pending,check)) { "同梱yt-dlpの整合性確認に失敗しました。" }
             check()
             Os.rename(pending.absolutePath,destination.absolutePath)
             AppLog.info("yt-dlp更新","同梱版 $BUNDLED_EXTRACTOR_VERSION を適用しました。")

@@ -8,6 +8,15 @@ import org.junit.Test
 import java.io.File
 
 class ExtractorRuntimeTest {
+    @Test fun officialResourceCanBeReadAndVerifiedOnAndroid() {
+        val context=InstrumentationRegistry.getInstrumentation().targetContext
+        val file=File.createTempFile("extractor-resource",".tmp",context.cacheDir)
+        try {
+            context.resources.openRawResource(R.raw.ytdlp).use { input -> file.outputStream().use { input.copyTo(it) } }
+            assertEquals(BUNDLED_EXTRACTOR_VERSION,extractorVersion(file))
+            assertTrue(isBundledExtractor(file))
+        } finally { file.delete() }
+    }
     @Test fun installedZipappRunsWithBundledPythonAndReportsItsActualVersion() {
         val context=InstrumentationRegistry.getInstrumentation().targetContext
         Engine(context) { _,_,_ -> }.init()
