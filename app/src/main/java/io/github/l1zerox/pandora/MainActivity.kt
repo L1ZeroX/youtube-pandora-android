@@ -165,11 +165,13 @@ fun PandoraScreen() {
                     item {
                         Column(Modifier.padding(top=16.dp,bottom=10.dp)) {
                             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                                Text(if(BuildConfig.BETA) "Youtube Pandora! Beta" else "Youtube Pandora!",fontSize=12.sp,modifier=Modifier.weight(1f))
+                                Text(if(BuildConfig.BETA) "ベータ版" else "Android版",fontSize=12.sp,modifier=Modifier.weight(1f))
                                 if(BuildConfig.BETA && p.bubble && android.provider.Settings.canDrawOverlays(context)) TextButton(
                                     onClick={ (context as? android.app.Activity)?.moveTaskToBack(true) }) { Text("バブルへ") }
                                 TextButton(onClick={settings=true}) { Text("環境設定") }
                             }
+                            TitleLogo(Modifier.align(Alignment.CenterHorizontally))
+                            Spacer(Modifier.height(12.dp))
                             Text("ダウンロード",fontSize=32.sp,fontWeight=FontWeight.Bold)
                             Text("お気に入りを、いつでも。",fontSize=13.sp,color=colors.onSurfaceVariant)
                         }

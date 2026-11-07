@@ -123,7 +123,7 @@ private fun BackgroundSample(bitmap: Bitmap?, p: Preferences, screenSize: IntSiz
                     Column(Modifier.fillMaxSize().padding(16.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
                         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()),
                             verticalArrangement=Arrangement.spacedBy(14.dp)) {
-                            Text("Youtube Pandora!",fontSize=12.sp,color=colors.onBackground)
+                            TitleLogo(Modifier.align(Alignment.CenterHorizontally))
                             Text("ダウンロード",fontSize=32.sp,fontWeight=FontWeight.Bold,color=colors.onBackground)
                             Panel(bitmap != null,p.glass) {
                                 TintBadge("リンクを追加",strong=true)
