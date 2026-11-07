@@ -56,7 +56,7 @@ class Engine(private val context: Context, private val progress: (String, Float?
         addOption("--no-colors"); addOption("--newline"); addOption("--no-mtime")
         addOption("--match-filter", "!is_live & !is_upcoming")
     }
-    private fun execute(request: YoutubeDLRequest): String {
+    private fun execute(request: YoutubeDLRequest, onAudio: ((String)->Unit)? = null): String {
         check()
         val lateStopHandled=AtomicBoolean(false)
         return YoutubeDL.execute(request, id) { percent, eta, line ->
@@ -65,6 +65,7 @@ class Engine(private val context: Context, private val progress: (String, Float?
                 if(lateStopHandled.compareAndSet(false,true)) stopProcesses()
                 return@execute
             }
+            if(line.trimStart().startsWith(AUDIO_SELECTION_PREFIX) || line.startsWith(AUDIO_FILE_PREFIX)) { onAudio?.invoke(line); return@execute }
             if(line.trimStart().startsWith("{")) return@execute
             transferProgress(line)?.let { progress("ダウンロード中",it.fraction,line); return@execute }
             val phase = if(line.contains("[download]")) "ダウンロード中" else if(line.contains("[Merger]") || line.contains("[ExtractAudio]")) "変換中" else "情報を確認中"
@@ -72,6 +73,7 @@ class Engine(private val context: Context, private val progress: (String, Float?
                 line.take(300) + if(eta >= 0) " · 残り ${durationText(eta.toDouble())}" else "")
         }.also { response ->
             check()
+            if(onAudio != null) response.out.lineSequence().filter { it.trimStart().startsWith(AUDIO_SELECTION_PREFIX) || it.startsWith(AUDIO_FILE_PREFIX) }.forEach(onAudio)
             if(response.err.isNotBlank()) AppLog.info("yt-dlp診断",response.err)
         }.out
     }
@@ -104,19 +106,41 @@ class Engine(private val context: Context, private val progress: (String, Float?
     fun download(video: Video, preferences: Preferences, workspace: File? = null): String {
         val work = (workspace ?: File(context.cacheDir, "download-${UUID.randomUUID()}")).apply { mkdirs() }
         try {
+            var selectedAudio: AudioDecision? = null
+            var selectedSource: File? = null
+            fun reportAudio(line: String) {
+                if(line.startsWith(AUDIO_FILE_PREFIX)) { selectedSource=selectedAudioSource(work,line); return }
+                val decision=parseAudioSelection(line) ?: return
+                if(decision == selectedAudio) return
+                selectedAudio=decision
+                Store.edit(video.key) { it.copy(audioInfo=decision.label) }; Store.save()
+                AppLog.info("音声の選択",decision.label)
+            }
+            if(preferences.preferJapaneseAudio) {
+                progress("情報を確認中",null,"日本語音声の対応を確認しています…")
+                Store.edit(video.key) { it.copy(audioInfo="日本語音声を判別中…") }
+            }
             withYoutubeRecovery(video.url,::check,::recoverYoutubeDownload) {
+            selectedAudio=null; selectedSource=null
             val req = request(video.url).apply {
                 addOption("--no-playlist"); addOption("-f", formatSelector(preferences))
                 addOption("-S", "res,fps,vcodec:h264,acodec:aac")
-                addOption("-o", File(work,"source.%(ext)s").absolutePath)
+                addOption("-o", File(work,if(preferences.preferJapaneseAudio) AUDIO_OUTPUT_NAME else "source.%(ext)s").absolutePath)
                 addOption("--merge-output-format", "mkv")
                 addOption("--continue")
+                if(preferences.preferJapaneseAudio) addJapaneseAudioOptions()
                 addOption("--progress-template","download:PANDORA_PROGRESS|%(progress.status)s|%(progress.downloaded_bytes)s|%(progress.total_bytes)s|%(progress.total_bytes_estimate)s|%(progress.speed)s|%(progress.eta)s")
             }
-            execute(req)
+            execute(req,if(preferences.preferJapaneseAudio) ::reportAudio else null)
+            }
+            if(preferences.preferJapaneseAudio && selectedAudio == null) {
+                val label="音声の言語を判別できず、通常の取得結果を使用"
+                Store.edit(video.key) { it.copy(audioInfo=label) }; Store.save()
+                AppLog.info("音声の選択",label)
             }
             AppLog.info("ダウンロード","取得完了、動画の解析へ")
-            val source = work.listFiles()!!.firstOrNull { it.name.matches(Regex("source\\.[a-zA-Z0-9]+")) && it.extension !in listOf("part","ytdl","json") }
+            val source = (if(preferences.preferJapaneseAudio) selectedSource?.takeIf { it.isFile } else
+                work.listFiles()!!.firstOrNull { it.name.matches(Regex("source\\.[a-zA-Z0-9]+")) && it.extension !in listOf("part","ytdl","json") })
                 ?: error("保存する動画ファイルがありません。")
             check()
             val metadata = JSONObject(runNative("libffprobe.so",listOf("-v","error","-show_streams","-show_format","-of","json",source.absolutePath)))
@@ -159,6 +183,7 @@ class Engine(private val context: Context, private val progress: (String, Float?
                 args += listOf("-map","0:v:0","-map","0:a:0?") + videoEncodingArgs(copy,preferences.fps,motionFilter)
                 args += if(audio?.optString("codec_name") == "aac") listOf("-c:a","copy") else listOf("-c:a","aac","-b:a","192k")
                 args += listOf("-movflags","+faststart")
+                if(selectedAudio?.usesJapanese == true && audio != null) args += listOf("-metadata:s:a:0","language=jpn")
             }
             val conversionDetail = if(interpolating) "フレーム補間中（CPU・60fps）" else "${preferences.format} 変換中"
             progress("変換中", null, conversionDetail)

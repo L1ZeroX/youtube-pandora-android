@@ -314,7 +314,9 @@ class BubbleService : Service() {
         progress?.progressTintList=ColorStateList.valueOf(progressColor)
         progress?.indeterminateTintList=ColorStateList.valueOf(progressColor)
         progress?.progressBackgroundTintList=ColorStateList.valueOf(palette.track.toArgb())
-        phase?.text=(if(s.paused) "一時停止中" else s.message)+"\n処理済み ${s.done} / ${s.total} 件"
+        val audioInfo=s.videos.firstOrNull { it.key == s.current }?.audioInfo.orEmpty()
+        phase?.text=(if(s.paused) "一時停止中" else s.message)+"\n処理済み ${s.done} / ${s.total} 件"+
+            if(audioInfo.isNotBlank()) "\n$audioInfo" else ""
         val fraction=s.progress?.takeIf { it.isFinite() }?.coerceIn(0f,1f)
         progress?.isIndeterminate=s.busy && fraction == null && !s.paused
         progress?.progress=((fraction ?: 0f)*100).roundToInt()
@@ -336,7 +338,8 @@ class BubbleService : Service() {
             for(video in s.videos.drop(queuePage*8).take(8)) {
                 val row=LinearLayout(this).apply { gravity=Gravity.CENTER_VERTICAL }
                 row.addView(text(13f).apply {
-                    text="${video.status}${if(video.selected) "" else "（対象外）"}\n${video.title}"
+                    text="${video.status}${if(video.selected) "" else "（対象外）"}\n${video.title}"+
+                        if(video.audioInfo.isNotBlank()) "\n${video.audioInfo}" else ""
                     maxLines=3; ellipsize=android.text.TextUtils.TruncateAt.END
                 },LinearLayout.LayoutParams(0,-2,1f))
                 val remove=button("削除",register=false) { Store.removeQueueVideo(video.key) }.apply {

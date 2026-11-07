@@ -35,6 +35,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
@@ -220,6 +222,14 @@ fun PandoraScreen(artworkRequested: Boolean = false, onArtworkClosed: ()->Unit =
                                 Choice("音質",p.audio,listOf("192kbps","320kbps","128kbps"),!s.busy) { Store.preferences(p.copy(audio=it)) }
                                 ArtworkSettings(p,s.busy)
                             }
+                            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text("日本語音声を優先")
+                                    Text("吹き替えを自動判別。なければ元音声を優先。",fontSize=11.sp,color=colors.onSurfaceVariant)
+                                }
+                                Switch(checked=p.preferJapaneseAudio,onCheckedChange={Store.preferences(p.copy(preferJapaneseAudio=it))},enabled=!s.busy,
+                                    modifier=Modifier.semantics { contentDescription="日本語音声を優先" })
+                            }
                             Text("保存先: 内部ストレージ/${saveRelativePath(p.format)}",fontSize=12.sp)
                             Text("互換性のある映像は再圧縮せず保存します。フレーム補間はCPUで中間の動きを生成するため時間がかかります。",fontSize=11.sp,color=colors.onSurfaceVariant)
                         }
@@ -242,6 +252,7 @@ fun PandoraScreen(artworkRequested: Boolean = false, onArtworkClosed: ()->Unit =
             Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)) {
                 if(video.thumbnail.isNotBlank()) TintedThumbnail(video.thumbnail,Modifier.fillMaxWidth().height(170.dp).clip(RoundedCornerShape(16.dp)),ContentScale.Fit) { thumbnailTone=it }
                 Text("${video.site} · ${durationText(video.duration)} · ${video.status}")
+                if(video.audioInfo.isNotBlank()) Text(video.audioInfo)
                 if(positiveDuration(video.duration) == null) TextButton(enabled=!s.busy,onClick={
                     runCatching { ContextCompat.startForegroundService(context,Intent(context,DownloadService::class.java)
                         .setAction("REFRESH").putExtra("urls",video.url)) }
@@ -402,6 +413,7 @@ private fun VideoPanel(video: Video, image: Boolean, glass: Float, busy: Boolean
                     ThumbnailGlassLabels(video.site.ifBlank { "サイト不明" },durationText(video.duration),thumbnailBitmap,tone,Modifier.matchParentSize())
                 }
                 Text(video.status,fontSize=12.sp,color=if(video.status == "失敗") colors.error else colors.onSurfaceVariant)
+                if(video.audioInfo.isNotBlank()) Text(video.audioInfo,fontSize=12.sp,color=colors.onSurfaceVariant)
                 if(video.status == "失敗") Text(video.error.ifBlank { "タップして詳細を確認" },
                     Modifier.clickable(onClick=onPreview),maxLines=2,overflow=TextOverflow.Ellipsis,fontSize=11.sp,color=colors.error)
             }

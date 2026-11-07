@@ -11,8 +11,8 @@ android {
         applicationId = "io.github.l1zerox.pandora"
         minSdk = 29
         targetSdk = 36
-        versionCode = 33
-        versionName = if(betaBuild) "0.4.6-beta.7" else "0.4.12"
+        versionCode = 34
+        versionName = if(betaBuild) "0.4.6-beta.7" else "0.4.13"
         buildConfigField("boolean", "BETA", betaBuild.toString())
         manifestPlaceholders["appLabel"] = "Youtube Pandora!"
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
@@ -44,6 +44,7 @@ dependencies {
     implementation("io.github.junkfood02.youtubedl-android:library:0.18.1")
     implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation(platform("androidx.compose:compose-bom:2025.06.01"))

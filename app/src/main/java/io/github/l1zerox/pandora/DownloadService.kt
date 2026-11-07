@@ -119,7 +119,8 @@ class DownloadService : Service() {
             val remaining=active.remaining(Store.state.value.videos)
             var video=remaining.firstOrNull() ?: break
             Store.state.update { it.copy(current=video.key,done=active.attempted.size,total=active.attempted.size+remaining.size,progress=null,speed="",eta=null) }
-            Store.edit(video.key) { it.copy(status="ダウンロード中",error="") }; Store.save()
+            video=video.copy(audioInfo="")
+            Store.edit(video.key) { it.copy(status="ダウンロード中",error="",audioInfo="") }; Store.save()
             try {
                 if(!video.resolved) {
                     val resolved=processor.discover(video.url,false).firstOrNull() ?: error("動画情報を取得できませんでした。")
