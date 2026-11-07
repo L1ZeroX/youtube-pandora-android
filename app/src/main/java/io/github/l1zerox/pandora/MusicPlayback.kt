@@ -52,7 +52,7 @@ internal class MusicPlayback(private val player: Player?) {
         val duration=p.duration
         if(p.currentMediaItem?.mediaId != expectedUri || !fraction.isFinite() || duration <= 0 ||
             !p.isCurrentMediaItemSeekable || !p.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)) return
-        p.seekTo((duration*fraction.coerceIn(0f,1f)).toLong()); refresh()
+        p.seekTo(playbackPositionMs(duration,fraction)); refresh()
     }
     fun previous() { player?.takeIf { it.isCommandAvailable(Player.COMMAND_SEEK_TO_PREVIOUS) }?.seekToPrevious(); refresh() }
     fun next() { player?.takeIf { it.isCommandAvailable(Player.COMMAND_SEEK_TO_NEXT) }?.seekToNext(); refresh() }

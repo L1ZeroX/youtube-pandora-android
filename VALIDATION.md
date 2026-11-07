@@ -1,5 +1,19 @@
 # 検証状況
 
+## v0.4.23（2026-11-08）
+
+ライブラリーのコンパクトな再生バーと音楽画面のカスタムSliderをPlaybackPositionSliderへ共通化した。使用中のMaterial3 1.3.2のSliderImplはthumb用BoxへSliderの高さの最小制約を渡す一方、その中の小さい丸いBoxを左上に配置する。このため高さ32dpのライブラリーでは丸がバーより上へ寄り得る。つまみのコンテナを操作領域の高さに満たし、幅4dp・高さ20dp/28dpの縦線を中央に置いた。
+
+バーは自前のfillMaxWidth(fraction)から、Sliderが渡す同じSliderStateを使用するSliderDefaults.Trackへ変更した。高さ3dp、端の点とthumbTrackGapは0にし、つまみの中心とバーの値の終端を合わせる。サムネイル由来の色・操作不可時の配色・読み上げを引き継ぐ。URIをkeyとしてSliderのジェスチャー状態を再作成し、曲が変わった後まで古い操作が残らないようにする。
+
+時刻表示とLibraryPlayback/MusicPlaybackのシークをplaybackPositionMsへ共通化し、Doubleの乗算とミリ秒の丸めを使う。LibraryPlaybackではUIが前回取得したduration/seekableでなく、シーク確定時のプレイヤーのduration・コマンド可否・URIを再確認する。表示用fractionは範囲内に制限する。
+
+単体テストでは0%・中間・100%の再生時間との往復、4分23秒中16秒の位置、9時間の素材、長さ不明・範囲外・非有限値を確認する。MusicPlaybackでは前回のUI更新後にdurationが変わっても最新の長さでシークすることを確認する。端末テストには幅88dp/320dp・通常/コンパクト・LTR/RTLでのバーと縦線の位置、タップ・ドラッグ・アクセシビリティ操作、無効時、曲変更中のドラッグ破棄を追加した。端末未接続のため端末テストはコンパイル確認のみ。実機での位置合わせ・タッチ操作・再生中の表示は未確認。
+
+`testDebugUnitTest`は171件成功、失敗・エラー・スキップ0。`compileDebugAndroidTestKotlin`成功、`lintDebug`はエラー0・警告59件。
+
+参照: [SliderDefaults.Track](https://developer.android.com/reference/kotlin/androidx/compose/material3/SliderDefaults)、Google MavenのMaterial3 1.3.2ソース（Slider.kt）。
+
 ## v0.4.22（2026-11-08）
 
 既存のAPK検証・ACTION_INSTALL_PACKAGEによる確認手順を維持し、インストーラー起動直前に更新先バージョン・起動元versionCode・時刻を専用SharedPreferencesへ同期保存する。APK整理がApplication.onCreateで走っても、この要求は消えない。非公開のUpdateReplacedReceiverがシステム限定のMY_PACKAGE_REPLACEDを受け、指定版への実際のversionCode増加・2時間以内の要求に限って消費する。重複・期限切れ・異なる版では開かない。キャンセルや起動失敗では要求を解除する。旧版は要求を記録しないため、この版のインストール後の更新から対応する。

@@ -72,6 +72,15 @@ class MusicPlaybackTest {
         assertFalse(s.transport.state.seekable); assertEquals(0,s.transport.state.duration)
         s.transport.seek("b",0f); assertEquals(10000,s.position)
     }
+    @Test fun seekUsesCurrentDurationAndTheSamePositionAsTheDragLabel() {
+        val s=Session()
+        s.duration=263_000 // Metadata changed after the last UI refresh.
+        val fraction=playbackFraction(16_000,s.duration)
+        s.transport.seek("a",fraction)
+        assertEquals(playbackPositionMs(s.duration,fraction),s.position)
+        assertEquals(16_000L,s.position)
+        assertEquals(16_000L,s.transport.state.position)
+    }
     @Test fun shuffleRepeatNavigationAndQueueSelectionOperateOnTheSameSession() {
         val s=Session()
         s.transport.shuffle(); assertTrue(s.shuffle)

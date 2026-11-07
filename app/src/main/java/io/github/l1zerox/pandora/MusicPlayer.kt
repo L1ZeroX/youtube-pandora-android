@@ -125,21 +125,17 @@ private fun MusicArtwork(artwork: Bitmap?, palette: MusicPalette, modifier: Modi
 private fun MusicControls(title: String, error: String, transport: MusicPlayback, palette: MusicPalette) {
     val state=transport.state
     var drag by remember(state.uri) { mutableStateOf<Float?>(null) }
-    val fraction=(drag ?: if(state.duration > 0) state.position.toFloat()/state.duration else 0f).coerceIn(0f,1f)
+    val fraction=drag ?: playbackFraction(state.position,state.duration)
+    LaunchedEffect(state.seekable) { if(!state.seekable) drag=null }
     Column(Modifier.fillMaxWidth()) {
         Text(title,fontSize=22.sp,fontWeight=FontWeight.Bold,color=Color.White,maxLines=2,overflow=TextOverflow.Ellipsis)
         Text(state.artist.ifBlank { "音楽 · ライブラリー" },fontSize=14.sp,color=palette.secondary,maxLines=1,overflow=TextOverflow.Ellipsis)
         if(error.isNotBlank()) Text(error,color=Color.White,fontSize=13.sp,modifier=Modifier.padding(top=8.dp))
-        Slider(value=fraction,onValueChange={drag=it},onValueChangeFinished={drag?.let { transport.seek(state.uri,it) }; drag=null},
-            enabled=state.seekable,modifier=Modifier.fillMaxWidth().padding(top=12.dp).semantics { contentDescription="音楽の再生位置" },
-            thumb={Box(Modifier.size(12.dp).background(if(state.seekable) palette.accent else palette.accent.copy(alpha=.35f),CircleShape))},
-            track={Box(Modifier.fillMaxWidth().height(3.dp).clip(CircleShape).background(palette.accent.copy(alpha=.25f))) {
-                Box(Modifier.fillMaxWidth(fraction).fillMaxHeight().background(if(state.seekable) palette.accent else palette.accent.copy(alpha=.35f)))
-            }},
-            colors=SliderDefaults.colors(thumbColor=palette.accent,activeTrackColor=palette.accent,
-                inactiveTrackColor=palette.accent.copy(alpha=.25f)))
+        PlaybackPositionSlider(mediaKey=state.uri,value=fraction,onValueChange={drag=it},
+            onValueChangeFinished={drag?.let { transport.seek(state.uri,it) }; drag=null},enabled=state.seekable,
+            color=palette.accent,description="音楽の再生位置",modifier=Modifier.fillMaxWidth().padding(top=12.dp))
         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
-            Text(durationText((if(drag != null) (state.duration*fraction).toLong() else state.position)/1000.0),fontSize=12.sp,color=palette.secondary)
+            Text(durationText((if(drag != null) playbackPositionMs(state.duration,fraction) else state.position)/1000.0),fontSize=12.sp,color=palette.secondary)
             Text(if(state.duration > 0) durationText(state.duration/1000.0) else "--:--",fontSize=12.sp,color=palette.secondary)
         }
         Row(Modifier.fillMaxWidth().padding(top=16.dp),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically) {

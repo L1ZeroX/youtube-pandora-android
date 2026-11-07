@@ -73,8 +73,10 @@ internal class LibraryPlayback(private val context: Context, videoOwnership: Mut
     fun seek(expectedUri: String, fraction: Float) {
         val player=controller ?: return
         // A drag begun on the previous track must never seek the next track.
-        if(player.currentMediaItem?.mediaId != expectedUri || !seekable || !fraction.isFinite()) return
-        player.seekTo((duration*fraction.coerceIn(0f,1f)).toLong()); refresh()
+        val currentDuration=player.duration
+        if(player.currentMediaItem?.mediaId != expectedUri || !fraction.isFinite() || currentDuration <= 0 ||
+            !player.isCurrentMediaItemSeekable || !player.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)) return
+        player.seekTo(playbackPositionMs(currentDuration,fraction)); refresh()
     }
     fun handOffToPlayer() { resumedVideo=false }
     fun disconnect() {
