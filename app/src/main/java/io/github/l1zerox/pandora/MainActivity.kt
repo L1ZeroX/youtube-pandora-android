@@ -167,7 +167,7 @@ fun PandoraScreen(artworkRequested: Boolean = false, onArtworkClosed: ()->Unit =
                                 Text(if(BuildConfig.BETA) "ベータ版" else "Android版",fontSize=12.sp,modifier=Modifier.weight(1f))
                                 if(p.bubble) {
                                     if(bubblePermission) Button(contentPadding=PaddingValues(horizontal=12.dp,vertical=8.dp),
-                                        onClick={ (context as? android.app.Activity)?.moveTaskToBack(true) }) { Text("バブルへ") }
+                                        onClick={ (context as? android.app.Activity)?.moveTaskToBack(true) }) { Text("バブル") }
                                     else Button(onClick={settings=true},contentPadding=PaddingValues(horizontal=12.dp,vertical=8.dp)) { Text("バブルの表示許可") }
                                 }
                                 Button(onClick={settings=true},contentPadding=PaddingValues(horizontal=12.dp,vertical=8.dp)) { Text("環境設定") }

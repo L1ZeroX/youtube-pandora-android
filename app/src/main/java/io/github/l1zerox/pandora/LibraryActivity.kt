@@ -19,12 +19,16 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Rect
@@ -32,9 +36,12 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -94,6 +101,10 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
     var error by remember { mutableStateOf("") }
     var filter by rememberSaveable { mutableStateOf("すべて") }
     var search by rememberSaveable { mutableStateOf("") }
+    var searchExpanded by rememberSaveable { mutableStateOf(false) }
+    val searchFocus=remember { FocusRequester() }
+    val focusManager=LocalFocusManager.current
+    val keyboard=LocalSoftwareKeyboardController.current
     var appearance by rememberSaveable { mutableStateOf(false) }
     var deletion by rememberSaveable(stateSaver=LibraryEntrySaver) { mutableStateOf<LibraryEntry?>(null) }
     val playback by PlaybackRuntime.state.collectAsStateWithLifecycle()
@@ -164,9 +175,18 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
                     Text(if(importing) "追加中…" else "ファイルを追加")
                 }
             }
-            OutlinedTextField(search,{search=it},Modifier.fillMaxWidth(),singleLine=true,label={Text("タイトルで検索")})
+            if(searchExpanded) {
+                OutlinedTextField(search,{search=it},Modifier.fillMaxWidth().focusRequester(searchFocus),singleLine=true,
+                    label={Text("タイトルで検索")},keyboardOptions=KeyboardOptions(imeAction=ImeAction.Search),
+                    keyboardActions=KeyboardActions(onSearch={focusManager.clearFocus(); keyboard?.hide()}))
+                LaunchedEffect(Unit) { searchFocus.requestFocus(); keyboard?.show() }
+            }
             FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
                 listOf("すべて","動画","音楽","ショート").forEach { option -> FilterChip(selected=filter == option,onClick={filter=option},label={Text(option)}) }
+                OutlinedButton(onClick={
+                    if(searchExpanded) { search=""; focusManager.clearFocus(); keyboard?.hide() }
+                    searchExpanded=!searchExpanded
+                }) { Text(if(searchExpanded) "検索を閉じる" else "検索") }
                 TextButton(onClick={appearance=!appearance}) { Text(if(appearance) "調整終了" else "表示調整",fontSize=12.sp) }
             }
             if(playback.uri.isNotBlank()) Surface(color=Color.Transparent,contentColor=playingPalette.content,

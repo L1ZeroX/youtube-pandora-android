@@ -4,9 +4,11 @@ Windows版と別プロジェクトのAndroid用アプリです。Android 10以�
 
 ## インストール
 
-**[正式版APK v0.4.17](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.4.17/YoutubePandora-Android-v0.4.17.apk)**（ライブラリー・再生・PiPを統合済み）
+**[正式版APK v0.4.18](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.4.18/YoutubePandora-Android-v0.4.18.apk)**（ライブラリー・再生・PiPを統合済み）
 
 ライブラリー試験版の機能は正式版v0.4.6へ統合しました。
+
+v0.4.18では「バブルへ」を「バブル」に変更しました。ライブラリーの検索欄は「検索」ボタンで開き、「検索を閉じる」で絞り込みを解除して閉じます。v0.4.17以降は環境設定からアプリ内で更新できます。
 
 v0.4.17では「アプリ内で更新」からAPKを取得し、進捗表示・検証の後にAndroidの更新確認画面を開けます。初回はインストール許可が必要です。画面を離れても取得を続け、「環境設定 → アプリの更新状況」から戻れます。更新用APKは専用領域に1件だけ保持し、更新後に整理します。v0.4.17への移行時だけは上記APKから更新してください。
 
