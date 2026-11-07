@@ -7,6 +7,7 @@
 - CPython: PSF License, https://github.com/python/cpython
 - QuickJS: MIT, https://github.com/bellard/quickjs
 - AndroidX / Jetpack Compose: Apache-2.0, https://android.googlesource.com/platform/frameworks/support/
+- AndroidX Media3 1.11.1 (ExoPlayer, session, UI): Apache-2.0, https://github.com/androidx/media/tree/1.11.1
 - Kotlin / kotlinx.coroutines: Apache-2.0, https://github.com/JetBrains/kotlin and https://github.com/Kotlin/kotlinx.coroutines
 - Coil: Apache-2.0, https://github.com/coil-kt/coil
 

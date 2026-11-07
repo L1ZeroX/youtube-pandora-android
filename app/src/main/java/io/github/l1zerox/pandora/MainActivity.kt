@@ -55,7 +55,7 @@ import kotlin.math.max
 class MainActivity : ComponentActivity() {
     private var artworkRequested by mutableStateOf(false)
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState); BubbleRuntime.foreground.value=true; enableEdgeToEdge()
+        super.onCreate(savedInstanceState); enableEdgeToEdge()
         artworkRequested=savedInstanceState?.getBoolean("artworkRequested") ?: false
         if(savedInstanceState == null) acceptShare(intent)
         setContent { PandoraScreen(artworkRequested) { artworkRequested=false } }
@@ -66,9 +66,9 @@ class MainActivity : ComponentActivity() {
         outState.putBoolean("artworkRequested",artworkRequested)
         super.onSaveInstanceState(outState)
     }
-    override fun onStart() { super.onStart(); BubbleRuntime.foreground.value=true }
+    override fun onStart() { super.onStart(); BubbleRuntime.enter(this) }
     override fun onResume() { super.onResume(); BubbleRuntime.sync(this) }
-    override fun onStop() { super.onStop(); if(!isChangingConfigurations) BubbleRuntime.foreground.value=false }
+    override fun onStop() { super.onStop(); BubbleRuntime.leave(this) }
     private fun acceptShare(intent: Intent?) {
         if(intent?.action == OPEN_ARTWORK) artworkRequested=true
         if(intent?.action == Intent.ACTION_SEND) {
@@ -185,6 +185,8 @@ fun PandoraScreen(artworkRequested: Boolean = false, onArtworkClosed: ()->Unit =
                             Spacer(Modifier.height(12.dp))
                             Text("ダウンロード",fontSize=32.sp,fontWeight=FontWeight.Bold)
                             Text("お気に入りを、いつでも。",fontSize=13.sp,color=colors.onSurfaceVariant)
+                            if(BuildConfig.BETA) OutlinedButton(onClick={context.startActivity(Intent(context,LibraryActivity::class.java))},
+                                modifier=Modifier.fillMaxWidth().padding(top=12.dp)) { Text("ライブラリー · 動画と音楽を再生") }
                         }
                     }
                     item {

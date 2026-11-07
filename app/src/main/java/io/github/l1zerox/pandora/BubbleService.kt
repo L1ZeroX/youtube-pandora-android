@@ -36,6 +36,9 @@ import kotlin.math.roundToInt
 
 internal object BubbleRuntime {
     val foreground=MutableStateFlow(false)
+    private val visible=java.util.Collections.newSetFromMap(java.util.WeakHashMap<Activity,Boolean>())
+    fun enter(activity: Activity) { visible.add(activity); foreground.value=true }
+    fun leave(activity: Activity) { visible.remove(activity); foreground.value=visible.isNotEmpty() }
     val permission=MutableStateFlow(false)
     val error=MutableStateFlow("")
     fun sync(context: Context): Boolean {

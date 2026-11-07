@@ -1,0 +1,150 @@
+package io.github.l1zerox.pandora
+
+import android.app.PictureInPictureParams
+import android.content.ComponentName
+import android.content.ContentValues
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.SystemClock
+import android.provider.MediaStore
+import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.session.MediaController
+import androidx.media3.session.SessionToken
+import androidx.test.core.app.ActivityScenario
+import androidx.test.platform.app.InstrumentationRegistry
+import com.google.common.util.concurrent.ListenableFuture
+import com.yausername.ffmpeg.FFmpeg
+import com.yausername.youtubedl_android.YoutubeDL
+import kotlinx.coroutines.runBlocking
+import org.junit.Assert.*
+import org.junit.Assume.assumeTrue
+import org.junit.Test
+import java.io.File
+import java.util.concurrent.TimeUnit
+
+@androidx.annotation.OptIn(UnstableApi::class)
+class LibraryPlaybackTest {
+    private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
+    private val context get() = instrumentation.targetContext
+    private fun insert(format: String, pending: Boolean = false, file: File? = null): Uri {
+        val resolver=context.contentResolver
+        val uri=resolver.insert(MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY),ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME,"Pandora-library-test-${System.nanoTime()}.${format.lowercase()}")
+            put(MediaStore.MediaColumns.MIME_TYPE,if(format == "MP4") "video/mp4" else "audio/mpeg")
+            put(MediaStore.MediaColumns.RELATIVE_PATH,saveRelativePath(format))
+            put(MediaStore.MediaColumns.IS_PENDING,1)
+        })!!
+        if(file != null) resolver.openOutputStream(uri)!!.use { output -> file.inputStream().use { it.copyTo(output) } }
+        if(!pending) resolver.update(uri,ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING,0) },null,null)
+        return uri
+    }
+
+    @Test fun savedLibrarySurvivesQueueRemovalAndExcludesPendingOrDeletedFiles() = runBlocking {
+        val original=Store.state.value
+        val saved=insert("MP4")
+        val pending=insert("MP3",true)
+        try {
+            Store.state.value=ScreenState()
+            val entries=LibraryRepository.load(context)
+            assertTrue(entries.any { it.uri == saved.toString() && it.video })
+            assertFalse(entries.any { it.uri == pending.toString() })
+            context.contentResolver.delete(saved,null,null)
+            assertFalse(LibraryRepository.load(context).any { it.uri == saved.toString() })
+        } finally {
+            Store.state.value=original
+            context.contentResolver.delete(saved,null,null)
+            context.contentResolver.delete(pending,null,null)
+        }
+    }
+
+    @Test fun betaComponentsAndPipAreDeclaredOnlyForTheBetaBuild() {
+        val flags=PackageManager.MATCH_DISABLED_COMPONENTS
+        val library=context.packageManager.getActivityInfo(ComponentName(context,LibraryActivity::class.java),flags)
+        val player=context.packageManager.getActivityInfo(ComponentName(context,PlayerActivity::class.java),flags)
+        val service=context.packageManager.getServiceInfo(ComponentName(context,PlaybackService::class.java),flags)
+        assertEquals(BuildConfig.BETA,library.enabled)
+        assertEquals(BuildConfig.BETA,player.enabled)
+        assertEquals(BuildConfig.BETA,service.enabled)
+        // FLAG_SUPPORTS_PICTURE_IN_PICTURE = 0x400000 (ActivityInfo constant is hidden on some SDKs).
+        assertTrue(player.flags and 0x400000 != 0)
+        assertFalse(player.exported); assertFalse(service.exported)
+    }
+
+    @Test fun musicPlaybackSurvivesClosingItsScreenAndRespondsToPauseResumeStop() {
+        assumeTrue(BuildConfig.BETA)
+        YoutubeDL.init(context); FFmpeg.init(context)
+        val file=File(context.cacheDir,"library-silence.mp3")
+        val process=NativeRuntime.command(context,"libffmpeg.so",listOf("-y","-f","lavfi","-i","anullsrc=r=44100:cl=stereo","-t","30","-c:a","libmp3lame",file.absolutePath)).start()
+        val output=process.inputStream.bufferedReader().readText()
+        assertEquals(output,0,process.waitFor())
+        val uri=insert("MP3",file=file)
+        var future: ListenableFuture<MediaController>? = null
+        val scenario=ActivityScenario.launch<PlayerActivity>(Intent(context,PlayerActivity::class.java).putExtra("uri",uri.toString()))
+        try {
+            instrumentation.runOnMainSync {
+                future=MediaController.Builder(context,SessionToken(context,ComponentName(context,PlaybackService::class.java))).buildAsync()
+            }
+            val controller=future!!.get(10,TimeUnit.SECONDS)
+            waitFor { controller.currentMediaItem?.mediaId == uri.toString() && controller.playbackState == Player.STATE_READY && controller.currentPosition > 250 }
+            scenario.close()
+            waitFor { controller.isPlaying && controller.currentPosition > 750 }
+            instrumentation.runOnMainSync { controller.pause() }
+            waitFor { !controller.playWhenReady }
+            instrumentation.runOnMainSync { controller.play() }
+            waitFor { controller.isPlaying }
+            instrumentation.runOnMainSync { controller.stop(); controller.clearMediaItems() }
+            waitFor { controller.playbackState == Player.STATE_IDLE && controller.mediaItemCount == 0 }
+        } finally {
+            scenario.close()
+            instrumentation.runOnMainSync { future?.let { MediaController.releaseFuture(it) } }
+            context.stopService(Intent(context,PlaybackService::class.java))
+            context.contentResolver.delete(uri,null,null); file.delete()
+        }
+    }
+
+    @Test fun videoContinuesInPipAndPausesWhenItsWindowCloses() {
+        assumeTrue(BuildConfig.BETA && context.packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE))
+        YoutubeDL.init(context); FFmpeg.init(context)
+        val file=File(context.cacheDir,"library-pip.mp4")
+        val process=NativeRuntime.command(context,"libffmpeg.so",listOf("-y","-f","lavfi","-i","color=c=blue:s=320x180:r=24",
+            "-t","30","-c:v","libx264","-pix_fmt","yuv420p",file.absolutePath)).start()
+        val output=process.inputStream.bufferedReader().readText()
+        assertEquals(output,0,process.waitFor())
+        val uri=insert("MP4",file=file)
+        var future: ListenableFuture<MediaController>? = null
+        val scenario=ActivityScenario.launch<PlayerActivity>(Intent(context,PlayerActivity::class.java).putExtra("uri",uri.toString()))
+        try {
+            instrumentation.runOnMainSync {
+                future=MediaController.Builder(context,SessionToken(context,ComponentName(context,PlaybackService::class.java))).buildAsync()
+            }
+            val controller=future!!.get(10,TimeUnit.SECONDS)
+            waitFor { controller.currentMediaItem?.mediaId == uri.toString() && controller.isPlaying && controller.videoSize.width > 0 }
+            var activity: PlayerActivity? = null
+            scenario.onActivity {
+                activity=it
+                assertTrue(it.enterPictureInPictureMode(PictureInPictureParams.Builder().build()))
+            }
+            waitFor { activity?.isInPictureInPictureMode == true && controller.isPlaying }
+            scenario.close()
+            waitFor { !controller.playWhenReady }
+        } finally {
+            scenario.close()
+            instrumentation.runOnMainSync { future?.let { MediaController.releaseFuture(it) } }
+            context.stopService(Intent(context,PlaybackService::class.java))
+            context.contentResolver.delete(uri,null,null); file.delete()
+        }
+    }
+
+    private fun waitFor(condition: ()->Boolean) {
+        val deadline=SystemClock.elapsedRealtime()+15000
+        while(SystemClock.elapsedRealtime() < deadline) {
+            var success=false
+            instrumentation.runOnMainSync { success=condition() }
+            if(success) return
+            SystemClock.sleep(100)
+        }
+        fail("Playback state did not arrive in time")
+    }
+}
