@@ -11,8 +11,8 @@ android {
         applicationId = "io.github.l1zerox.pandora"
         minSdk = 29
         targetSdk = 36
-        versionCode = 19
-        versionName = if(betaBuild) "0.4.0-beta.7" else "0.3.4"
+        versionCode = 20
+        versionName = if(betaBuild) "0.4.0-beta.8" else "0.3.5"
         buildConfigField("boolean", "BETA", betaBuild.toString())
         manifestPlaceholders["appLabel"] = "Youtube Pandora!"
         manifestPlaceholders["bubbleEnabled"] = betaBuild.toString()
