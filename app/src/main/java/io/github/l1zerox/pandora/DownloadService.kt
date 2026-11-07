@@ -135,7 +135,7 @@ class DownloadService : Service() {
             } catch(e: Exception) {
                 processor.check()
                 active.failed++; AppLog.error("動画保存",e)
-                Store.edit(video.key) { it.copy(status="失敗",error=(e.message ?: "保存できませんでした。").takeLast(2000)) }
+                Store.edit(video.key) { it.copy(status="失敗",error=downloadFailureMessage(video.url,e)) }
             }
             active.attempted.add(video.key)
             Store.state.update { it.copy(done=active.attempted.size) }; Store.save()

@@ -11,9 +11,8 @@ android {
         applicationId = "io.github.l1zerox.pandora"
         minSdk = 29
         targetSdk = 36
-        // Promote the library beta while preserving the application ID and signing key.
-        versionCode = 27
-        versionName = if(betaBuild) "0.4.6-beta.7" else "0.4.6"
+        versionCode = 28
+        versionName = if(betaBuild) "0.4.6-beta.7" else "0.4.7"
         buildConfigField("boolean", "BETA", betaBuild.toString())
         manifestPlaceholders["appLabel"] = "Youtube Pandora!"
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }

@@ -18,11 +18,13 @@ class Engine(private val context: Context, private val progress: (String, Float?
     private val control = TransferControl()
     val paused get() = control.paused
     @Volatile private var native: Process? = null
+    private var recoveryUpdateAttempted = false
     private val id = UUID.randomUUID().toString()
     fun init() {
         AppLog.info("準備","yt-dlp / FFmpegを初期化")
         YoutubeDL.init(context); FFmpeg.init(context); check()
-        AppLog.info("準備","初期化完了 / yt-dlp ${YoutubeDL.version(context) ?: "不明"} / 空き容量 ${context.filesDir.usableSpace / (1024*1024)} MiB")
+        BundledExtractor.install(context,::check)
+        AppLog.info("準備","初期化完了 / yt-dlp ${BundledExtractor.version(context) ?: "確認できません"} / QuickJS=${File(context.applicationInfo.nativeLibraryDir,"libqjs.so").exists()} / 空き容量 ${context.filesDir.usableSpace / (1024*1024)} MiB")
     }
     fun check() { control.check() }
     fun pause() { control.pause(); stopProcesses() }
@@ -50,7 +52,7 @@ class Engine(private val context: Context, private val progress: (String, Float?
         descendants.filter { it != android.os.Process.myPid() }.reversed().forEach { pid -> runCatching { Os.kill(pid, OsConstants.SIGKILL) } }
     }
     private fun request(url: String) = YoutubeDLRequest(url).apply {
-        addOption("--no-warnings"); addOption("--socket-timeout", "20"); addOption("--retries", "3")
+        addOption("--socket-timeout", "20"); addOption("--retries", "3")
         addOption("--no-colors"); addOption("--newline"); addOption("--no-mtime")
         addOption("--match-filter", "!is_live & !is_upcoming")
     }
@@ -68,7 +70,10 @@ class Engine(private val context: Context, private val progress: (String, Float?
             val phase = if(line.contains("[download]")) "ダウンロード中" else if(line.contains("[Merger]") || line.contains("[ExtractAudio]")) "変換中" else "情報を確認中"
             progress(phase, percent.takeIf { it >= 0 }?.coerceIn(0f,100f)?.div(100f),
                 line.take(300) + if(eta >= 0) " · 残り ${durationText(eta.toDouble())}" else "")
-        }.out.also { check() }
+        }.also { response ->
+            check()
+            if(response.err.isNotBlank()) AppLog.info("yt-dlp診断",response.err)
+        }.out
     }
     fun discover(url: String, playlist: Boolean): List<Video> {
         AppLog.info("情報取得","開始 / プレイリスト=$playlist / $url")
@@ -99,6 +104,7 @@ class Engine(private val context: Context, private val progress: (String, Float?
     fun download(video: Video, preferences: Preferences, workspace: File? = null): String {
         val work = (workspace ?: File(context.cacheDir, "download-${UUID.randomUUID()}")).apply { mkdirs() }
         try {
+            withYoutubeRecovery(video.url,::check,::recoverYoutubeDownload) {
             val req = request(video.url).apply {
                 addOption("--no-playlist"); addOption("-f", formatSelector(preferences))
                 addOption("-S", "res,fps,vcodec:h264,acodec:aac")
@@ -108,6 +114,7 @@ class Engine(private val context: Context, private val progress: (String, Float?
                 addOption("--progress-template","download:PANDORA_PROGRESS|%(progress.status)s|%(progress.downloaded_bytes)s|%(progress.total_bytes)s|%(progress.total_bytes_estimate)s|%(progress.speed)s|%(progress.eta)s")
             }
             execute(req)
+            }
             AppLog.info("ダウンロード","取得完了、動画の解析へ")
             val source = work.listFiles()!!.firstOrNull { it.name.matches(Regex("source\\.[a-zA-Z0-9]+")) && it.extension !in listOf("part","ytdl","json") }
                 ?: error("保存する動画ファイルがありません。")
@@ -238,5 +245,22 @@ class Engine(private val context: Context, private val progress: (String, Float?
             return uri.toString()
         } catch(error: Exception) { resolver.delete(uri,null,null); throw error }
     }
-    fun update() { YoutubeDL.updateYoutubeDL(context,YoutubeDL.UpdateChannel.STABLE); check() }
+    private fun recoverYoutubeDownload() {
+        check()
+        AppLog.info("YouTube 403","yt-dlp ${BundledExtractor.version(context)} / 動画情報を取り直して1回だけ再試行します。")
+        if(!recoveryUpdateAttempted) {
+            recoveryUpdateAttempted=true
+            progress("更新を確認中",null,"YouTube 403のためyt-dlpを確認しています…")
+            try { update() }
+            catch(error: Exception) { check(); AppLog.error("yt-dlp更新",error) }
+        }
+        check()
+        progress("再試行中",null,"動画データのURLを取得し直しています…")
+    }
+    fun update() {
+        check()
+        YoutubeDL.updateYoutubeDL(context,YoutubeDL.UpdateChannel.STABLE)
+        check()
+        AppLog.info("yt-dlp更新","現在のバージョン: ${BundledExtractor.version(context) ?: "確認できません"}")
+    }
 }
