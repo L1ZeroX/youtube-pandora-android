@@ -129,7 +129,12 @@ class DownloadService : Service() {
                 }
                 active.workspace=transferWorkspace(cacheDir,video,active.preferences)
                 val uri=processor.download(video,active.preferences,active.workspace)
-                Store.edit(video.key) { it.copy(status="完了",savedUri=uri,error="") }
+                Store.state.update { state ->
+                    state.copy(videos=state.videos.map {
+                        if(it.key == video.key) it.copy(status="完了",savedUri=uri,error="") else it
+                    }).withoutSavedDownloads()
+                }
+                Store.save()
                 active.workspace?.deleteRecursively(); active.workspace=null
                 AppLog.info("動画完了","${video.key} / $uri")
             } catch(e: Exception) {

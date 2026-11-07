@@ -6,6 +6,37 @@ import java.io.File
 import java.util.concurrent.CancellationException
 
 class TransferStateTest {
+    @Test fun publishedDownloadsLeaveQueueWithoutRemovingUnfinishedItemsOrCounters() {
+        val saved=Video("saved","https://example.com/saved","Saved",status="完了",savedUri="content://media/1")
+        val pending=listOf("待機中","失敗","一時停止","キャンセル","変換中").mapIndexed { i,status ->
+            Video("item$i","https://example.com/$i",status,status=status)
+        }
+        val state=ScreenState(videos=listOf(saved)+pending,busy=true,current=saved.key,done=1,total=6,operation="DOWNLOAD")
+        val result=state.withoutSavedDownloads()
+        assertEquals(pending,result.videos); assertEquals("",result.current)
+        assertTrue(result.busy); assertEquals(1,result.done); assertEquals(6,result.total)
+        assertEquals(state.preferences,result.preferences)
+    }
+    @Test fun unconfirmedCompletionAndCurrentUnfinishedWorkArePreserved() {
+        val unconfirmed=Video("unknown","https://example.com/unknown","Unknown",status="完了")
+        val active=Video("active","https://example.com/active","Active",status="ダウンロード中")
+        val saved=Video("saved","https://example.com/saved","Saved",status="完了",savedUri="content://media/1")
+        val state=ScreenState(videos=listOf(unconfirmed,active,saved),current=active.key,busy=true)
+        val result=state.withoutSavedDownloads()
+        assertEquals(listOf(unconfirmed,active),result.videos); assertEquals(active.key,result.current)
+        assertSame(result,result.withoutSavedDownloads())
+    }
+    @Test fun batchContinuesAfterSuccessfulRowsDisappearAndDoesNotRepeatTheirKeys() {
+        val a=Video("a","https://example.com/a","A")
+        val b=Video("b","https://example.com/b","B")
+        val batch=DownloadBatch(Preferences(),listOf(a,b),false)
+        batch.attempted.add(a.key)
+        val queue=ScreenState(videos=listOf(a.copy(status="完了",savedUri="content://media/1"),b)).withoutSavedDownloads()
+        assertEquals(listOf(b),batch.remaining(queue.videos))
+        assertEquals(listOf(b),batch.remaining(queue.videos+a))
+        batch.attempted.add(b.key)
+        assertTrue(batch.remaining(emptyList()).isEmpty()); assertEquals(2,batch.attempted.size)
+    }
     @Test fun cancelWinsOverPauseAndCheckStopsTheWorker() {
         val control=TransferControl()
         control.check(); assertFalse(control.stopped)

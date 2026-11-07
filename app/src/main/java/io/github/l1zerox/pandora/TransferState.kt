@@ -39,6 +39,13 @@ internal class DownloadBatch(val preferences: Preferences, videos: List<Video>, 
     }
 }
 
+/** Only confirmed, published downloads leave the queue; media files are not touched. */
+internal fun ScreenState.withoutSavedDownloads(): ScreenState {
+    val completed=videos.filter { it.status == "完了" && it.savedUri.isNotBlank() }.map { it.key }.toSet()
+    if(completed.isEmpty()) return this
+    return copy(videos=videos.filterNot { it.key in completed },current=if(current in completed) "" else current)
+}
+
 internal data class TransferProgress(val fraction: Float?, val speed: String, val eta: Double?, val detail: String)
 private fun number(value: String) = value.toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0 }
 internal fun byteText(bytes: Double): String {
