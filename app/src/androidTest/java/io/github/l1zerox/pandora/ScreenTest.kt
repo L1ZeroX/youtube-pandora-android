@@ -14,6 +14,21 @@ import java.io.File
 
 class ScreenTest {
     @get:Rule val screen = createAndroidComposeRule<MainActivity>()
+    @Test fun mp3ArtworkChoicePersistsAndLocksDuringDownload() {
+        val original=Store.state.value
+        try {
+            screen.runOnIdle { AppUpdates.dismiss(); Store.state.value=ScreenState(preferences=Preferences(format="MP3")) }
+            screen.onNodeWithText("アートワークなし").performScrollTo().performClick()
+            screen.runOnIdle { org.junit.Assert.assertEquals("なし",Store.state.value.preferences.artworkMode) }
+            screen.onNodeWithText("サムネイル").performScrollTo().performClick()
+            screen.runOnIdle {
+                org.junit.Assert.assertEquals("サムネイル",Store.state.value.preferences.artworkMode)
+                Store.state.update { it.copy(busy=true,operation="DOWNLOAD") }
+            }
+            screen.onNodeWithText("ギャラリーから選ぶ").assertIsNotEnabled()
+            screen.onNodeWithText("サムネイル").assertIsNotEnabled()
+        } finally { screen.runOnIdle { Store.state.value=original; Store.save() } }
+    }
     @Test fun promotedFeaturesAreAvailableInTheDefaultReleaseChannel() {
         val original=Store.state.value
         try {

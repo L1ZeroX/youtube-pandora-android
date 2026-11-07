@@ -121,9 +121,14 @@ class Engine(private val context: Context, private val progress: (String, Float?
             AppLog.info("動画解析","映像=${visual?.optString("codec_name")} / ${visual?.optInt("width")}x${visual?.optInt("height")} / fps=${visual?.optString("avg_frame_rate")} (nominal=${visual?.optString("r_frame_rate")}) / 音声=${audio?.optString("codec_name")} / 時間=$duration 秒")
             val args = conversionInputArgs(source.absolutePath).toMutableList()
             var interpolating = false
+            var attachedCover = false
             if(preferences.format == "MP3") {
                 require(audio != null) { "音声がない動画です。" }
-                args += listOf("-vn","-c:a","libmp3lame","-b:a",preferences.audio.removeSuffix("bps"))
+                progress("変換中",null,"アルバムアートを準備しています…")
+                val cover=prepareMp3Artwork(context,video,preferences,work)
+                attachedCover=cover != null
+                check()
+                args += mp3EncodingArgs(preferences.audio,cover?.absolutePath)
             } else {
                 require(visual != null) { "映像がありません。MP3を選択してください。" }
                 val motionFilter = if(preferences.fps == INTERPOLATED_FPS) {
@@ -152,6 +157,12 @@ class Engine(private val context: Context, private val progress: (String, Float?
                 }
             }
             require(output.exists() && output.length() > 0) { "変換後のファイルがありません。" }
+            if(attachedCover) {
+                val verified=JSONObject(runNative("libffprobe.so",listOf("-v","error","-show_streams","-of","json",output.absolutePath))).getJSONArray("streams")
+                require((0 until verified.length()).any { verified.getJSONObject(it).optJSONObject("disposition")?.optInt("attached_pic") == 1 }) {
+                    "MP3へのアルバムアート埋め込みを確認できませんでした。"
+                }
+            }
             if(interpolating) {
                 val verified=JSONObject(runNative("libffprobe.so",listOf("-v","quiet","-print_format","json","-show_streams",output.absolutePath))).getJSONArray("streams")
                 val rate=(0 until verified.length()).map { verified.getJSONObject(it) }.first { it.optString("codec_type") == "video" }.optString("avg_frame_rate")

@@ -53,17 +53,24 @@ import java.io.File
 import kotlin.math.max
 
 class MainActivity : ComponentActivity() {
+    private var artworkRequested by mutableStateOf(false)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState); BubbleRuntime.foreground.value=true; enableEdgeToEdge()
+        artworkRequested=savedInstanceState?.getBoolean("artworkRequested") ?: false
         if(savedInstanceState == null) acceptShare(intent)
-        setContent { PandoraScreen() }
+        setContent { PandoraScreen(artworkRequested) { artworkRequested=false } }
         AppUpdates.check()
     }
     override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); acceptShare(intent) }
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBoolean("artworkRequested",artworkRequested)
+        super.onSaveInstanceState(outState)
+    }
     override fun onStart() { super.onStart(); BubbleRuntime.foreground.value=true }
     override fun onResume() { super.onResume(); BubbleRuntime.sync(this) }
     override fun onStop() { super.onStop(); if(!isChangingConfigurations) BubbleRuntime.foreground.value=false }
     private fun acceptShare(intent: Intent?) {
+        if(intent?.action == OPEN_ARTWORK) artworkRequested=true
         if(intent?.action == Intent.ACTION_SEND) {
             val text = intent.getStringExtra(Intent.EXTRA_TEXT).orEmpty()
             val count=Store.receiveShare(text)
@@ -73,7 +80,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun PandoraScreen() {
+fun PandoraScreen(artworkRequested: Boolean = false, onArtworkClosed: ()->Unit = {}) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val s by Store.state.collectAsStateWithLifecycle()
@@ -214,7 +221,10 @@ fun PandoraScreen() {
                             if(p.format == "MP4") {
                                 Choice("画質",p.quality,listOf("1080p以下","720p以下","最高"),!s.busy) { Store.preferences(p.copy(quality=it)) }
                                 Choice("フレームレート",p.fps,listOf("元のまま","24fps","30fps","60fps",INTERPOLATED_FPS),!s.busy) { Store.preferences(p.copy(fps=it)) }
-                            } else Choice("音質",p.audio,listOf("192kbps","320kbps","128kbps"),!s.busy) { Store.preferences(p.copy(audio=it)) }
+                            } else {
+                                Choice("音質",p.audio,listOf("192kbps","320kbps","128kbps"),!s.busy) { Store.preferences(p.copy(audio=it)) }
+                                ArtworkSettings(p,s.busy)
+                            }
                             Text("保存先: 内部ストレージ/${saveRelativePath(p.format)}",fontSize=12.sp)
                             Text("互換性のある映像は再圧縮せず保存します。フレーム補間はCPUで中間の動きを生成するため時間がかかります。",fontSize=11.sp,color=colors.onSurfaceVariant)
                         }
@@ -223,9 +233,12 @@ fun PandoraScreen() {
                 }
             }
         }
+        if(artworkRequested) AlertDialog(onDismissRequest=onArtworkClosed,title={Text("MP3のアルバムアート")},text={
+            Column(Modifier.verticalScroll(rememberScrollState())) { ArtworkSettings(p,s.busy) }
+        },confirmButton={TextButton(onClick=onArtworkClosed) { Text("完了") }})
         if(error.isNotEmpty()) AlertDialog(onDismissRequest={error=""},title={Text("確認")},text={Text(error)},confirmButton={TextButton(onClick={error=""}) { Text("閉じる") }})
         if(logs) LogDialog { logs=false }
-        if(!s.busy && !settings && !logs && preview == null && error.isEmpty() && pending == null &&
+        if(!s.busy && !settings && !logs && !artworkRequested && preview == null && error.isEmpty() && pending == null &&
             (updateState.release != null || updateState.message.isNotEmpty())) UpdateDialog(updateState) { AppUpdates.dismiss() }
         preview?.let { video ->
             var thumbnailTone by remember(video.thumbnail) { mutableStateOf<Color?>(null) }

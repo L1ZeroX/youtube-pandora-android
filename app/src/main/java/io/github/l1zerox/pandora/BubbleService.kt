@@ -72,6 +72,7 @@ class BubbleService : Service() {
     private var mp4: Button? = null
     private var mp3: Button? = null
     private var formatHint: TextView? = null
+    private var artworkSettings: Button? = null
     private var progress: ProgressBar? = null
     private var pause: Button? = null
     private var start: Button? = null
@@ -223,6 +224,10 @@ class BubbleService : Service() {
         formats.addView(mp4,LinearLayout.LayoutParams(0,-2,1f)); formats.addView(mp3,LinearLayout.LayoutParams(0,-2,1f))
         container.addView(formats)
         formatHint=text(12f).also { container.addView(it) }
+        artworkSettings=button("アルバムアート設定") {
+            runCatching { startActivity(Intent(this,MainActivity::class.java).setAction(OPEN_ARTWORK)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)) }.onFailure(::failed)
+        }.also { container.addView(it) }
         val actions=LinearLayout(this)
         pause=button("一時停止") { command(if(Store.state.value.paused) "RESUME" else "PAUSE") }
         cancel=button("キャンセル") { command("CANCEL") }
@@ -298,6 +303,9 @@ class BubbleService : Service() {
         mp3?.text=if(s.preferences.format == "MP3") "✓ MP3 音声" else "MP3 音声"
         mp4?.isEnabled=!s.busy; mp3?.isEnabled=!s.busy
         mp4?.isSelected=s.preferences.format == "MP4"; mp3?.isSelected=s.preferences.format == "MP3"
+        artworkSettings?.visibility=if(s.preferences.format == "MP3") View.VISIBLE else View.GONE
+        artworkSettings?.text="アルバムアート: ${s.preferences.artworkMode} · 変更"
+        artworkSettings?.isEnabled=!s.busy
         formatHint?.text=if(s.busy) "DL中・一時停止中は形式変更とキュー削除をロックします。変更する場合はキャンセルしてください。"
             else "選んだ形式で待機キューを保存します。削除は一覧のみで、保存済みファイルは残ります。"
         progress?.progressTintList=ColorStateList.valueOf(palette.ring.toArgb())
@@ -351,7 +359,7 @@ class BubbleService : Service() {
         title=null; phase=null; progress=null; metrics=null; queue=null; pause=null; cancel=null; start=null
         clipboardStatus=null; panelBackground=null; panelButtons.clear()
         queueRows=null; queueSnapshot=null; renderedPage=-1; queuePage=0; queueDeletes.clear()
-        previousPage=null; nextPage=null; mp4=null; mp3=null; formatHint=null
+        previousPage=null; nextPage=null; mp4=null; mp3=null; formatHint=null; artworkSettings=null
     }
     private fun hide() { hidePanel(); bubble?.let { runCatching { windows.removeView(it) } }; bubble=null; bubbleParams=null }
     private fun failed(error: Throwable) {

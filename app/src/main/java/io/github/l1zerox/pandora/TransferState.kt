@@ -21,7 +21,8 @@ internal class TransferControl {
 }
 
 internal fun transferWorkspace(root: File, video: Video, p: Preferences): File {
-    val identity=listOf(video.url,p.format,p.quality,p.audio,p.fps).joinToString("\n")
+    val identity=(listOf(video.url,p.format,p.quality,p.audio,p.fps) +
+        if(p.format == "MP3") listOf(p.artworkMode,p.artworkImage) else emptyList()).joinToString("\n")
     val hash=MessageDigest.getInstance("SHA-256").digest(identity.toByteArray()).joinToString("") { "%02x".format(it) }
     return File(root,"transfer-$hash")
 }
