@@ -26,7 +26,8 @@ class Mp3ArtworkRuntimeTest {
             val bitmap=Bitmap.createBitmap(2048,1024,Bitmap.Config.ARGB_8888)
             bitmap.eraseColor(android.graphics.Color.CYAN)
             png.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG,100,it) }; bitmap.recycle()
-            imported=importArtwork(context,Uri.fromFile(png))
+            val preview=loadArtworkBitmap(context,Uri.fromFile(png))
+            try { imported=saveCroppedArtwork(context,preview,ArtworkCrop()) } finally { preview.recycle() }
             val p=Preferences(format="MP3",artworkMode="ギャラリー",artworkImage=imported.absolutePath)
             Store.preferences(p); Store.init(context)
             assertEquals(p,Store.state.value.preferences)
@@ -43,7 +44,7 @@ class Mp3ArtworkRuntimeTest {
             assertEquals("mjpeg",art.getString("codec_name"))
             assertEquals(1,art.getJSONObject("disposition").getInt("attached_pic"))
             assertEquals("Cover (front)",art.getJSONObject("tags").getString("comment"))
-            assertEquals(1024,art.getInt("width")); assertEquals(512,art.getInt("height"))
+            assertEquals(1024,art.getInt("width")); assertEquals(1024,art.getInt("height"))
             assertTrue(result.getJSONObject("format").getString("duration").toDouble() in 1.9..2.2)
         } finally {
             Store.state.value=original; Store.save()

@@ -214,7 +214,7 @@ fun PandoraScreen(artworkRequested: Boolean = false, onArtworkClosed: ()->Unit =
                     items(s.videos,key={it.key}) { video ->
                         VideoPanel(video,bitmap != null,p.glass,s.busy) { preview=video }
                     }
-                    item {
+                    item(key="save-settings") {
                         Panel(bitmap != null,p.glass) {
                             TintBadge("保存設定",strong=true)
                             Choice("形式",p.format,listOf("MP4","MP3"),!s.busy) { Store.preferences(p.copy(format=it)) }

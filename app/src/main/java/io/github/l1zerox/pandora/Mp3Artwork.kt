@@ -48,17 +48,20 @@ private fun writeCover(bitmap: Bitmap, target: File) {
     } finally { flat.recycle() }
 }
 
-internal fun importArtwork(context: Context, uri: Uri): File {
+internal fun loadArtworkBitmap(context: Context, uri: Uri, maxSize: Int = 2048): Bitmap =
+    ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver,uri)) { decoder,info,_ ->
+        val scale=(max(info.size.width,info.size.height)/maxSize.toFloat()).coerceAtLeast(1f)
+        decoder.setTargetSize((info.size.width/scale).toInt().coerceAtLeast(1),(info.size.height/scale).toInt().coerceAtLeast(1))
+        decoder.allocator=ImageDecoder.ALLOCATOR_SOFTWARE
+    }
+
+internal fun saveCroppedArtwork(context: Context, bitmap: Bitmap, crop: ArtworkCrop): File {
+    val bounds=artworkCropBounds(crop,bitmap.width,bitmap.height)
+    val selected=Bitmap.createBitmap(bitmap,bounds.left,bounds.top,bounds.size,bounds.size)
     val target=File(File(context.filesDir,"artwork").apply { mkdirs() },"cover-${UUID.randomUUID()}.jpg")
-    try {
-        val bitmap=ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver,uri)) { decoder,info,_ ->
-            val scale=(max(info.size.width,info.size.height)/1024f).coerceAtLeast(1f)
-            decoder.setTargetSize((info.size.width/scale).toInt().coerceAtLeast(1),(info.size.height/scale).toInt().coerceAtLeast(1))
-            decoder.allocator=ImageDecoder.ALLOCATOR_SOFTWARE
-        }
-        try { writeCover(bitmap,target) } finally { bitmap.recycle() }
-        return target
-    } catch(e: Exception) { target.delete(); throw e }
+    try { writeCover(selected,target); return target }
+    catch(e: Exception) { target.delete(); throw e }
+    finally { if(selected !== bitmap) selected.recycle() }
 }
 
 internal fun prepareMp3Artwork(context: Context, video: Video, p: Preferences, work: File): File? {

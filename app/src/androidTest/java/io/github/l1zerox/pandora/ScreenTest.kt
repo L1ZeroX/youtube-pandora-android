@@ -19,8 +19,10 @@ class ScreenTest {
         try {
             screen.runOnIdle { AppUpdates.dismiss(); Store.state.value=ScreenState(preferences=Preferences(format="MP3")) }
             screen.onNodeWithText("アートワークなし").performScrollTo().performClick()
+            screen.onNodeWithText("アートワークなし").assertIsSelected()
             screen.runOnIdle { org.junit.Assert.assertEquals("なし",Store.state.value.preferences.artworkMode) }
             screen.onNodeWithText("サムネイル").performScrollTo().performClick()
+            screen.onNodeWithText("サムネイル").assertIsSelected()
             screen.runOnIdle {
                 org.junit.Assert.assertEquals("サムネイル",Store.state.value.preferences.artworkMode)
                 Store.state.update { it.copy(busy=true,operation="DOWNLOAD") }
