@@ -13,6 +13,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -35,6 +36,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.core.view.WindowCompat
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
@@ -45,8 +47,14 @@ class LibraryActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             val state by Store.state.collectAsStateWithLifecycle()
+            SideEffect {
+                WindowCompat.getInsetsController(window,window.decorView).apply {
+                    isAppearanceLightStatusBars=!state.preferences.dark
+                    isAppearanceLightNavigationBars=!state.preferences.dark
+                }
+            }
             MaterialTheme(colorScheme=if(state.preferences.dark) darkColorScheme() else lightColorScheme()) {
-                LibraryScreen { finish() }
+                LibraryScreen(state.preferences.dark) { finish() }
             }
         }
     }
@@ -56,7 +64,7 @@ class LibraryActivity : ComponentActivity() {
 }
 
 @Composable
-internal fun LibraryScreen(onBack: ()->Unit) {
+internal fun LibraryScreen(dark: Boolean, onBack: ()->Unit) {
     val context=LocalContext.current
     val scope=rememberCoroutineScope()
     var entries by remember { mutableStateOf(emptyList<LibraryEntry>()) }
@@ -95,6 +103,14 @@ internal fun LibraryScreen(onBack: ()->Unit) {
         finally { loading=false }
     }
     val visible=remember(entries,filter,search) { libraryEntries(entries,emptyList(),filter,search) }
+    val playingEntry=entries.firstOrNull { it.uri == playback.uri }
+    val playingArtwork by produceState<Bitmap?>(null,playingEntry?.uri) {
+        value=null
+        if(playingEntry != null) value=LibraryRepository.artwork(context,playingEntry)
+    }
+    val playingColor=remember(playingArtwork) { playingArtwork?.let { libraryThumbnailColor(it) } }
+    val playingPalette=remember(playingColor,dark) { libraryPalette(playingColor,dark) }
+    MaterialTheme(colorScheme=remember(playingColor,dark) { libraryColorScheme(playingColor,dark) }) {
     Scaffold { padding ->
         Column(Modifier.fillMaxSize().padding(padding).imePadding().padding(horizontal=16.dp)) {
             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
@@ -112,7 +128,9 @@ internal fun LibraryScreen(onBack: ()->Unit) {
             Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                 listOf("すべて","動画","音楽").forEach { option -> FilterChip(selected=filter == option,onClick={filter=option},label={Text(option)}) }
             }
-            if(playback.uri.isNotBlank()) OutlinedButton(onClick={context.startActivity(Intent(context,PlayerActivity::class.java))},modifier=Modifier.fillMaxWidth()) {
+            if(playback.uri.isNotBlank()) OutlinedButton(onClick={context.startActivity(Intent(context,PlayerActivity::class.java))},modifier=Modifier.fillMaxWidth(),
+                colors=ButtonDefaults.outlinedButtonColors(containerColor=playingPalette.surface,contentColor=playingPalette.content),
+                border=BorderStroke(1.dp,playingPalette.content.copy(alpha=.3f))) {
                 Text("${if(playback.playing) "再生中" else "一時停止"} · ${playback.title}",maxLines=1,overflow=TextOverflow.Ellipsis)
             }
             if(error.isNotBlank()) Text(error,color=MaterialTheme.colorScheme.error,fontSize=13.sp)
@@ -120,33 +138,36 @@ internal fun LibraryScreen(onBack: ()->Unit) {
             if(visible.isEmpty() && !loading) Text(if(entries.isEmpty()) "保存した動画・音楽がここに表示されます。" else "該当するファイルはありません。",Modifier.padding(vertical=24.dp))
             LazyColumn(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(10.dp),contentPadding=PaddingValues(vertical=8.dp)) {
                 items(visible,key={it.uri}) { item ->
-                    Surface(shape=RoundedCornerShape(16.dp),tonalElevation=2.dp,modifier=Modifier.fillMaxWidth().clickable {
+                    LibraryCard(item,dark) {
                         context.startActivity(Intent(context,PlayerActivity::class.java).putExtra("uri",item.uri))
-                    }) {
-                        Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-                            LibraryArtwork(item,Modifier.size(80.dp).clip(RoundedCornerShape(10.dp)))
-                            Column(Modifier.weight(1f)) {
-                                Text(item.title,maxLines=2,overflow=TextOverflow.Ellipsis,fontWeight=FontWeight.SemiBold)
-                                Text((if(item.video) "動画" else "音楽") + if(item.durationMs > 0) " · ${durationText(item.durationMs/1000.0)}" else "",fontSize=12.sp)
-                            }
-                            Text("▶",fontSize=22.sp)
-                        }
                     }
                 }
             }
         }
     }
+    }
 }
 
 @Composable
-private fun LibraryArtwork(entry: LibraryEntry, modifier: Modifier) {
+internal fun LibraryCard(entry: LibraryEntry, dark: Boolean, onClick: ()->Unit) {
     val context=LocalContext.current
-    val bitmap by produceState<Bitmap?>(null,entry.uri) { value=LibraryRepository.artwork(context,entry) }
-    Surface(modifier,color=MaterialTheme.colorScheme.secondaryContainer) {
-        Box(contentAlignment=Alignment.Center) {
-            val image=bitmap
-            if(image != null) Image(image.asImageBitmap(),null,Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
-            else Text(if(entry.video) "▶" else "♪",fontSize=32.sp)
+    val bitmap by produceState<Bitmap?>(null,entry.uri) { value=null; value=LibraryRepository.artwork(context,entry) }
+    val source=remember(bitmap) { bitmap?.let { libraryThumbnailColor(it) } }
+    val palette=remember(source,dark) { libraryPalette(source,dark) }
+    Surface(shape=RoundedCornerShape(16.dp),color=palette.surface,contentColor=palette.content,
+        border=BorderStroke(1.dp,palette.content.copy(alpha=.18f)),modifier=Modifier.fillMaxWidth().clickable(onClick=onClick)) {
+        Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+            Box(Modifier.size(80.dp).clip(RoundedCornerShape(10.dp)),contentAlignment=Alignment.Center) {
+                val image=bitmap
+                if(image != null) Image(image.asImageBitmap(),null,Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
+                else Text(if(entry.video) "▶" else "♪",fontSize=32.sp,color=palette.content)
+            }
+            Column(Modifier.weight(1f)) {
+                Text(entry.title,maxLines=2,overflow=TextOverflow.Ellipsis,fontWeight=FontWeight.SemiBold,color=palette.content)
+                Text((if(entry.video) "動画" else "音楽") + if(entry.durationMs > 0) " · ${durationText(entry.durationMs/1000.0)}" else "",
+                    fontSize=12.sp,color=palette.detail)
+            }
+            Text("▶",fontSize=22.sp,color=palette.content)
         }
     }
 }

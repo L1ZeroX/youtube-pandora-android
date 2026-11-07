@@ -6,7 +6,7 @@ Windows版と別プロジェクトのAndroid用アプリです。Android 10以�
 
 **[正式版APK v0.4.5](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.4.5/YoutubePandora-Android-v0.4.5.apk)**（ベータ版の機能を統合済み）
 
-**[ライブラリー試験版 v0.4.6-beta.1](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.4.6-beta.1/YoutubePandora-Android-v0.4.6-beta.1.apk)**（正式版v0.4.5をベースに動画・音楽再生を追加）
+**[ライブラリー試験版 v0.4.6-beta.2](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.4.6-beta.2/YoutubePandora-Android-v0.4.6-beta.2.apk)**（正式版v0.4.5をベースに動画・音楽再生を追加）
 
 [リリース一覧・更新情報](https://github.com/L1ZeroX/youtube-pandora-android/releases) / [Windows版](https://github.com/L1ZeroX/media-downloader)
 
@@ -25,6 +25,8 @@ v0.1.2から上記の保存先を使います。Android標準のダウンロー�
 ## 機能
 
 ### ベータ版のライブラリー
+
+v0.4.6-beta.2から、各カードはサムネイル／アルバムアートに合わせた配色になります。再生中・一時停止中の画像に合わせて上部の表示・操作色も切り替わります。背景と文字のコントラストを確保し、黒・白・グレーの画像は無彩色を維持します。ダーク／ライト両方でタイトル・時間・再生アイコンを読みやすくします。
 
 v0.4.6-beta.1では、メイン画面の「ライブラリー · 動画と音楽を再生」から保存済みのMP4・MP3を開けます。「すべて／動画／音楽」とタイトル検索で絞り込めます。ダウンロードキューを消しても保存済みファイルを表示します。「ファイルを追加」では端末のファイル選択画面から動画・音楽を追加できます。別アプリのファイルを無断で走査せず、選択したファイルの読み取り権限を保存します。移動・削除・権限失効後は追加し直してください。
 
