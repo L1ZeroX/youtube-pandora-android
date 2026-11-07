@@ -5,6 +5,7 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 import kotlin.math.max
@@ -47,6 +48,18 @@ internal fun libraryPalette(source: Color?, dark: Boolean): LibraryPalette {
     val content=libraryTextColor(surface)
     val softer=lerp(content,surface,.14f)
     return LibraryPalette(surface,content,if(libraryContrast(softer,surface) >= 4.5f) softer else content)
+}
+
+/** Keep the existing RGB palette; only increase opacity when wallpaper would obscure text. */
+internal fun libraryGlassTint(palette: LibraryPalette): Color {
+    for(step in 0..12) {
+        val tint=palette.surface.copy(alpha=(.70f+step*.025f).coerceAtMost(1f))
+        if(listOf(Color.Black,Color.White).all { backdrop ->
+            val background=tint.compositeOver(backdrop)
+            libraryContrast(palette.content,background) >= 4.5f && libraryContrast(palette.detail,background) >= 4.5f
+        }) return tint
+    }
+    return palette.surface
 }
 
 /** Active artwork also tints controls; all active text pairs retain at least 4.5:1 contrast. */

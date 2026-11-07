@@ -6,7 +6,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Rect
-import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable
 import android.os.Build
 import android.os.Bundle
@@ -52,7 +51,6 @@ class PlayerActivity : ComponentActivity() {
     private var loadJob: Job? = null
     private var artJob: Job? = null
     private var artworkUri=""
-    private var blurredArtwork by mutableStateOf<Bitmap?>(null)
     private var artworkColor by mutableStateOf<Color?>(null)
     private var title by mutableStateOf("読み込み中…")
     private var video by mutableStateOf(false)
@@ -83,19 +81,19 @@ class PlayerActivity : ComponentActivity() {
                 Column(Modifier.fillMaxSize().background(Color.Black).then(if(inPip) Modifier else Modifier.safeDrawingPadding())) {
                     if(!inPip) {
                         Row(Modifier.fillMaxWidth().padding(horizontal=12.dp,vertical=8.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                            ArtworkGlass(blurredArtwork,artworkColor) {
+                            PlaybackColorGlass(artworkColor) {
                                 TextButton(onClick={closePlayerScreen()},colors=ButtonDefaults.textButtonColors(contentColor=Color.White)) { Text("戻る") }
                             }
-                            if(video && supportsPip) ArtworkGlass(blurredArtwork,artworkColor) {
+                            if(video && supportsPip) PlaybackColorGlass(artworkColor) {
                                 TextButton(onClick={enterPip()},colors=ButtonDefaults.textButtonColors(contentColor=Color.White)) { Text("小窓で再生") }
                             }
                             Spacer(Modifier.weight(1f))
-                            ArtworkGlass(blurredArtwork,artworkColor) {
+                            PlaybackColorGlass(artworkColor) {
                                 TextButton(enabled=connected,onClick={controller?.stop(); controller?.clearMediaItems(); closePlayerScreen()},
                                     colors=ButtonDefaults.textButtonColors(contentColor=Color.White)) { Text("停止") }
                             }
                         }
-                        ArtworkGlass(blurredArtwork,artworkColor,Modifier.fillMaxWidth().padding(horizontal=12.dp)) {
+                        PlaybackColorGlass(artworkColor,Modifier.fillMaxWidth().padding(horizontal=12.dp)) {
                             Text(title,Modifier.padding(horizontal=14.dp,vertical=10.dp),color=Color.White,maxLines=2,overflow=TextOverflow.Ellipsis)
                         }
                         if(!video) Text("画面を閉じても音楽を再生します。",Modifier.padding(horizontal=16.dp),color=Color.LightGray)
@@ -106,7 +104,7 @@ class PlayerActivity : ComponentActivity() {
                             view.player=controller
                             view.setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
                             view.setShowNextButton(true); view.setShowPreviousButton(true)
-                            stylePlaybackControls(view,blurredArtwork,artworkColor)
+                            stylePlaybackControls(view,artworkColor)
                             view.addOnLayoutChangeListener { _,_,_,_,_,_,_,_,_ -> updatePip() }
                             playerView=view
                         }
@@ -180,16 +178,16 @@ class PlayerActivity : ComponentActivity() {
         val uri=player.currentMediaItem?.mediaId.orEmpty()
         if(uri != artworkUri) {
             artworkUri=uri; artJob?.cancel(); playerView?.defaultArtwork=null
-            blurredArtwork=null; artworkColor=null
-            playerView?.let { stylePlaybackControls(it,null,null) }
+            artworkColor=null
+            playerView?.let { stylePlaybackControls(it,null) }
             val isVideo=video
             if(uri.isNotBlank()) artJob=lifecycleScope.launch {
                 val art=LibraryRepository.artwork(this@PlayerActivity,LibraryEntry(uri,title,if(isVideo) "video/mp4" else "audio/mpeg"))
-                val appearance=withContext(Dispatchers.Default) { art?.let { blurThumbnail(it) to libraryThumbnailColor(it) } }
+                val color=withContext(Dispatchers.Default) { art?.let { libraryThumbnailColor(it) } }
                 if(artworkUri == uri) {
-                    blurredArtwork=appearance?.first; artworkColor=appearance?.second
+                    artworkColor=color
                     if(!isVideo && art != null) playerView?.defaultArtwork=BitmapDrawable(resources,art)
-                    playerView?.let { stylePlaybackControls(it,blurredArtwork,artworkColor) }
+                    playerView?.let { stylePlaybackControls(it,artworkColor) }
                 }
             }
         }

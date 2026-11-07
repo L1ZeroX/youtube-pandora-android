@@ -27,7 +27,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -39,6 +42,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.core.view.WindowCompat
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 
 class LibraryActivity : ComponentActivity() {
@@ -68,6 +73,15 @@ class LibraryActivity : ComponentActivity() {
 internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
     val dark=preferences.dark
     val wallpaper by rememberWallpaper(preferences.wallpaper)
+    var wallpaperBounds by remember { mutableStateOf(Rect.Zero) }
+    val frostedWallpaper by produceState<Bitmap?>(null,wallpaper) {
+        value=null
+        val image=wallpaper
+        if(image != null) value=withContext(Dispatchers.Default) { blurThumbnail(image,maxEdge=96,passes=8) }
+    }
+    val backdrop=remember(frostedWallpaper,wallpaperBounds,preferences.opacity,dark) {
+        LibraryBackdrop(frostedWallpaper,wallpaperBounds,preferences.opacity,appBackgroundColor(dark))
+    }
     val context=LocalContext.current
     val scope=rememberCoroutineScope()
     var entries by remember { mutableStateOf(emptyList<LibraryEntry>()) }
@@ -115,7 +129,10 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
     val playingPalette=remember(playingColor,dark) { libraryPalette(playingColor,dark) }
     val colors=remember(playingColor,dark) { libraryColorScheme(playingColor,dark,appBackgroundColor(dark)) }
     MaterialTheme(colorScheme=colors) {
-    Box(Modifier.fillMaxSize()) {
+    Box(Modifier.fillMaxSize().onGloballyPositioned {
+        val position=it.positionInWindow()
+        wallpaperBounds=Rect(position.x,position.y,position.x+it.size.width,position.y+it.size.height)
+    }) {
     WallpaperLayer(wallpaper,preferences,Modifier.fillMaxSize())
     Scaffold(containerColor=Color.Transparent) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).imePadding().padding(horizontal=16.dp)) {
@@ -154,7 +171,7 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
             }
             LazyColumn(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(10.dp),contentPadding=PaddingValues(vertical=8.dp)) {
                 items(visible,key={it.uri}) { item ->
-                    LibraryCard(item,dark) {
+                    LibraryCard(item,dark,backdrop) {
                         context.startActivity(Intent(context,PlayerActivity::class.java).putExtra("uri",item.uri))
                     }
                 }
@@ -166,13 +183,14 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
 }
 
 @Composable
-internal fun LibraryCard(entry: LibraryEntry, dark: Boolean, onClick: ()->Unit) {
+internal fun LibraryCard(entry: LibraryEntry, dark: Boolean, backdrop: LibraryBackdrop, onClick: ()->Unit) {
     val context=LocalContext.current
     val bitmap by produceState<Bitmap?>(null,entry.uri) { value=null; value=LibraryRepository.artwork(context,entry) }
     val source=remember(bitmap) { bitmap?.let { libraryThumbnailColor(it) } }
     val palette=remember(source,dark) { libraryPalette(source,dark) }
-    Surface(shape=RoundedCornerShape(16.dp),color=palette.surface,contentColor=palette.content,
-        border=BorderStroke(1.dp,palette.content.copy(alpha=.18f)),modifier=Modifier.fillMaxWidth().clickable(onClick=onClick)) {
+    Surface(shape=RoundedCornerShape(16.dp),color=Color.Transparent,contentColor=palette.content,
+        border=BorderStroke(1.dp,palette.content.copy(alpha=.25f)),
+        modifier=Modifier.fillMaxWidth().libraryCardGlass(palette,backdrop).clickable(onClick=onClick)) {
         Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
             Box(Modifier.size(80.dp).clip(RoundedCornerShape(10.dp)),contentAlignment=Alignment.Center) {
                 val image=bitmap

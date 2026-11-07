@@ -65,9 +65,9 @@ internal class ArtworkGlassDrawable(bitmap: Bitmap?, tint: Color, private val de
 }
 
 @Composable
-internal fun ArtworkGlass(blurred: Bitmap?, source: Color?, modifier: Modifier = Modifier, content: @Composable BoxScope.()->Unit) {
+internal fun PlaybackColorGlass(source: Color?, modifier: Modifier = Modifier, content: @Composable BoxScope.()->Unit) {
     val density=LocalDensity.current.density
-    val background=remember(blurred,source,density) { ArtworkGlassDrawable(blurred,artworkGlassTint(source),density) }
+    val background=remember(source,density) { ArtworkGlassDrawable(null,artworkGlassTint(source),density) }
     CompositionLocalProvider(LocalContentColor provides Color.White) {
         Box(modifier.drawWithCache {
             onDrawBehind {

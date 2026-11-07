@@ -36,9 +36,15 @@ class ArtworkGlassRenderTest {
         val instrumentation=InstrumentationRegistry.getInstrumentation()
         instrumentation.runOnMainSync {
             val view=PlayerView(instrumentation.targetContext)
-            stylePlaybackControls(view,null,Color.Blue)
+            stylePlaybackControls(view,Color.Blue)
             assertTrue(view.findViewById<View>(MediaUiR.id.exo_bottom_bar).background is ArtworkGlassDrawable)
             assertTrue(view.findViewById<DefaultTimeBar>(MediaUiR.id.exo_progress).background is ArtworkGlassDrawable)
+            val image=Bitmap.createBitmap(200,48,Bitmap.Config.ARGB_8888)
+            try {
+                val background=view.findViewById<View>(MediaUiR.id.exo_bottom_bar).background
+                background.setBounds(0,0,200,48); background.draw(Canvas(image))
+                assertEquals("Playback controls must use a uniform color without artwork texture",image.getPixel(60,24),image.getPixel(140,24))
+            } finally { image.recycle() }
             for(id in listOf(MediaUiR.id.exo_position,MediaUiR.id.exo_duration))
                 assertEquals(android.graphics.Color.WHITE,view.findViewById<TextView>(id).currentTextColor)
         }

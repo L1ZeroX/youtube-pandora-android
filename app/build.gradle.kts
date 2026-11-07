@@ -13,7 +13,7 @@ android {
         targetSdk = 36
         // Keep this beta install-compatible with its v0.4.5 base in both directions.
         versionCode = 26
-        versionName = if(betaBuild) "0.4.6-beta.4" else "0.4.5"
+        versionName = if(betaBuild) "0.4.6-beta.5" else "0.4.5"
         buildConfigField("boolean", "BETA", betaBuild.toString())
         manifestPlaceholders["appLabel"] = "Youtube Pandora!"
         manifestPlaceholders["libraryEnabled"] = betaBuild.toString()
