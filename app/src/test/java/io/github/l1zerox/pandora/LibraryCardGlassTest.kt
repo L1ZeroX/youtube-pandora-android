@@ -10,6 +10,18 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class LibraryCardGlassTest {
+    @Test fun actualDarkWallpaperAllowsMoreTransparencyWhileKeepingTextReadable() {
+        val backgrounds=listOf(Color(0xFF152030),Color(0xFF354050))
+        for(source in listOf(Color.Black,Color.Red,Color.Blue)) {
+            val palette=libraryPalette(source,true)
+            val tint=libraryGlassTint(palette,backgrounds)
+            assertTrue(tint.alpha < libraryGlassTint(palette).alpha)
+            for(background in backgrounds) {
+                assertTrue(libraryContrast(palette.content,tint.compositeOver(background)) >= 4.5f)
+                assertTrue(libraryContrast(palette.detail,tint.compositeOver(background)) >= 4.5f)
+            }
+        }
+    }
     @Test fun glassRetainsExistingColorsAndTextContrastOverDifferentWallpapers() {
         for(dark in listOf(false,true)) for(r in 0..255 step 51) for(g in 0..255 step 51) for(b in 0..255 step 51) {
             val palette=libraryPalette(Color(r,g,b),dark)

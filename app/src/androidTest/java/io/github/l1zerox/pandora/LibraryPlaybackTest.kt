@@ -80,6 +80,7 @@ class LibraryPlaybackTest {
         val output=process.inputStream.bufferedReader().readText()
         assertEquals(output,0,process.waitFor())
         val uri=insert("MP3",file=file)
+        val library=LibraryPlayback(context)
         var future: ListenableFuture<MediaController>? = null
         val scenario=ActivityScenario.launch<PlayerActivity>(Intent(context,PlayerActivity::class.java).putExtra("uri",uri.toString()))
         try {
@@ -90,15 +91,25 @@ class LibraryPlaybackTest {
             waitFor { controller.currentMediaItem?.mediaId == uri.toString() && controller.playbackState == Player.STATE_READY && controller.currentPosition > 250 }
             scenario.close()
             waitFor { controller.isPlaying && controller.currentPosition > 750 }
-            instrumentation.runOnMainSync { controller.pause() }
-            waitFor { !controller.playWhenReady }
-            instrumentation.runOnMainSync { controller.play() }
+            instrumentation.runOnMainSync { library.connect() }
+            waitFor { library.controller != null && library.seekable && library.uri == uri.toString() }
+            instrumentation.runOnMainSync { library.toggle(uri.toString()) }
+            waitFor { !controller.playWhenReady && !library.playing }
+            instrumentation.runOnMainSync { library.seek(uri.toString(),.5f) }
+            waitFor { controller.currentPosition in 14000..16000 && library.position in 14000..16000 }
+            instrumentation.runOnMainSync { library.seek("stale-track",0f) }
+            waitFor { controller.currentPosition in 14000..16000 }
+            instrumentation.runOnMainSync { library.toggle(uri.toString()) }
             waitFor { controller.isPlaying }
+            instrumentation.runOnMainSync { library.disconnect() }
+            waitFor { controller.isPlaying }
+            instrumentation.runOnMainSync { library.connect() }
+            waitFor { library.controller != null && library.playing && library.position > 14000 }
             instrumentation.runOnMainSync { controller.stop(); controller.clearMediaItems() }
             waitFor { controller.playbackState == Player.STATE_IDLE && controller.mediaItemCount == 0 }
         } finally {
             scenario.close()
-            instrumentation.runOnMainSync { future?.let { MediaController.releaseFuture(it) } }
+            instrumentation.runOnMainSync { library.disconnect(); future?.let { MediaController.releaseFuture(it) } }
             context.stopService(Intent(context,PlaybackService::class.java))
             context.contentResolver.delete(uri,null,null); file.delete()
         }

@@ -77,7 +77,7 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
     val frostedWallpaper by produceState<Bitmap?>(null,wallpaper) {
         value=null
         val image=wallpaper
-        if(image != null) value=withContext(Dispatchers.Default) { blurThumbnail(image,maxEdge=96,passes=8) }
+        if(image != null) value=withContext(Dispatchers.Default) { blurThumbnail(image,maxEdge=80,passes=10) }
     }
     val backdrop=remember(frostedWallpaper,wallpaperBounds,preferences.opacity,dark) {
         LibraryBackdrop(frostedWallpaper,wallpaperBounds,preferences.opacity,appBackgroundColor(dark))
@@ -92,6 +92,11 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
     var filter by rememberSaveable { mutableStateOf("すべて") }
     var search by rememberSaveable { mutableStateOf("") }
     val playback by PlaybackRuntime.state.collectAsStateWithLifecycle()
+    val transport=rememberLibraryPlayback()
+    fun openPlayer(uri: String? = null) {
+        transport.handOffToPlayer()
+        context.startActivity(Intent(context,PlayerActivity::class.java).apply { if(uri != null) putExtra("uri",uri) })
+    }
     val lifecycle=LocalLifecycleOwner.current.lifecycle
     val picker=rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         if(uris.isNotEmpty()) scope.launch {
@@ -158,11 +163,17 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
             Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                 listOf("すべて","動画","音楽").forEach { option -> FilterChip(selected=filter == option,onClick={filter=option},label={Text(option)}) }
             }
-            if(playback.uri.isNotBlank()) OutlinedButton(onClick={context.startActivity(Intent(context,PlayerActivity::class.java))},modifier=Modifier.fillMaxWidth(),
-                colors=ButtonDefaults.outlinedButtonColors(containerColor=playingPalette.surface,contentColor=playingPalette.content),
-                border=BorderStroke(1.dp,playingPalette.content.copy(alpha=.3f))) {
-                Text("${if(playback.playing) "再生中" else "一時停止"} · ${playback.title}",maxLines=1,overflow=TextOverflow.Ellipsis)
+            if(playback.uri.isNotBlank()) Surface(color=Color.Transparent,contentColor=playingPalette.content,
+                shape=RoundedCornerShape(16.dp),modifier=Modifier.fillMaxWidth().libraryCardGlass(playingPalette,backdrop)) {
+                Column(Modifier.padding(horizontal=12.dp,vertical=6.dp)) {
+                    Row(verticalAlignment=Alignment.CenterVertically) {
+                        Text(playback.title,Modifier.weight(1f).clickable { openPlayer() },maxLines=1,overflow=TextOverflow.Ellipsis)
+                        LibraryPlayButton(playback.uri,transport,playingPalette) { openPlayer() }
+                    }
+                    if(transport.uri == playback.uri) LibrarySeekBar(playback.uri,transport,playingPalette,playingColor,backdrop)
+                }
             }
+            if(transport.error.isNotBlank()) Text(transport.error,fontSize=13.sp)
             if(error.isNotBlank()) Text(error,color=if(hasWallpaper) Color.White else MaterialTheme.colorScheme.error,fontSize=13.sp)
             if(loading) LinearProgressIndicator(Modifier.fillMaxWidth())
             if(visible.isEmpty() && !loading) Text(if(entries.isEmpty()) "保存した動画・音楽がここに表示されます。" else "該当するファイルはありません。",Modifier.padding(vertical=24.dp))
@@ -171,8 +182,8 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
             }
             LazyColumn(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(10.dp),contentPadding=PaddingValues(vertical=8.dp)) {
                 items(visible,key={it.uri}) { item ->
-                    LibraryCard(item,dark,backdrop) {
-                        context.startActivity(Intent(context,PlayerActivity::class.java).putExtra("uri",item.uri))
+                    LibraryCard(item,dark,backdrop,transport) {
+                        openPlayer(item.uri)
                     }
                 }
             }
@@ -183,7 +194,7 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
 }
 
 @Composable
-internal fun LibraryCard(entry: LibraryEntry, dark: Boolean, backdrop: LibraryBackdrop, onClick: ()->Unit) {
+internal fun LibraryCard(entry: LibraryEntry, dark: Boolean, backdrop: LibraryBackdrop, playback: LibraryPlayback, onClick: ()->Unit) {
     val context=LocalContext.current
     val bitmap by produceState<Bitmap?>(null,entry.uri) { value=null; value=LibraryRepository.artwork(context,entry) }
     val source=remember(bitmap) { bitmap?.let { libraryThumbnailColor(it) } }
@@ -191,7 +202,8 @@ internal fun LibraryCard(entry: LibraryEntry, dark: Boolean, backdrop: LibraryBa
     Surface(shape=RoundedCornerShape(16.dp),color=Color.Transparent,contentColor=palette.content,
         border=BorderStroke(1.dp,palette.content.copy(alpha=.25f)),
         modifier=Modifier.fillMaxWidth().libraryCardGlass(palette,backdrop).clickable(onClick=onClick)) {
-        Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.padding(12.dp)) {
+        Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
             Box(Modifier.size(80.dp).clip(RoundedCornerShape(10.dp)),contentAlignment=Alignment.Center) {
                 val image=bitmap
                 if(image != null) Image(image.asImageBitmap(),null,Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
@@ -202,7 +214,9 @@ internal fun LibraryCard(entry: LibraryEntry, dark: Boolean, backdrop: LibraryBa
                 Text((if(entry.video) "動画" else "音楽") + if(entry.durationMs > 0) " · ${durationText(entry.durationMs/1000.0)}" else "",
                     fontSize=12.sp,color=palette.detail)
             }
-            Text("▶",fontSize=22.sp,color=palette.content)
+            LibraryPlayButton(entry.uri,playback,palette,onClick)
+        }
+        if(playback.uri == entry.uri) LibrarySeekBar(entry.uri,playback,palette,source,backdrop)
         }
     }
 }

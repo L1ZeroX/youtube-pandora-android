@@ -6,7 +6,7 @@ Windows版と別プロジェクトのAndroid用アプリです。Android 10以�
 
 **[正式版APK v0.4.5](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.4.5/YoutubePandora-Android-v0.4.5.apk)**（ベータ版の機能を統合済み）
 
-**[ライブラリー試験版 v0.4.6-beta.6](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.4.6-beta.6/YoutubePandora-Android-v0.4.6-beta.6.apk)**（正式版v0.4.5をベースに動画・音楽再生を追加）
+**[ライブラリー試験版 v0.4.6-beta.7](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.4.6-beta.7/YoutubePandora-Android-v0.4.6-beta.7.apk)**（正式版v0.4.5をベースに動画・音楽再生を追加）
 
 [リリース一覧・更新情報](https://github.com/L1ZeroX/youtube-pandora-android/releases) / [Windows版](https://github.com/L1ZeroX/media-downloader)
 
@@ -25,6 +25,8 @@ v0.1.2から上記の保存先を使います。Android標準のダウンロー�
 ## 機能
 
 ### ベータ版のライブラリー
+
+v0.4.6-beta.7では、ライブラリー上部と再生中のカードで再生／一時停止・シークができます。再生位置と経過時間が自動更新され、タイトルを押すと再生画面を開けます。カードは配色を保ちながら背景の透過とぼかしを強め、実際の壁紙の明るさに合わせて文字の読みやすさを確保します。
 
 v0.4.6-beta.6では、再生バーの背景を外し、バーとつまみにサムネイルの色を適用しました。暗すぎる色だけ明るさを補正します。
 
