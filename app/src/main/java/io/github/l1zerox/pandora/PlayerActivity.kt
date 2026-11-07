@@ -157,8 +157,8 @@ class PlayerActivity : ComponentActivity() {
                 error=""
                 val entries=LibraryRepository.load(this@PlayerActivity)
                 val selected=entries.firstOrNull { it.uri == uri } ?: error("保存先にファイルが見つかりません。")
-                // Keep video and music playlists separate so a background music playlist never starts hidden video.
-                val playlist=entries.filter { it.video == selected.video }
+                // Keep video, shorts and music separate; background music must never start hidden video.
+                val playlist=entries.filter { it.category == selected.category }
                 player.setMediaItems(playlist.map { it.mediaItem() },playlist.indexOf(selected),if(restoring) restorePosition else 0)
                 player.prepare()
                 if(lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) player.play()

@@ -7,6 +7,34 @@ class LibraryTest {
     private val video=LibraryEntry("content://media/external/downloads/1","Night sky","video/mp4",120000,10)
     private val music=LibraryEntry("content://media/external/downloads/2","Morning song","audio/mpeg",60000,20)
 
+    @Test fun portraitVideosAreShortsWhileLandscapeSquareUnknownAndMusicAreNot() {
+        assertEquals("ショート",video.copy(width=1080,height=1920).category)
+        assertEquals("ショート",video.copy(width=720,height=1280,durationMs=3600000).category)
+        for(size in listOf(1920 to 1080,1080 to 1080,0 to 1920,1080 to 0,-1 to 1920)) {
+            assertEquals("動画",video.copy(width=size.first,height=size.second).category)
+        }
+        assertEquals("音楽",music.copy(width=1080,height=1920).category)
+    }
+    @Test fun displayDimensionsRespectRotatedMetadataBeforeClassification() {
+        for(rotation in listOf(90,270,-90,450)) {
+            val size=libraryDisplaySize(1920,1080,rotation)
+            assertEquals(1080 to 1920,size)
+            assertTrue(video.copy(width=size.first,height=size.second).short)
+        }
+        for(rotation in listOf(0,180,360,-180)) assertEquals(1920 to 1080,libraryDisplaySize(1920,1080,rotation))
+        assertEquals(0 to 0,libraryDisplaySize(0,1920,90))
+        assertEquals(0 to 0,libraryDisplaySize(1080,-1,270))
+    }
+    @Test fun shortsHaveASeparateSearchableCategoryWithoutDuplicatingVideos() {
+        val short=video.copy(uri="content://media/external/downloads/3",title="Short NIGHT",width=1080,height=1920,added=30)
+        val entries=listOf(video,music,short)
+        assertEquals(listOf(short),libraryEntries(entries,emptyList(),"ショート"," night "))
+        assertEquals(listOf(video),libraryEntries(entries,emptyList(),"動画"))
+        assertEquals(listOf(music),libraryEntries(entries,emptyList(),"音楽"))
+        assertEquals(listOf(short,music,video),libraryEntries(entries,emptyList()))
+        assertEquals(listOf(short.copy(imported=true)),libraryEntries(emptyList(),listOf(short.copy(imported=true)),"ショート"))
+    }
+
     @Test fun importsNeverDuplicateDownloadsOrReplaceTheirMetadata() {
         val result=libraryEntries(listOf(video,music),listOf(video.copy(title="Import",imported=true)))
         assertEquals(listOf(music,video),result)

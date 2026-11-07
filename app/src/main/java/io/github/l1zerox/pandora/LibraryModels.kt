@@ -1,8 +1,17 @@
 package io.github.l1zerox.pandora
 
 internal data class LibraryEntry(val uri: String, val title: String, val mime: String,
-    val durationMs: Long = 0, val added: Long = 0, val imported: Boolean = false) {
+    val durationMs: Long = 0, val added: Long = 0, val imported: Boolean = false,
+    val width: Int = 0, val height: Int = 0) {
     val video: Boolean get() = mime.startsWith("video/")
+    val short: Boolean get() = video && width > 0 && height > width
+    val category: String get() = if(!video) "音楽" else if(short) "ショート" else "動画"
+}
+
+/** Metadata dimensions describe the encoded frame; classify its displayed orientation. */
+internal fun libraryDisplaySize(width: Int, height: Int, rotation: Int): Pair<Int,Int> {
+    if(width <= 0 || height <= 0) return 0 to 0
+    return if(((rotation%360)+360)%360 in listOf(90,270)) height to width else width to height
 }
 
 internal fun libraryMime(mime: String?, name: String): String? = when {
@@ -15,7 +24,7 @@ internal fun libraryMime(mime: String?, name: String): String? = when {
 /** Download rows win over imported duplicates; deterministic ordering survives refreshes. */
 internal fun libraryEntries(downloads: List<LibraryEntry>, imports: List<LibraryEntry>, filter: String = "すべて", search: String = ""): List<LibraryEntry> =
     (downloads+imports).distinctBy { it.uri }.filter {
-        (filter == "すべて" || (filter == "動画" && it.video) || (filter == "音楽" && !it.video)) &&
+        (filter == "すべて" || filter == it.category) &&
             it.title.contains(search.trim(),ignoreCase=true)
     }.sortedWith(compareByDescending<LibraryEntry> { it.added }.thenBy { it.title }.thenBy { it.uri })
 

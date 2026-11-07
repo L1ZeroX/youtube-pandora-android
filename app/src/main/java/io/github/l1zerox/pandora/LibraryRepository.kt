@@ -11,31 +11,40 @@ import android.provider.MediaStore
 import android.provider.OpenableColumns
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import org.json.JSONArray
 import org.json.JSONObject
 
 internal object LibraryRepository {
+    private val importLock=Any()
     private fun preferences(context: Context) = context.getSharedPreferences("library",Context.MODE_PRIVATE)
 
     suspend fun load(context: Context): List<LibraryEntry> = withContext(Dispatchers.IO) {
         val collection=MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
         val columns=arrayOf(MediaStore.MediaColumns._ID,MediaStore.MediaColumns.DISPLAY_NAME,
-            MediaStore.MediaColumns.MIME_TYPE,MediaStore.MediaColumns.DATE_ADDED,MediaStore.MediaColumns.DURATION)
+            MediaStore.MediaColumns.MIME_TYPE,MediaStore.MediaColumns.DATE_ADDED,MediaStore.MediaColumns.DURATION,
+            MediaStore.MediaColumns.SIZE,MediaStore.MediaColumns.DATE_MODIFIED)
         val downloads=mutableListOf<LibraryEntry>()
         val queue=Store.state.value.videos.associateBy { it.savedUri }
         context.contentResolver.query(collection,columns,
             "${MediaStore.MediaColumns.RELATIVE_PATH} IN (?,?) AND ${MediaStore.MediaColumns.IS_PENDING}=0",
             arrayOf(saveRelativePath("MP4"),saveRelativePath("MP3")),null)?.use { cursor ->
             while(cursor.moveToNext()) {
+                currentCoroutineContext().ensureActive()
                 val uri=ContentUris.withAppendedId(collection,cursor.getLong(0)).toString()
                 val name=cursor.getString(1).orEmpty()
                 val mime=libraryMime(cursor.getString(2),name) ?: continue
                 val saved=queue[uri]
-                downloads+=LibraryEntry(uri,saved?.title ?: name.substringBeforeLast('.'),mime,
+                val entry=LibraryEntry(uri,saved?.title ?: name.substringBeforeLast('.'),mime,
                     cursor.getLong(4).takeIf { it > 0 } ?: ((saved?.duration ?: 0.0)*1000).toLong(),cursor.getLong(3))
+                downloads+=LibraryMetadata.enrich(context,entry,"${cursor.getLong(5)}:${cursor.getLong(6)}")
             }
         }
-        libraryEntries(downloads,readImports(context))
+        libraryEntries(downloads,readImports(context).map {
+            currentCoroutineContext().ensureActive()
+            LibraryMetadata.enrich(context,it)
+        })
     }
 
     private fun readImports(context: Context): List<LibraryEntry> = runCatching {
@@ -48,7 +57,7 @@ internal object LibraryRepository {
     }.getOrDefault(emptyList())
 
     suspend fun addFiles(context: Context, uris: List<Uri>): Int = withContext(Dispatchers.IO) {
-        val entries=readImports(context).associateBy { it.uri }.toMutableMap()
+        val entries=mutableMapOf<String,LibraryEntry>()
         var failed=0
         for(uri in uris) {
             try {
@@ -59,15 +68,30 @@ internal object LibraryRepository {
                 } ?: "メディア"
                 val mime=libraryMime(resolver.getType(uri),name) ?: error("非対応のファイル")
                 resolver.takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                // Providers may grant only read access; importing must still work in that case.
+                runCatching { resolver.takePersistableUriPermission(uri,Intent.FLAG_GRANT_WRITE_URI_PERMISSION) }
                 entries[uri.toString()]=LibraryEntry(uri.toString(),name.substringBeforeLast('.'),mime,
                     added=System.currentTimeMillis()/1000,imported=true)
             } catch(e: Exception) { failed++; AppLog.info("ライブラリー","ファイルを追加できません: ${e.javaClass.simpleName}") }
         }
+        synchronized(importLock) {
+            val merged=readImports(context).associateBy { it.uri }.toMutableMap()
+            merged.putAll(entries)
+            writeImports(context,merged.values.toList())
+        }
+        failed
+    }
+
+    private fun writeImports(context: Context, entries: List<LibraryEntry>) {
         val array=JSONArray()
-        entries.values.forEach { item -> array.put(JSONObject().put("uri",item.uri).put("title",item.title)
+        entries.forEach { item -> array.put(JSONObject().put("uri",item.uri).put("title",item.title)
             .put("mime",item.mime).put("duration",item.durationMs).put("added",item.added)) }
         preferences(context).edit().putString("items",array.toString()).apply()
-        failed
+    }
+
+    internal fun forgetImport(context: Context, uri: String) {
+        synchronized(importLock) { writeImports(context,readImports(context).filterNot { it.uri == uri }) }
+        LibraryMetadata.remove(context,uri)
     }
 
     suspend fun artwork(context: Context, entry: LibraryEntry): Bitmap? = withContext(Dispatchers.IO) {

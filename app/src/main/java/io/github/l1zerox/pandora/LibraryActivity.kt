@@ -32,6 +32,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -68,6 +70,7 @@ class LibraryActivity : ComponentActivity() {
     override fun onStop() { super.onStop(); BubbleRuntime.leave(this) }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
     val dark=preferences.dark
@@ -92,6 +95,7 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
     var filter by rememberSaveable { mutableStateOf("すべて") }
     var search by rememberSaveable { mutableStateOf("") }
     var appearance by rememberSaveable { mutableStateOf(false) }
+    var deletion by rememberSaveable(stateSaver=LibraryEntrySaver) { mutableStateOf<LibraryEntry?>(null) }
     val playback by PlaybackRuntime.state.collectAsStateWithLifecycle()
     val transport=rememberLibraryPlayback()
     fun openPlayer(uri: String? = null) {
@@ -161,9 +165,8 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
                 }
             }
             OutlinedTextField(search,{search=it},Modifier.fillMaxWidth(),singleLine=true,label={Text("タイトルで検索")})
-            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp),verticalAlignment=Alignment.CenterVertically) {
-                listOf("すべて","動画","音楽").forEach { option -> FilterChip(selected=filter == option,onClick={filter=option},label={Text(option)}) }
-                Spacer(Modifier.weight(1f))
+            FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+                listOf("すべて","動画","音楽","ショート").forEach { option -> FilterChip(selected=filter == option,onClick={filter=option},label={Text(option)}) }
                 TextButton(onClick={appearance=!appearance}) { Text(if(appearance) "調整終了" else "表示調整",fontSize=12.sp) }
             }
             if(playback.uri.isNotBlank()) Surface(color=Color.Transparent,contentColor=playingPalette.content,
@@ -194,7 +197,7 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
                     }
                 }
                 items(visible,key={it.uri}) { item ->
-                    LibraryCard(item,dark,backdrop,transport) {
+                    LibraryCard(item,dark,backdrop,transport,onDelete={if(!importing) deletion=item}) {
                         openPlayer(item.uri)
                     }
                 }
@@ -202,15 +205,22 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
         }
     }
     }
+    deletion?.let { entry -> key(entry.uri) {
+        LibraryDeleteDialog(entry,onDismiss={deletion=null},onRemoved={
+            entries=entries.filterNot { it.uri == entry.uri }; refresh++
+        })
+    } }
     }
 }
 
 @Composable
-internal fun LibraryCard(entry: LibraryEntry, dark: Boolean, backdrop: LibraryBackdrop, playback: LibraryPlayback, onClick: ()->Unit) {
+internal fun LibraryCard(entry: LibraryEntry, dark: Boolean, backdrop: LibraryBackdrop, playback: LibraryPlayback,
+    onDelete: ()->Unit, onClick: ()->Unit) {
     val context=LocalContext.current
     val bitmap by produceState<Bitmap?>(null,entry.uri) { value=null; value=LibraryRepository.artwork(context,entry) }
     val source=remember(bitmap) { bitmap?.let { libraryThumbnailColor(it) } }
     val palette=remember(source,dark) { libraryPalette(source,dark) }
+    var menu by remember { mutableStateOf(false) }
     Surface(shape=RoundedCornerShape(16.dp),color=Color.Transparent,contentColor=palette.content,
         border=BorderStroke(1.dp,palette.content.copy(alpha=.25f)),
         modifier=Modifier.fillMaxWidth().libraryCardGlass(palette,backdrop).clickable(onClick=onClick)) {
@@ -223,10 +233,20 @@ internal fun LibraryCard(entry: LibraryEntry, dark: Boolean, backdrop: LibraryBa
             }
             Column(Modifier.weight(1f)) {
                 Text(entry.title,maxLines=2,overflow=TextOverflow.Ellipsis,fontWeight=FontWeight.SemiBold,color=palette.content)
-                Text((if(entry.video) "動画" else "音楽") + if(entry.durationMs > 0) " · ${durationText(entry.durationMs/1000.0)}" else "",
+                Text(entry.category + if(entry.durationMs > 0) " · ${durationText(entry.durationMs/1000.0)}" else "",
                     fontSize=12.sp,color=palette.detail)
             }
-            LibraryPlayButton(entry.uri,playback,palette,onClick)
+            Column(horizontalAlignment=Alignment.CenterHorizontally) {
+                LibraryPlayButton(entry.uri,playback,palette,onClick)
+                Box {
+                    IconButton(onClick={menu=true},modifier=Modifier.semantics { contentDescription="${entry.title}のメニュー" }) {
+                        Text("⋮",fontSize=22.sp,color=palette.content)
+                    }
+                    DropdownMenu(expanded=menu,onDismissRequest={menu=false}) {
+                        DropdownMenuItem(text={Text("削除")},onClick={menu=false; onDelete()})
+                    }
+                }
+            }
         }
         if(playback.uri == entry.uri) LibrarySeekBar(entry.uri,playback,palette,source,backdrop)
         }

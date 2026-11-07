@@ -1,5 +1,15 @@
 # 検証状況
 
+## v0.4.11（2026-11-07）
+
+削除確認を経てMediaStoreの単一URIまたはDocumentsContract.deleteDocumentを使う。保存先の削除対応フラグを確認し、権限エラーではAndroid 11以降のMediaStore.createDeleteRequestまたはAndroid 10のRecoverableSecurityExceptionによる同意フローを使う。拒否・失敗時は登録を維持する。成功時だけインポート登録・メタデータキャッシュと再生リストを整理し、対象が再生中なら一時停止する。インポートの「ライブラリーから外す」はファイル削除を呼ばない。ファイル削除と後処理は画面回転でも完遂し、同意待ちの対象は保存可能な状態として保持する。インポート登録更新の競合で削除項目が戻らないよう同期する。
+
+動画はMediaMetadataRetrieverで実寸法と回転を取得し、90/270度なら幅・高さを交換して判定する。表示高さが幅を超える動画だけをショートに分類し、時間・URLには依存しない。成功した解析をサイズ・更新日時に紐付けて保存し、初回の既存動画も分類する。解析失敗は通常の動画として保持して次回再試行する。動画・音楽・ショートの検索と連続再生はカテゴリ別に行う。
+
+単体テストで縦長・横長・正方形・寸法不明・音声・回転・長時間動画・検索を確認し、再生リストからの重複除去、現在項目の停止、他項目の再生継続を検証する。端末テストには生成した縦長MP4の分類、実ファイル削除、重複登録の除去、他ファイルの保持、登録だけの削除と削除失敗時の保持を追加。端末未接続のため端末テストはコンパイル確認のみ。実機のAndroid削除同意画面・SAFプロバイダー別動作・表示は未確認。
+
+参照: [Androidのメディア削除](https://developer.android.com/training/data-storage/shared/media#remove-item)、[ドキュメント削除](https://developer.android.com/training/data-storage/shared/documents-files#delete)、[動画メタデータ](https://developer.android.com/reference/android/media/MediaMetadataRetriever)。
+
 ## v0.4.10（2026-11-07）
 
 ライブラリー入口を「リンクを追加」と同じMaterial 3 Buttonへ変更。ライブラリーの「表示調整」と環境設定で共通の透過・ぼかしスライダーを提供する。保存キーはlibraryGlass/libraryBlur。初期値は従来の透過45%・ぼかし10とし、範囲を制限して復元する。調整パネルはスクロール可能な一覧内に置き、表示したままカードの変化を確認できる。文字・サムネイル本体はぼかさない。

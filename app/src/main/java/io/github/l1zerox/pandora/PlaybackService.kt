@@ -13,7 +13,19 @@ import androidx.media3.session.MediaSessionService
 import kotlinx.coroutines.flow.MutableStateFlow
 
 internal data class PlaybackStatus(val uri: String = "", val title: String = "", val playing: Boolean = false)
-internal object PlaybackRuntime { val state=MutableStateFlow(PlaybackStatus()) }
+internal object PlaybackRuntime {
+    val state=MutableStateFlow(PlaybackStatus())
+    // Main-thread callback owned by the service; deletion also works while the UI controller is disconnected.
+    var removeLibraryItem: ((String)->Unit)? = null
+}
+
+internal fun removeLibraryMedia(player: Player, uri: String) {
+    if(player.currentMediaItem?.mediaId == uri) player.pause()
+    for(index in player.mediaItemCount-1 downTo 0) {
+        if(player.getMediaItemAt(index).mediaId == uri) player.removeMediaItem(index)
+    }
+    if(player.mediaItemCount == 0) player.stop()
+}
 
 @androidx.annotation.OptIn(UnstableApi::class)
 class PlaybackService : MediaSessionService() {
@@ -32,9 +44,11 @@ class PlaybackService : MediaSessionService() {
         })
         val open=PendingIntent.getActivity(this,40,Intent(this,PlayerActivity::class.java),PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         session=MediaSession.Builder(this,player).setSessionActivity(open).build()
+        PlaybackRuntime.removeLibraryItem={ uri -> removeLibraryMedia(player,uri) }
     }
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
     override fun onDestroy() {
+        PlaybackRuntime.removeLibraryItem=null
         session?.run { player.release(); release() }; session=null
         PlaybackRuntime.state.value=PlaybackStatus()
         super.onDestroy()

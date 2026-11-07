@@ -23,6 +23,8 @@ import org.junit.Assume.assumeTrue
 import org.junit.Test
 import java.io.File
 import java.util.concurrent.TimeUnit
+import org.json.JSONArray
+import org.json.JSONObject
 
 @androidx.annotation.OptIn(UnstableApi::class)
 class LibraryPlaybackTest {
@@ -70,6 +72,58 @@ class LibraryPlaybackTest {
         // FLAG_SUPPORTS_PICTURE_IN_PICTURE = 0x400000 (ActivityInfo constant is hidden on some SDKs).
         assertTrue(player.flags and 0x400000 != 0)
         assertFalse(player.exported); assertFalse(service.exported)
+    }
+
+    @Test fun portraitDownloadIsClassifiedAndDeletionRemovesOnlyItsFileAndRegistration() = runBlocking {
+        YoutubeDL.init(context); FFmpeg.init(context)
+        val file=File(context.cacheDir,"library-portrait-${System.nanoTime()}.mp4")
+        val process=NativeRuntime.command(context,"libffmpeg.so",listOf("-y","-f","lavfi","-i","color=c=blue:s=180x320:r=1",
+            "-t","1","-c:v","libx264","-pix_fmt","yuv420p",file.absolutePath)).start()
+        val output=process.inputStream.bufferedReader().readText()
+        assertEquals(output,0,process.waitFor())
+        val portrait=insert("MP4",file=file)
+        val other=insert("MP3")
+        val prefs=context.getSharedPreferences("library",0)
+        val original=prefs.getString("items","[]")
+        try {
+            // The same URI can also have been imported. Deletion must not resurrect that duplicate.
+            prefs.edit().putString("items",JSONArray().put(JSONObject().put("uri",portrait.toString())
+                .put("title","portrait").put("mime","video/mp4")).toString()).commit()
+            val entry=LibraryRepository.load(context).single { it.uri == portrait.toString() }
+            assertEquals(180,entry.width); assertEquals(320,entry.height)
+            assertTrue(entry.short); assertEquals("ショート",entry.category)
+            assertTrue(LibraryRepository.load(context).single { it.uri == portrait.toString() }.short)
+            assertEquals(LibraryDeleteResult.Deleted,LibraryDeletion.delete(context,entry))
+            val remaining=LibraryRepository.load(context)
+            assertFalse(remaining.any { it.uri == portrait.toString() })
+            assertTrue(remaining.any { it.uri == other.toString() })
+            assertFalse(context.getSharedPreferences("library_metadata",0).contains(portrait.toString()))
+            context.contentResolver.query(portrait,arrayOf(MediaStore.MediaColumns._ID),null,null,null)!!.use { assertEquals(0,it.count) }
+        } finally {
+            prefs.edit().putString("items",original).commit()
+            context.contentResolver.delete(portrait,null,null); context.contentResolver.delete(other,null,null); file.delete()
+        }
+    }
+
+    @Test fun removingAnImportKeepsItsFileAndFailedDeletionKeepsItsRegistration() = runBlocking {
+        val uri=insert("MP3")
+        val entry=LibraryEntry(uri.toString(),"fixture","audio/mpeg",imported=true)
+        val prefs=context.getSharedPreferences("library",0)
+        val original=prefs.getString("items","[]")
+        val registered=JSONArray().put(JSONObject().put("uri",uri.toString()).put("title","fixture").put("mime","audio/mpeg")).toString()
+        try {
+            prefs.edit().putString("items",registered).commit()
+            LibraryDeletion.removeImport(context,entry)
+            assertEquals(0,JSONArray(prefs.getString("items","[]")).length())
+            context.contentResolver.query(uri,arrayOf(MediaStore.MediaColumns._ID),null,null,null)!!.use { assertEquals(1,it.count) }
+            context.contentResolver.delete(uri,null,null)
+            prefs.edit().putString("items",registered).commit()
+            assertTrue(runCatching { LibraryDeletion.delete(context,entry) }.isFailure)
+            assertEquals(registered,prefs.getString("items","[]"))
+        } finally {
+            prefs.edit().putString("items",original).commit()
+            context.contentResolver.delete(uri,null,null)
+        }
     }
 
     @Test fun musicPlaybackSurvivesClosingItsScreenAndRespondsToPauseResumeStop() {
