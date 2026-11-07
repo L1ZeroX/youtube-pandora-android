@@ -32,13 +32,13 @@ class ArtworkGlassRenderTest {
         } finally { source.recycle(); blurred.recycle() }
     }
     @androidx.annotation.OptIn(UnstableApi::class)
-    @Test fun media3TimeLabelsAndSeekBarUseGlassWithoutReplacingPlaybackControls() {
+    @Test fun media3TimeLabelsKeepGlassAndSeekBarHasNoBackground() {
         val instrumentation=InstrumentationRegistry.getInstrumentation()
         instrumentation.runOnMainSync {
             val view=PlayerView(instrumentation.targetContext)
             stylePlaybackControls(view,Color.Blue)
             assertTrue(view.findViewById<View>(MediaUiR.id.exo_bottom_bar).background is ArtworkGlassDrawable)
-            assertTrue(view.findViewById<DefaultTimeBar>(MediaUiR.id.exo_progress).background is ArtworkGlassDrawable)
+            assertNull(view.findViewById<DefaultTimeBar>(MediaUiR.id.exo_progress).background)
             val image=Bitmap.createBitmap(200,48,Bitmap.Config.ARGB_8888)
             try {
                 val background=view.findViewById<View>(MediaUiR.id.exo_bottom_bar).background
