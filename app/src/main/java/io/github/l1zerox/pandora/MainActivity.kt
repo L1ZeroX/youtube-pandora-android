@@ -8,6 +8,7 @@ import android.graphics.ImageDecoder
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -53,16 +54,20 @@ import kotlin.math.max
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState); enableEdgeToEdge(); acceptShare(intent)
+        super.onCreate(savedInstanceState); BubbleRuntime.foreground.value=true; enableEdgeToEdge()
+        if(savedInstanceState == null) acceptShare(intent)
         setContent { PandoraScreen() }
         AppUpdates.check()
     }
     override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); acceptShare(intent) }
+    override fun onStart() { super.onStart(); BubbleRuntime.foreground.value=true }
+    override fun onResume() { super.onResume(); BubbleRuntime.sync(this) }
+    override fun onStop() { super.onStop(); if(!isChangingConfigurations) BubbleRuntime.foreground.value=false }
     private fun acceptShare(intent: Intent?) {
         if(intent?.action == Intent.ACTION_SEND) {
             val text = intent.getStringExtra(Intent.EXTRA_TEXT).orEmpty()
-            val urls = Regex("https?://[^\\s]+").findAll(text).map { it.value }.joinToString("\n")
-            Store.state.update { it.copy(incomingUrl=urls) }
+            val count=Store.receiveShare(text)
+            Toast.makeText(this,if(count > 0) "$count 件をDLキューに追加しました。" else "追加できる新しいURLはありません。",Toast.LENGTH_LONG).show()
         }
     }
 }
@@ -144,7 +149,13 @@ fun PandoraScreen() {
                         }
                         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                             OutlinedButton(onClick={start("DOWNLOAD",true)},enabled=!s.busy && s.videos.any { it.status == "失敗" }) { Text("再試行") }
-                            if(s.busy) Button(onClick={context.startService(Intent(context,DownloadService::class.java).setAction("STOP"))},modifier=Modifier.weight(1f)) { Text("停止") }
+                            if(s.busy) {
+                                if(BuildConfig.BETA && s.operation == "DOWNLOAD") Button(
+                                    onClick={context.startService(Intent(context,DownloadService::class.java).setAction(if(s.paused) "RESUME" else "PAUSE"))},
+                                    enabled=!s.stopping,modifier=Modifier.weight(1f)) { Text(if(s.paused) "再開" else "一時停止") }
+                                Button(onClick={context.startService(Intent(context,DownloadService::class.java).setAction("STOP"))},
+                                    enabled=!s.stopping,modifier=Modifier.weight(1f)) { Text(if(BuildConfig.BETA) "キャンセル" else "停止") }
+                            }
                             else Button(onClick={start("DOWNLOAD")},enabled=s.videos.any { it.selected && it.status != "完了" },modifier=Modifier.weight(1f).height(48.dp)) { Text("ダウンロード") }
                         }
                     }
@@ -155,6 +166,8 @@ fun PandoraScreen() {
                         Column(Modifier.padding(top=16.dp,bottom=10.dp)) {
                             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                                 Text(if(BuildConfig.BETA) "Youtube Pandora! Beta" else "Youtube Pandora!",fontSize=12.sp,modifier=Modifier.weight(1f))
+                                if(BuildConfig.BETA && p.bubble && android.provider.Settings.canDrawOverlays(context)) TextButton(
+                                    onClick={ (context as? android.app.Activity)?.moveTaskToBack(true) }) { Text("バブルへ") }
                                 TextButton(onClick={settings=true}) { Text("環境設定") }
                             }
                             Text("ダウンロード",fontSize=32.sp,fontWeight=FontWeight.Bold)
@@ -198,10 +211,10 @@ fun PandoraScreen() {
                             Choice("形式",p.format,listOf("MP4","MP3"),!s.busy) { Store.preferences(p.copy(format=it)) }
                             if(p.format == "MP4") {
                                 Choice("画質",p.quality,listOf("1080p以下","720p以下","最高"),!s.busy) { Store.preferences(p.copy(quality=it)) }
-                                Choice("フレームレート",p.fps,listOf("元のまま","24fps","30fps","60fps") + if(BuildConfig.BETA) listOf(INTERPOLATED_FPS) else emptyList(),!s.busy) { Store.preferences(p.copy(fps=it)) }
+                                Choice("フレームレート",p.fps,listOf("元のまま","24fps","30fps","60fps",INTERPOLATED_FPS),!s.busy) { Store.preferences(p.copy(fps=it)) }
                             } else Choice("音質",p.audio,listOf("192kbps","320kbps","128kbps"),!s.busy) { Store.preferences(p.copy(audio=it)) }
                             Text("保存先: 内部ストレージ/${saveRelativePath(p.format)}",fontSize=12.sp)
-                            Text(if(BuildConfig.BETA) "フレーム補間はCPUで中間の動きを生成します。処理に時間がかかり、動きが崩れる場合があります。" else "互換性のある映像は再圧縮せず保存します。fps変更はCPUで変換します。",fontSize=11.sp,color=colors.onSurfaceVariant)
+                            Text("互換性のある映像は再圧縮せず保存します。フレーム補間はCPUで中間の動きを生成するため時間がかかります。",fontSize=11.sp,color=colors.onSurfaceVariant)
                         }
                     }
                     item { Text("Android版 ${BuildConfig.VERSION_NAME} · yt-dlp",fontSize=11.sp,color=colors.onSurfaceVariant) }
@@ -261,6 +274,7 @@ fun PandoraScreen() {
                     Text("背景",fontWeight=FontWeight.Bold)
                     Button(onClick={backgroundSettings=true}) { Text("背景をプレビュー・調整") }
                     Text("仕上がりを見ながら、画像・透明度・パネルの透過率・ぼかしを調整できます。",fontSize=12.sp)
+                    if(BuildConfig.BETA) BubbleSettings(p)
                     OutlinedButton(onClick={settings=false; start("UPDATE")},enabled=!s.busy) { Text("yt-dlpを更新") }
                     OutlinedButton(onClick={settings=false;logs=true}) { Text("処理ログを見る") }
                     Text("アプリの更新 · 現在 ${BuildConfig.VERSION_NAME}")

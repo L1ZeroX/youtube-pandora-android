@@ -15,7 +15,8 @@ import java.util.concurrent.CancellationException
 import java.util.concurrent.atomic.AtomicBoolean
 
 class Engine(private val context: Context, private val progress: (String, Float?, String) -> Unit) {
-    private val cancelled = AtomicBoolean(false)
+    private val control = TransferControl()
+    val paused get() = control.paused
     @Volatile private var native: Process? = null
     private val id = UUID.randomUUID().toString()
     fun init() {
@@ -23,9 +24,12 @@ class Engine(private val context: Context, private val progress: (String, Float?
         YoutubeDL.init(context); FFmpeg.init(context); check()
         AppLog.info("準備","初期化完了 / yt-dlp ${YoutubeDL.version(context) ?: "不明"} / 空き容量 ${context.filesDir.usableSpace / (1024*1024)} MiB")
     }
-    fun check() { if(cancelled.get()) throw CancellationException("停止しました") }
+    fun check() { control.check() }
+    fun pause() { control.pause(); stopProcesses() }
     fun cancel() {
-        cancelled.set(true)
+        control.cancel(); stopProcesses()
+    }
+    @Synchronized private fun stopProcesses() {
         native?.destroyForcibly()
         // Stop only descendants of this app's PID, never processes owned by another app.
         killDescendants()
@@ -52,9 +56,15 @@ class Engine(private val context: Context, private val progress: (String, Float?
     }
     private fun execute(request: YoutubeDLRequest): String {
         check()
+        val lateStopHandled=AtomicBoolean(false)
         return YoutubeDL.execute(request, id) { percent, eta, line ->
-            if(cancelled.get()) { cancel(); return@execute }
+            if(control.stopped) {
+                // Covers a stop arriving between check() and the library's process creation.
+                if(lateStopHandled.compareAndSet(false,true)) stopProcesses()
+                return@execute
+            }
             if(line.trimStart().startsWith("{")) return@execute
+            transferProgress(line)?.let { progress("ダウンロード中",it.fraction,line); return@execute }
             val phase = if(line.contains("[download]")) "ダウンロード中" else if(line.contains("[Merger]") || line.contains("[ExtractAudio]")) "変換中" else "情報を確認中"
             progress(phase, percent.takeIf { it >= 0 }?.coerceIn(0f,100f)?.div(100f),
                 line.take(300) + if(eta >= 0) " · 残り ${durationText(eta.toDouble())}" else "")
@@ -85,18 +95,20 @@ class Engine(private val context: Context, private val progress: (String, Float?
         return Video("${site.lowercase()}:${videoId.ifBlank { url }}",url,json.optString("title","タイトル不明"),site,
             json.optDouble("duration").takeIf { it.isFinite() && it >= 0 },thumb)
     }
-    fun download(video: Video, preferences: Preferences): String {
-        val work = File(context.cacheDir, "download-${UUID.randomUUID()}").apply { mkdirs() }
+    fun download(video: Video, preferences: Preferences, workspace: File? = null): String {
+        val work = (workspace ?: File(context.cacheDir, "download-${UUID.randomUUID()}")).apply { mkdirs() }
         try {
             val req = request(video.url).apply {
                 addOption("--no-playlist"); addOption("-f", formatSelector(preferences))
                 addOption("-S", "res,fps,vcodec:h264,acodec:aac")
                 addOption("-o", File(work,"source.%(ext)s").absolutePath)
                 addOption("--merge-output-format", "mkv")
+                addOption("--continue")
+                addOption("--progress-template","download:PANDORA_PROGRESS|%(progress.status)s|%(progress.downloaded_bytes)s|%(progress.total_bytes)s|%(progress.total_bytes_estimate)s|%(progress.speed)s|%(progress.eta)s")
             }
             execute(req)
             AppLog.info("ダウンロード","取得完了、動画の解析へ")
-            val source = work.listFiles()!!.firstOrNull { it.name.startsWith("source.") && it.extension !in listOf("part","ytdl","json") }
+            val source = work.listFiles()!!.firstOrNull { it.name.matches(Regex("source\\.[a-zA-Z0-9]+")) && it.extension !in listOf("part","ytdl","json") }
                 ?: error("保存する動画ファイルがありません。")
             check()
             val metadata = JSONObject(runNative("libffprobe.so",listOf("-v","error","-show_streams","-show_format","-of","json",source.absolutePath)))
@@ -115,7 +127,6 @@ class Engine(private val context: Context, private val progress: (String, Float?
             } else {
                 require(visual != null) { "映像がありません。MP3を選択してください。" }
                 val motionFilter = if(preferences.fps == INTERPOLATED_FPS) {
-                    require(BuildConfig.BETA) { "フレーム補間はベータ版で利用できます。" }
                     interpolationFilter(frameRate(visual.optString("avg_frame_rate")) ?: frameRate(visual.optString("r_frame_rate")),duration)
                 } else null
                 interpolating = motionFilter != null
@@ -132,10 +143,12 @@ class Engine(private val context: Context, private val progress: (String, Float?
             }
             val conversionDetail = if(interpolating) "フレーム補間中（CPU・60fps）" else "${preferences.format} 変換中"
             progress("変換中", null, conversionDetail)
+            val conversionStart=System.nanoTime()
             args += listOf("-progress","pipe:1","-nostats",output.absolutePath)
             runNative("libffmpeg.so",args) { line ->
                 if(line.startsWith("out_time_us=")) line.substringAfter('=').toDoubleOrNull()?.let {
-                    progress("変換中", if(duration > 0) (it / 1e6 / duration).toFloat().coerceIn(0f,.999f) else null, conversionDetail)
+                    val detail="PANDORA_CONVERT|${it/1e6}|$duration|${(System.nanoTime()-conversionStart)/1e9}"
+                    progress("変換中",transferProgress(detail)?.fraction,detail)
                 }
             }
             require(output.exists() && output.length() > 0) { "変換後のファイルがありません。" }
@@ -147,7 +160,7 @@ class Engine(private val context: Context, private val progress: (String, Float?
             check()
             progress("端末へ保存中",null,saveRelativePath(preferences.format))
             return publish(output,"${safeName(video.title)} [${safeName(video.key.substringAfter(':'))}].${preferences.format.lowercase()}",preferences.format)
-        } finally { work.deleteRecursively() }
+        } finally { if(!control.paused) work.deleteRecursively() }
     }
     private fun runNative(binary: String, args: List<String>, line: ((String)->Unit)? = null): String {
         check()
@@ -156,7 +169,7 @@ class Engine(private val context: Context, private val progress: (String, Float?
         ProcessDiagnostics.memory(context,"$binary 開始前")
         val process = builder.start(); native = process
         AppLog.info("ネイティブ処理","$binary プロセス起動完了")
-        if(cancelled.get()) process.destroyForcibly()
+        if(control.stopped) process.destroyForcibly()
         val output = StringBuilder()
         var lastMemory=System.nanoTime()
         var firstLine=true

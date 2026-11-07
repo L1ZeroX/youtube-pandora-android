@@ -62,7 +62,7 @@ internal object AppUpdates {
                         assets.optJSONObject(i)?.let { ReleaseAsset(it.optString("name"),it.optString("browser_download_url"),it.optString("state") == "uploaded") }
                     })
             }
-            return newestRelease(releases,BuildConfig.VERSION_NAME,beta,offer)
+            return newestRelease(releases,BuildConfig.VERSION_NAME,beta,offer,unifiedOnly=true)
         } finally { connection.disconnect() }
     }
 }

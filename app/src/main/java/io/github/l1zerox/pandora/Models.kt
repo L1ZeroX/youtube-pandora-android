@@ -10,15 +10,17 @@ import java.net.URI
 
 data class Video(val key: String, val url: String, val title: String, val site: String = "",
     val duration: Double? = null, val thumbnail: String = "", val selected: Boolean = true,
-    val status: String = "待機中", val error: String = "", val savedUri: String = "")
+    val status: String = "待機中", val error: String = "", val savedUri: String = "", val resolved: Boolean = true)
 data class Preferences(val format: String = "MP4", val quality: String = "1080p以下",
     val audio: String = "192kbps", val fps: String = "元のまま", val dark: Boolean = true,
     val playlists: Boolean = false, val wallpaper: String = "", val opacity: Float = .35f,
-    val glass: Float = .35f, val blur: Float = 18f)
+    val glass: Float = .35f, val blur: Float = 18f, val bubble: Boolean = false)
 data class ScreenState(val videos: List<Video> = emptyList(), val busy: Boolean = false,
     val message: String = "URLを貼り付けて情報を取得してください。", val progress: Float? = null,
     val detail: String = "", val current: String = "", val done: Int = 0, val total: Int = 0,
-    val preferences: Preferences = Preferences(), val incomingUrl: String = "")
+    val preferences: Preferences = Preferences(), val incomingUrl: String = "",
+    val paused: Boolean = false, val stopping: Boolean = false, val operation: String = "",
+    val speed: String = "", val eta: Double? = null)
 
 fun durationText(value: Double?): String {
     if (value == null || !value.isFinite() || value < 0) return "時間不明"
@@ -53,7 +55,7 @@ object Store {
         val preferences = Preferences(p.optString("format", "MP4"), p.optString("quality", "1080p以下"),
             p.optString("audio", "192kbps"), p.optString("fps", "元のまま"), p.optBoolean("dark", true),
             p.optBoolean("playlists"), p.optString("wallpaper"), p.optDouble("opacity", .35).toFloat().coerceIn(0f,1f),
-            p.optDouble("glass", .35).toFloat().coerceIn(0f,.85f), p.optDouble("blur", 18.0).toFloat().coerceIn(0f,40f))
+            p.optDouble("glass", .35).toFloat().coerceIn(0f,.85f), p.optDouble("blur", 18.0).toFloat().coerceIn(0f,40f),p.optBoolean("bubble"))
         val videos = runCatching {
             val array = JSONArray(data.getString("queue", "[]"))
             (0 until array.length()).map { index ->
@@ -61,8 +63,8 @@ object Store {
                 val interrupted=interruptedStatus(v.optString("status"))
                 Video(v.getString("key"), v.getString("url"), v.getString("title"), v.optString("site"),
                     v.optDouble("duration").takeIf { it.isFinite() && it >= 0 }, v.optString("thumbnail"),
-                    v.optBoolean("selected", true), if(interrupted) "失敗" else v.optString("status").takeIf { it in listOf("完了","失敗") } ?: "待機中",
-                    error=if(interrupted) "前回の処理中にアプリが終了しました。保存完了は確認できません。ログを確認し、再試行してください。" else v.optString("error"),savedUri=v.optString("savedUri"))
+                    v.optBoolean("selected", true), if(interrupted) "失敗" else v.optString("status").takeIf { it in listOf("完了","失敗","一時停止","キャンセル") } ?: "待機中",
+                    error=if(interrupted) "前回の処理中にアプリが終了しました。保存完了は確認できません。ログを確認し、再試行してください。" else v.optString("error"),savedUri=v.optString("savedUri"),resolved=v.optBoolean("resolved",true))
             }
         }.getOrDefault(emptyList())
         state.value = ScreenState(videos=videos, preferences=preferences)
@@ -80,15 +82,25 @@ object Store {
     fun edit(key: String, transform: (Video) -> Video) { state.update { s -> s.copy(videos=s.videos.map { if(it.key == key) transform(it) else it }) } }
     fun preferences(p: Preferences) { state.update { it.copy(preferences=p) }; save() }
     fun removeSelected() { state.update { it.withoutSelectedVideos() }; save() }
-    fun save() {
+    fun receiveShare(text: String): Int {
+        var added=0
+        state.update { s ->
+            val videos=appendSharedVideos(s.videos,text)
+            added=videos.size-s.videos.size
+            s.copy(videos=videos,total=if(s.busy && s.operation == "DOWNLOAD") s.total+added else s.total,
+                message=if(s.busy) s.message else if(added > 0) "$added 件をキューに追加しました。" else "追加できる新しいURLはありません。")
+        }
+        save(); return added
+    }
+    @Synchronized fun save() {
         val s = state.value; val p = s.preferences
         val config = JSONObject().put("format",p.format).put("quality",p.quality).put("audio",p.audio).put("fps",p.fps)
             .put("dark",p.dark).put("playlists",p.playlists).put("wallpaper",p.wallpaper)
-            .put("opacity",p.opacity).put("glass",p.glass).put("blur",p.blur)
+            .put("opacity",p.opacity).put("glass",p.glass).put("blur",p.blur).put("bubble",p.bubble)
         val videos = JSONArray()
         s.videos.forEach { v -> videos.put(JSONObject().put("key",v.key).put("url",v.url).put("title",v.title)
             .put("site",v.site).put("duration",v.duration).put("thumbnail",v.thumbnail).put("selected",v.selected)
-            .put("status",v.status).put("error",v.error).put("savedUri",v.savedUri)) }
+            .put("status",v.status).put("error",v.error).put("savedUri",v.savedUri).put("resolved",v.resolved)) }
         context.getSharedPreferences("pandora", Context.MODE_PRIVATE).edit().putString("preferences",config.toString())
             .putString("queue",videos.toString()).apply()
     }

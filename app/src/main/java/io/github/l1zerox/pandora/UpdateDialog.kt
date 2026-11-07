@@ -26,12 +26,7 @@ internal fun UpdateDialog(state: UpdateState, dismiss: ()->Unit) {
             if(release != null) {
                 Text("現在 ${BuildConfig.VERSION_NAME} → ${release.version}${if(release.preview) "（試用版）" else ""}")
                 Text(release.notes,fontSize=13.sp)
-                val targetBeta = release.version.contains("-beta.")
-                Text(when {
-                    BuildConfig.BETA && !targetBeta -> "リリース版（Youtube Pandora!）のAPKをダウンロードして開いてください。ベータ版とは別アプリです。インストール後はリリース版を起動してください。既存のリリース版の設定・一覧は引き継がれますが、ベータ版の設定・一覧は移行されません。"
-                    !BuildConfig.BETA && targetBeta -> "ベータ版は通常版と別にインストールされます。設定・一覧も別管理です。"
-                    else -> "APKをダウンロードして開き、アプリを削除せず上書き更新してください。"
-                },fontSize=12.sp)
+                Text("統合版は通常版・ベータ版とも同じアプリとして上書きインストールし、設定・キューを引き継ぎます。ダウンロード処理を終了してからAPKを開いてください。ベータ版のバブル機能は通常版では無効になります。",fontSize=12.sp)
                 TextButton(onClick={open(release.pageUrl)}) { Text("GitHubで更新内容を見る") }
             } else Text(state.message)
             if(browserError.isNotBlank()) Text(browserError,color=MaterialTheme.colorScheme.error)

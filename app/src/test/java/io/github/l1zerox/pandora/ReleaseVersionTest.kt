@@ -4,6 +4,13 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ReleaseVersionTest {
+    @Test fun unifiedAppsOnlyOfferInstallCompatibleChannels() {
+        val releases=listOf(release("0.2.7"),release("0.3.0-beta.3"),release("0.3.0"),release("0.4.0-beta.1"))
+        assertEquals("0.3.0",newestRelease(releases,"0.4.0-beta.1",offer=true,unifiedOnly=true)!!.version)
+        assertEquals("0.4.0-beta.1",newestRelease(releases,"0.3.0",beta=true,offer=true,unifiedOnly=true)!!.version)
+        assertNull(newestRelease(listOf(release("0.3.0-beta.3")),"0.3.0",beta=true,offer=true,unifiedOnly=true))
+        assertNull(newestRelease(listOf(release("0.2.7")),"0.4.0-beta.1",offer=true,unifiedOnly=true))
+    }
     @Test fun returnToReleaseOffersOlderVersionOnlyOnExplicitRequest() {
         val releases=listOf(release("0.2.5"),release("0.2.6"),release("0.3.0-beta.2"),release("0.4.0",draft=true))
         assertNull(newestRelease(releases,"0.3.0-beta.2"))
