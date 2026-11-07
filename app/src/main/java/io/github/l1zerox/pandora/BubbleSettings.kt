@@ -30,17 +30,18 @@ internal fun BubbleSettings(p: Preferences) {
             .onFailure { BubbleRuntime.error.value="Androidの設定から「他のアプリの上に表示」を許可してください。" }
     }
     val notifications=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { requestOverlay() }
+    fun requestBubblePermissions() {
+        if(Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context,Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
+            notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+        else requestOverlay()
+    }
     Text("バブル",fontWeight=FontWeight.Bold)
     Row(verticalAlignment=Alignment.CenterVertically) {
         Text("最小化するとバブルを表示",Modifier.weight(1f))
         Switch(p.bubble,{ enabled ->
             BubbleRuntime.error.value=""
             Store.preferences(Store.state.value.preferences.copy(bubble=enabled))
-            if(enabled) {
-                if(Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context,Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
-                    notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
-                else requestOverlay()
-            } else BubbleRuntime.sync(context)
+            if(enabled) requestBubblePermissions() else BubbleRuntime.sync(context)
         })
     }
     Text("他のアプリを開いている間も進捗を表示します。タップで管理パネル、ドラッグで移動できます。",fontSize=12.sp)
@@ -52,7 +53,7 @@ internal fun BubbleSettings(p: Preferences) {
     Text("バブル・ゲージ・パネルの色は動画のサムネイルに合わせます。DL中は処理中の動画、待機中は最後に追加した選択済みの動画を優先します。",fontSize=12.sp)
     if(p.bubble && !permission) {
         Text("表示許可が必要です。Androidの設定画面で許可してください。",fontSize=12.sp)
-        OutlinedButton(onClick={requestOverlay()}) { Text("表示許可の設定を開く") }
+        OutlinedButton(onClick={requestBubblePermissions()}) { Text("表示許可の設定を開く") }
     }
     if(error.isNotBlank()) Text(error,color=MaterialTheme.colorScheme.error,fontSize=12.sp)
     Text("共有URLをキューへ追加し、開始・一時停止・再開・キャンセルを操作できます。変換中の一時停止は、再開時にその動画の変換からやり直します。",fontSize=12.sp)

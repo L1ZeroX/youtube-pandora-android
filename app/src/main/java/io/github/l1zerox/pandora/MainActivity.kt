@@ -85,6 +85,7 @@ fun PandoraScreen(artworkRequested: Boolean = false, onArtworkClosed: ()->Unit =
     val scope = rememberCoroutineScope()
     val s by Store.state.collectAsStateWithLifecycle()
     val p = s.preferences
+    val bubblePermission by BubbleRuntime.permission.collectAsStateWithLifecycle()
     var text by rememberSaveable { mutableStateOf("") }
     var settings by rememberSaveable { mutableStateOf(false) }
     var backgroundSettings by rememberSaveable { mutableStateOf(false) }
@@ -173,8 +174,11 @@ fun PandoraScreen(artworkRequested: Boolean = false, onArtworkClosed: ()->Unit =
                         Column(Modifier.padding(top=16.dp,bottom=10.dp)) {
                             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                                 Text(if(BuildConfig.BETA) "ベータ版" else "Android版",fontSize=12.sp,modifier=Modifier.weight(1f))
-                                if(p.bubble && android.provider.Settings.canDrawOverlays(context)) TextButton(
-                                    onClick={ (context as? android.app.Activity)?.moveTaskToBack(true) }) { Text("バブルへ") }
+                                if(p.bubble) {
+                                    if(bubblePermission) TextButton(
+                                        onClick={ (context as? android.app.Activity)?.moveTaskToBack(true) }) { Text("バブルへ") }
+                                    else TextButton(onClick={settings=true}) { Text("バブルの表示許可") }
+                                }
                                 TextButton(onClick={settings=true}) { Text("環境設定") }
                             }
                             TitleLogo(Modifier.align(Alignment.CenterHorizontally))

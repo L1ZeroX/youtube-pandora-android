@@ -11,8 +11,8 @@ android {
         applicationId = "io.github.l1zerox.pandora"
         minSdk = 29
         targetSdk = 36
-        versionCode = 24
-        versionName = if(betaBuild) "0.4.4-beta.1" else "0.4.3"
+        versionCode = 25
+        versionName = if(betaBuild) "0.4.5-beta.1" else "0.4.4"
         buildConfigField("boolean", "BETA", betaBuild.toString())
         manifestPlaceholders["appLabel"] = "Youtube Pandora!"
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
