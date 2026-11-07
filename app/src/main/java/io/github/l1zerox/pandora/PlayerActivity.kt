@@ -85,6 +85,7 @@ class PlayerActivity : ComponentActivity() {
         onBackPressedDispatcher.addCallback(this) { closePlayerScreen() }
         setContent {
             MaterialTheme(colorScheme=darkColorScheme()) {
+                UpdatePrompt(allowed=!inPip && !videoFullscreen && error.isBlank())
                 if(!video && !inPip) {
                     MusicPlayerScreen(controller,title,artwork,artworkColor,error,
                         onBack={closePlayerScreen()},onStop={controller?.stop(); controller?.clearMediaItems(); closePlayerScreen()})

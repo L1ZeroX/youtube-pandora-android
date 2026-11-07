@@ -176,7 +176,7 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
                         Text(playback.title,Modifier.weight(1f).clickable { openPlayer() },maxLines=1,overflow=TextOverflow.Ellipsis)
                         LibraryPlayButton(playback.uri,transport,playingPalette) { openPlayer() }
                     }
-                    if(transport.uri == playback.uri) LibrarySeekBar(playback.uri,transport,playingPalette,playingColor,backdrop)
+                    if(transport.uri == playback.uri) LibrarySeekBar(playback.uri,transport,playingPalette,playingColor,backdrop,compact=true)
                 }
             }
             if(transport.error.isNotBlank()) Text(transport.error,fontSize=13.sp)
@@ -205,6 +205,7 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
         }
     }
     }
+    UpdatePrompt(allowed=deletion == null && !importing && error.isBlank())
     deletion?.let { entry -> key(entry.uri) {
         LibraryDeleteDialog(entry,onDismiss={deletion=null},onRemoved={
             entries=entries.filterNot { it.uri == entry.uri }; refresh++

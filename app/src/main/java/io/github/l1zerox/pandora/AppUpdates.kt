@@ -1,41 +1,26 @@
 package io.github.l1zerox.pandora
 
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.update
+import android.os.SystemClock
 import org.json.JSONArray
 import java.net.HttpURLConnection
 import java.net.URL
 
-internal data class UpdateState(val checking: Boolean = false, val release: AppRelease? = null, val message: String = "")
-
 internal object AppUpdates {
-    val state=MutableStateFlow(UpdateState())
     private val scope=CoroutineScope(SupervisorJob()+Dispatchers.Main.immediate)
-    private var startupChecked=false
+    private val checker=UpdateChecker(scope,BuildConfig.VERSION_NAME,SystemClock::elapsedRealtime,
+        fetch={ beta,offer -> withContext(Dispatchers.IO) { fetchRelease(beta,offer) } },
+        log={ AppLog.info("バージョンチェック",it) })
+    val state get()=checker.state
     fun check(manual: Boolean = false, beta: Boolean = BuildConfig.BETA, offer: Boolean = false) {
-        if(state.value.checking || (!manual && startupChecked)) return
-        startupChecked=true
-        state.update { it.copy(checking=true) }
-        scope.launch {
-            try {
-                val release=withContext(Dispatchers.IO) { fetchRelease(beta,offer) }
-                state.value=UpdateState(release=release,message=if(manual && release == null) {
-                    if(offer) "ダウンロード可能な${if(beta) "ベータ版" else "リリース版"}が見つかりませんでした。"
-                    else "利用可能な新しいバージョンはありません。現在 ${BuildConfig.VERSION_NAME}"
-                } else "")
-                AppLog.info("バージョンチェック",release?.let { "ダウンロード可能なバージョン ${it.version}" } ?: "利用可能な更新はありません。")
-            } catch(e: Exception) {
-                if(e is CancellationException) throw e
-                AppLog.info("バージョンチェック","確認できません: ${e.message}")
-                state.value=UpdateState(message=if(manual) "更新を確認できませんでした。通信状態を確認して再度お試しください。" else "")
-            }
-        }
+        checker.check(manual,beta,offer)
     }
-    fun dismiss() { state.update { it.copy(release=null,message="") } }
+    fun retryFailedCheck() { if(state.value.failed) check() }
+    fun dismiss() = checker.dismiss()
     private fun fetchRelease(beta: Boolean, offer: Boolean): AppRelease? {
         val connection=URL("https://api.github.com/repos/L1ZeroX/youtube-pandora-android/releases?per_page=30").openConnection() as HttpURLConnection
         try {
+            connection.useCaches=false
             connection.connectTimeout=10_000; connection.readTimeout=10_000
             connection.setRequestProperty("Accept","application/vnd.github+json")
             connection.setRequestProperty("User-Agent","YoutubePandora-Android/${BuildConfig.VERSION_NAME}")

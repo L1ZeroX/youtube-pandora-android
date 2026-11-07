@@ -11,6 +11,34 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+
+/** Only the resumed screen shows the prompt; keep pending results while another dialog or DL is active. */
+@Composable
+internal fun UpdatePrompt(allowed: Boolean = true) {
+    val lifecycle=LocalLifecycleOwner.current.lifecycle
+    val lifecycleState by lifecycle.currentStateFlow.collectAsState()
+    val foreground=lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
+    val state by AppUpdates.state.collectAsStateWithLifecycle()
+    val screen by Store.state.collectAsStateWithLifecycle()
+    LaunchedEffect(foreground) {
+        if(foreground) {
+            AppUpdates.check()
+            // One bounded retry while visible, for transient offline/startup failures.
+            val checked=AppUpdates.state.first { !it.checking }
+            if(checked.failed && checked.message.isEmpty()) {
+                delay(30_000)
+                AppUpdates.retryFailedCheck()
+            }
+        }
+    }
+    if(foreground && allowed && !screen.busy && (state.release != null || state.message.isNotEmpty()))
+        UpdateDialog(state,AppUpdates::dismiss)
+}
 
 @Composable
 internal fun UpdateDialog(state: UpdateState, dismiss: ()->Unit) {

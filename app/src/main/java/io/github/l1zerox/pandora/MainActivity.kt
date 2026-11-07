@@ -61,7 +61,6 @@ class MainActivity : ComponentActivity() {
         artworkRequested=savedInstanceState?.getBoolean("artworkRequested") ?: false
         if(savedInstanceState == null) acceptShare(intent)
         setContent { PandoraScreen(artworkRequested) { artworkRequested=false } }
-        AppUpdates.check()
     }
     override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); acceptShare(intent) }
     override fun onSaveInstanceState(outState: Bundle) {
@@ -243,8 +242,7 @@ fun PandoraScreen(artworkRequested: Boolean = false, onArtworkClosed: ()->Unit =
         },confirmButton={TextButton(onClick=onArtworkClosed) { Text("完了") }})
         if(error.isNotEmpty()) AlertDialog(onDismissRequest={error=""},title={Text("確認")},text={Text(error)},confirmButton={TextButton(onClick={error=""}) { Text("閉じる") }})
         if(logs) LogDialog { logs=false }
-        if(!s.busy && !settings && !logs && !artworkRequested && preview == null && error.isEmpty() && pending == null &&
-            (updateState.release != null || updateState.message.isNotEmpty())) UpdateDialog(updateState) { AppUpdates.dismiss() }
+        UpdatePrompt(allowed=!settings && !backgroundSettings && !logs && !artworkRequested && preview == null && error.isEmpty() && pending == null)
         preview?.let { selected ->
             val video=s.videos.firstOrNull { it.key == selected.key } ?: selected
             var thumbnailTone by remember(video.thumbnail) { mutableStateOf<Color?>(null) }
