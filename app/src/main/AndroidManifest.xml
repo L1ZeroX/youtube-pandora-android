@@ -29,6 +29,9 @@
         </activity>
         <activity android:name=".LibraryActivity" android:exported="false" />
         <activity android:name=".AppUpdateActivity" android:exported="false" />
+        <receiver android:name=".UpdateReplacedReceiver" android:exported="false">
+            <intent-filter><action android:name="android.intent.action.MY_PACKAGE_REPLACED" /></intent-filter>
+        </receiver>
         <activity android:name=".PlayerActivity" android:exported="false"
             android:launchMode="singleTask" android:supportsPictureInPicture="true"
             android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation" />

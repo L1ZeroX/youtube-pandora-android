@@ -68,7 +68,7 @@ class MainActivity : ComponentActivity() {
         super.onSaveInstanceState(outState)
     }
     override fun onStart() { super.onStart(); BubbleRuntime.enter(this) }
-    override fun onResume() { super.onResume(); BubbleRuntime.sync(this) }
+    override fun onResume() { super.onResume(); UpdateRelaunch.onAppVisible(this); BubbleRuntime.sync(this) }
     override fun onStop() { super.onStop(); BubbleRuntime.leave(this) }
     private fun acceptShare(intent: Intent?) {
         if(intent?.action == OPEN_ARTWORK) artworkRequested=true
@@ -223,11 +223,11 @@ fun PandoraScreen(artworkRequested: Boolean = false, onArtworkClosed: ()->Unit =
                             }
                             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                                 Column(Modifier.weight(1f)) {
-                                    Text("日本語音声を優先")
+                                    Text("オートダビング版を優先")
                                     Text("吹き替えを自動判別。なければ元音声を優先。",fontSize=11.sp,color=colors.onSurfaceVariant)
                                 }
                                 Switch(checked=p.preferJapaneseAudio,onCheckedChange={Store.preferences(p.copy(preferJapaneseAudio=it))},enabled=!s.busy,
-                                    modifier=Modifier.semantics { contentDescription="日本語音声を優先" })
+                                    modifier=Modifier.semantics { contentDescription="オートダビング版を優先" })
                             }
                             Text("保存先: 内部ストレージ/${saveRelativePath(p.format)}",fontSize=12.sp)
                             Text("互換性のある映像は再圧縮せず保存します。フレーム補間はCPUで中間の動きを生成するため時間がかかります。",fontSize=11.sp,color=colors.onSurfaceVariant)

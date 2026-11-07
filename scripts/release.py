@@ -10,7 +10,7 @@ import sys
 import zipfile
 
 beta = "--beta" in sys.argv
-version = "0.4.6-beta.7" if beta else "0.4.21"
+version = "0.4.6-beta.7" if beta else "0.4.22"
 root = Path(__file__).resolve().parent.parent
 config = json.loads((root / '.tools/environment.json').read_text())
 private = root / '.signing'

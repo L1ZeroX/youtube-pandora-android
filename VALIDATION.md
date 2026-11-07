@@ -1,5 +1,19 @@
 # 検証状況
 
+## v0.4.22（2026-11-08）
+
+既存のAPK検証・ACTION_INSTALL_PACKAGEによる確認手順を維持し、インストーラー起動直前に更新先バージョン・起動元versionCode・時刻を専用SharedPreferencesへ同期保存する。APK整理がApplication.onCreateで走っても、この要求は消えない。非公開のUpdateReplacedReceiverがシステム限定のMY_PACKAGE_REPLACEDを受け、指定版への実際のversionCode増加・2時間以内の要求に限って消費する。重複・期限切れ・異なる版では開かない。キャンセルや起動失敗では要求を解除する。旧版は要求を記録しないため、この版のインストール後の更新から対応する。
+
+受信時は更新完了通知を先に用意してから、通常のstartActivityでMainActivityを開く。Androidのバックグラウンド起動制限を回避する別アプリ・アラーム・全画面通知は使わない。自動起動が抑止されても通知のimmutableなActivity PendingIntentから直接開ける。MainActivityが表示されたら通知と完了済み要求を整理する。通知拒否時は通知を出せない。更新画面の成功コールバックでもメイン画面へ戻り、新しいプロセスに同じリリースIntentが復元された場合は再ダウンロードを防ぐ。
+
+設定の表示名と読み上げ名を「オートダビング版を優先」へ変更。既存のpreferJapaneseAudio設定キー・音声の選択処理・保存メタデータの判別条件は維持する。ライブラリーのオートダビング版ラベルを種類・時間と同じFlowRowへ移し、幅不足では折り返す。グリッドではラベルのある項目にカード幅全体を使い、再生ボタンに押しつぶされない配置とする。実際のカードとプレビューは共通のLibraryCardBodyを使う。
+
+要求のJSON保存、成功版とversionCodeの判定、別版・期限切れ・未来時刻・不正レコードの拒否を単体テストへ追加。端末テストは要求の保存/再読み込み/一度だけの消費/キャンセルとreceiverの非公開設定・直接Activityを開くIntentを確認する構成。端末未接続のためコンパイル確認のみ。実機での自己更新・自動表示・通知拒否時の動作・カード表示は未確認。
+
+`testDebugUnitTest`は168件成功、失敗・エラー・スキップ0。`compileDebugAndroidTestKotlin`成功、`lintDebug`はエラー0・警告59件。追加された2件はSharedPreferencesのKTX推奨警告で、更新によるプロセス終了前に保存が成功したことを確認するためcommitの戻り値を検証している。
+
+参照: [Androidのバックグラウンド画面起動制限](https://developer.android.com/guide/components/activities/secure-bal)、[MY_PACKAGE_REPLACED](https://developer.android.com/reference/android/content/Intent#ACTION_MY_PACKAGE_REPLACED)、[通知からActivityを開く](https://developer.android.com/develop/ui/views/notifications/navigation)。
+
 ## v0.4.21（2026-11-08）
 
 ライブラリーの「表示調整」を48dpのOutlinedIconButtonへ変更。22dpのスライダー形アイコンをCanvasで描画し、背景色・白いアイコン・外枠をレイアウトボタンと揃える。読み上げ用contentDescriptionを「表示調整」とし、既存のフォーカス解除・キーボード非表示・プレビュー付きメニューを開く処理へ接続する。検索ボタンの閉じた状態のラベルを「検索 🔎」へ変更し、検索欄の開閉処理は維持する。

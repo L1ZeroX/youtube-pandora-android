@@ -4,9 +4,11 @@ Windows版と別プロジェクトのAndroid用アプリです。Android 10以�
 
 ## インストール
 
-**[正式版APK v0.4.21](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.4.21/YoutubePandora-Android-v0.4.21.apk)**（ライブラリー・再生・PiPを統合済み）
+**[正式版APK v0.4.22](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.4.22/YoutubePandora-Android-v0.4.22.apk)**（ライブラリー・再生・PiPを統合済み）
 
 ライブラリー試験版の機能は正式版v0.4.6へ統合しました。
+
+v0.4.22では、アプリ内で更新を開始すると、完了後にアプリを開き直す処理を追加しました。Android側で自動表示が制限される場合は「更新が完了しました」通知から開けます（通知許可が必要）。この版を入れた後の更新から対応します。「日本語音声を優先」は「オートダビング版を優先」に名称変更し、ライブラリーの該当動画では種類・再生時間の隣に「オートダビング版」を表示します。狭いカードでは折り返します。
 
 v0.4.21では「表示調整」をスライダー形のアイコンボタンに変更し、レイアウトボタンの隣へ配置しました。同じ大きさ・背景画像に合わせた色で表示します。検索ボタンは「検索 🔎」になりました。
 

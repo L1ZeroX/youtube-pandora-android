@@ -47,15 +47,21 @@ class AppUpdateActivity : ComponentActivity() {
     }
     private val installer=registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         external(false)
+        UpdateRelaunch.cancel(this)
         if(result.resultCode == RESULT_OK) lifecycleScope.launch {
             runCatching { ApkUpdates.clear() }.onFailure { AppLog.error("APK整理",it) }
-            message="更新が完了しました。"
+            UpdateRelaunch.openApp(this@AppUpdateActivity)
+            finish()
         } else message="更新を完了していません。「更新する」から再度開けます。"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState); enableEdgeToEdge()
         val requested=parseApkRelease(intent.getStringExtra("release"))
+        // Android may restore this activity with the old release Intent after replacing our process.
+        if(requested?.version == BuildConfig.VERSION_NAME) {
+            UpdateRelaunch.openApp(this); finish(); return
+        }
         expectedVersion=requested?.version
         autoInstall=savedInstanceState?.getBoolean("autoInstall") ?: (requested != null)
         external(savedInstanceState?.getBoolean("externalStep") ?: false)
@@ -84,6 +90,7 @@ class AppUpdateActivity : ComponentActivity() {
                             ApkStage.IDLE -> Unit
                         }
                         Text("初回はこのアプリからのインストールを許可します。更新用APKはアプリ専用領域に保存し、更新後の起動時に整理します。")
+                        Text("更新後にアプリを開き直します。自動で開かない端末では、更新完了通知またはホーム画面から開いてください。")
                         if(message.isNotBlank()) Text(message)
                         if(screen.busy) Text("動画のダウンロードが終わってから更新できます。")
                         if(update.stage == ApkStage.READY) Button(onClick={autoInstall=false; requestInstall()},enabled=!installBusy && !screen.busy) { Text("更新する") }
@@ -138,6 +145,7 @@ class AppUpdateActivity : ComponentActivity() {
                 val uri=ApkUpdates.installerUri()
                 lifecycle.withResumed {
                     if(!Store.state.value.busy) {
+                        UpdateRelaunch.arm(this@AppUpdateActivity,requireNotNull(ApkUpdates.state.value.release).version)
                         external(true)
                         installer.launch(Intent(Intent.ACTION_INSTALL_PACKAGE).setDataAndType(uri,"application/vnd.android.package-archive")
                             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION).putExtra(Intent.EXTRA_RETURN_RESULT,true)
@@ -146,6 +154,7 @@ class AppUpdateActivity : ComponentActivity() {
                 }
             } catch(e: Exception) {
                 external(false)
+                UpdateRelaunch.cancel(this@AppUpdateActivity)
                 if(e is CancellationException) throw e
                 message="更新画面を開けませんでした。${e.message.orEmpty()}"
             } finally { preparingInstall=false }

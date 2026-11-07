@@ -31,7 +31,6 @@ internal fun LibraryCardBody(entry: LibraryEntry, artwork: Bitmap?, palette: Lib
                     Text(entry.title,maxLines=if(compact) 1 else 2,overflow=TextOverflow.Ellipsis,fontWeight=FontWeight.SemiBold,
                         color=palette.content,fontSize=if(compact) 14.sp else 16.sp)
                     LibraryCardInfo(entry,palette,false)
-                    LibraryDubbingLabel(entry,palette)
                 }
                 if(compact) Row(verticalAlignment=Alignment.CenterVertically) { play(); menu() }
                 else Column(horizontalAlignment=Alignment.CenterHorizontally) { play(); menu() }
@@ -46,10 +45,15 @@ internal fun LibraryCardBody(entry: LibraryEntry, artwork: Bitmap?, palette: Lib
             Spacer(Modifier.height(8.dp))
             Text(entry.title,maxLines=2,overflow=TextOverflow.Ellipsis,fontWeight=FontWeight.SemiBold,color=palette.content,
                 fontSize=when { three -> 12.sp; layout == LibraryLayout.LARGE -> 18.sp; else -> 14.sp })
-            LibraryDubbingLabel(entry,palette)
-            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) { LibraryCardInfo(entry,palette,three) }
-                play()
+            if(layout.columns > 1 && entry.dubbingLabel != null) {
+                // Give the label the full tile width instead of squeezing it beside a 48dp button.
+                LibraryCardInfo(entry,palette,false)
+                Box(Modifier.fillMaxWidth(),contentAlignment=Alignment.CenterEnd) { play() }
+            } else {
+                Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) { LibraryCardInfo(entry,palette,three) }
+                    play()
+                }
             }
         }
         footer()
@@ -64,15 +68,13 @@ private fun LibraryCardArtwork(entry: LibraryEntry, artwork: Bitmap?, palette: L
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun LibraryCardInfo(entry: LibraryEntry, palette: LibraryPalette, stacked: Boolean) {
     val duration=if(entry.durationMs > 0) durationText(entry.durationMs/1000.0) else ""
-    Text(entry.category+if(duration.isEmpty()) "" else if(stacked) "\n$duration" else " · $duration",
-        fontSize=if(stacked) 11.sp else 12.sp,color=palette.detail)
-}
-
-@Composable
-private fun LibraryDubbingLabel(entry: LibraryEntry, palette: LibraryPalette) {
-    entry.dubbingLabel?.let { Text(it,fontSize=12.sp,fontWeight=FontWeight.SemiBold,color=palette.content,
-        modifier=Modifier.padding(top=4.dp)) }
+    FlowRow(horizontalArrangement=Arrangement.spacedBy(6.dp),verticalArrangement=Arrangement.spacedBy(2.dp)) {
+        Text(entry.category+if(duration.isEmpty()) "" else if(stacked) "\n$duration" else " · $duration",
+            fontSize=if(stacked) 11.sp else 12.sp,color=palette.detail)
+        entry.dubbingLabel?.let { Text(it,fontSize=12.sp,fontWeight=FontWeight.SemiBold,color=palette.content) }
+    }
 }
