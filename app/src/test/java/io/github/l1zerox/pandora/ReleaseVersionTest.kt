@@ -19,10 +19,10 @@ class ReleaseVersionTest {
             assertEquals("0.4.6",newestRelease(releases,installed,unifiedOnly=true)!!.version)
         assertNull(newestRelease(releases,"0.4.6",beta=true,offer=true,unifiedOnly=true))
     }
-    @Test fun libraryBetaCanBeSelectedFromItsBaseAndReturnOnExplicitRequest() {
+    @Test fun libraryBetaCanUpgradeItsBaseButCannotDowngradeBack() {
         val releases=listOf(release("0.4.5",preview=false),release("0.4.6-beta.1"))
         assertEquals("0.4.6-beta.1",newestRelease(releases,"0.4.5",beta=true,offer=true)!!.version)
-        assertEquals("0.4.5",newestRelease(releases,"0.4.6-beta.1",offer=true)!!.version)
+        assertNull(newestRelease(releases,"0.4.6-beta.1",offer=true))
         assertNull(newestRelease(releases,"0.4.6-beta.1"))
     }
     @Test fun promotedReleaseUpgradesBothInstalledChannels() {
@@ -39,15 +39,15 @@ class ReleaseVersionTest {
     }
     @Test fun unifiedAppsOnlyOfferInstallCompatibleChannels() {
         val releases=listOf(release("0.2.7"),release("0.3.0-beta.3"),release("0.3.0"),release("0.4.0-beta.1"))
-        assertEquals("0.3.0",newestRelease(releases,"0.4.0-beta.1",offer=true,unifiedOnly=true)!!.version)
+        assertNull(newestRelease(releases,"0.4.0-beta.1",offer=true,unifiedOnly=true))
         assertEquals("0.4.0-beta.1",newestRelease(releases,"0.3.0",beta=true,offer=true,unifiedOnly=true)!!.version)
         assertNull(newestRelease(listOf(release("0.3.0-beta.3")),"0.3.0",beta=true,offer=true,unifiedOnly=true))
         assertNull(newestRelease(listOf(release("0.2.7")),"0.4.0-beta.1",offer=true,unifiedOnly=true))
     }
-    @Test fun returnToReleaseOffersOlderVersionOnlyOnExplicitRequest() {
+    @Test fun returnToReleaseDoesNotOfferOlderVersionEvenOnExplicitRequest() {
         val releases=listOf(release("0.2.5"),release("0.2.6"),release("0.3.0-beta.2"),release("0.4.0",draft=true))
         assertNull(newestRelease(releases,"0.3.0-beta.2"))
-        assertEquals("0.2.6",newestRelease(releases,"0.3.0-beta.2",beta=false,offer=true)!!.version)
+        assertNull(newestRelease(releases,"0.3.0-beta.2",beta=false,offer=true))
         assertNull(newestRelease(listOf(release("0.3.0-beta.2")),"0.3.0-beta.2",beta=false,offer=true))
     }
     @Test fun betaChannelRequiresOptInAndHasNumericOrdering() {

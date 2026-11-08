@@ -7,6 +7,13 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class UpdateCheckerTest {
+    @Test fun noCompatibleStableExplainsWhyBetaCannotBeOverwritten() = runBlocking {
+        val checker=UpdateChecker(this,"0.4.25-beta.2",{0L},{_,_ -> null})
+        checker.check(manual=true,beta=false,offer=true); yield()
+        assertNull(checker.state.value.release)
+        assertFalse(checker.state.value.failed)
+        assertTrue(checker.state.value.message.contains("上書きできるリリース版はまだありません"))
+    }
     private val release=AppRelease("0.4.15","$RELEASES_URL/tag/v0.4.15",
         "$RELEASES_URL/download/v0.4.15/YoutubePandora-Android-v0.4.15.apk","更新内容",false)
 

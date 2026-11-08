@@ -49,24 +49,27 @@ internal fun UpdateDialog(state: UpdateState, dismiss: ()->Unit) {
             .onFailure { browserError="ブラウザーを開けませんでした。GitHubのリリースページから更新してください。" }
     }
     val release=state.release
+    fun download(fullApk: Boolean = false) {
+        if(release == null) return
+        runCatching { openAppUpdate(context,if(fullApk) release.copy(delta=null) else release); dismiss() }
+            .onFailure { browserError="更新画面を開けませんでした。${it.message.orEmpty()}" }
+    }
     AlertDialog(onDismissRequest=dismiss,title={Text(if(release?.version?.contains("-beta.") == true) "ベータ版をダウンロード" else if(release != null) "リリース版をダウンロード" else "バージョンチェック")},text={
         Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)) {
             if(release != null) {
                 Text("現在 ${BuildConfig.VERSION_NAME} → ${release.version}${if(release.preview) "（試用版）" else ""}")
-                Text(release.notes,fontSize=13.sp)
                 release.delta?.let { delta ->
                     Text("差分更新 約%.1f MB（通常 約%.1f MB）。利用できない場合はAPK全体を取得します。".format(delta.size/1048576.0,release.size/1048576.0),fontSize=12.sp)
+                    OutlinedButton(onClick={download(fullApk=true)}) { Text("通常APKで更新") }
                 }
+                Text(release.notes,fontSize=13.sp)
                 Text("アプリ内でAPKを取得し、Androidの更新確認画面を開きます。設定・キューは引き継ぎます。",fontSize=12.sp)
                 TextButton(onClick={open(release.pageUrl)}) { Text("GitHubで更新内容を見る") }
             } else Text(state.message)
             if(browserError.isNotBlank()) Text(browserError,color=MaterialTheme.colorScheme.error)
         }
     },confirmButton={
-        if(release != null) TextButton(onClick={
-            runCatching { openAppUpdate(context,release); dismiss() }
-                .onFailure { browserError="更新画面を開けませんでした。${it.message.orEmpty()}" }
-        }) { Text("アプリ内で更新") }
+        if(release != null) TextButton(onClick={download()}) { Text("アプリ内で更新") }
         else TextButton(onClick=dismiss) { Text("閉じる") }
     },dismissButton={ if(release != null) TextButton(onClick=dismiss) { Text("あとで") } })
 }

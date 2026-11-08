@@ -32,8 +32,9 @@ internal fun newestRelease(releases: List<ReleaseCandidate>, current: String, be
         val number=ReleaseVersion.parse(release.tag) ?: return@mapNotNull null
         if(unifiedOnly && !unifiedRelease(number)) return@mapNotNull null
         if(release.draft || (number.beta != null) != beta || (!offer && number <= installed)) return@mapNotNull null
-        // After promotion, archived betas can have a lower Android versionCode than the release.
-        if(beta && number < installed) return@mapNotNull null
+        // Both channels use one package and increasing versionCodes. An explicit channel switch
+        // must not offer an older APK that Android will refuse after downloading it.
+        if(number < installed) return@mapNotNull null
         // Android is currently distributed through GitHub's prerelease channel as well.
         val version=release.tag.removePrefix("v")
         val name="YoutubePandora-Android-v$version.apk"

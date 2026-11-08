@@ -29,7 +29,9 @@ internal class UpdateChecker(
                 val release=fetch(beta,offer)
                 nextAutomaticCheck=now()+5*60_000L
                 state.value=UpdateState(release=release,message=if(manual && release == null) {
-                    if(offer) "ダウンロード可能な${if(beta) "ベータ版" else "リリース版"}が見つかりませんでした。"
+                    if(offer && !beta && ReleaseVersion.parse(currentVersion)?.beta != null)
+                        "現在のベータ版から上書きできるリリース版はまだありません。新しいリリース版をお待ちください。"
+                    else if(offer) "ダウンロード可能な${if(beta) "ベータ版" else "リリース版"}が見つかりませんでした。"
                     else "利用可能な新しいバージョンはありません。現在 $currentVersion"
                 } else "")
                 log(release?.let { "ダウンロード可能なバージョン ${it.version}" } ?: "利用可能な更新はありません。")

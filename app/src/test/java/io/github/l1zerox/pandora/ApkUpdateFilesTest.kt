@@ -6,6 +6,14 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ApkUpdateFilesTest {
+    @Test fun staleRequestsCannotDownloadAnOlderReleaseButPromotionAndSameVersionAreAllowed() {
+        assertFalse(apkVersionCanUpdate("0.4.24","0.4.25-beta.2"))
+        assertFalse(apkVersionCanUpdate("0.4.25-beta.1","0.4.25-beta.2"))
+        assertTrue(apkVersionCanUpdate("0.4.25","0.4.25-beta.2"))
+        assertTrue(apkVersionCanUpdate("0.4.25-beta.2","0.4.25-beta.2"))
+        assertFalse(apkVersionCanUpdate("invalid","0.4.25-beta.2"))
+        assertFalse(apkVersionCanUpdate("0.4.25","invalid"))
+    }
     private val release=AppRelease("0.4.17","$RELEASES_URL/tag/v0.4.17",
         "$RELEASES_URL/download/v0.4.17/YoutubePandora-Android-v0.4.17.apk","更新",false)
 

@@ -48,12 +48,16 @@ internal object ApkUpdates {
         lock.withLock {
             try {
                 require(validApkRelease(release)) { "更新先の情報が不正です。更新を確認し直してください。" }
-                if(state.value.release?.downloadUrl == release.downloadUrl && id > 0 && state.value.stage != ApkStage.ERROR) {
-                    refreshLocked(); return@withLock
+                require(apkVersionCanUpdate(release.version,BuildConfig.VERSION_NAME)) { "現在より古い版へは上書きできません。新しいリリースをお待ちください。" }
+                if(state.value.release?.downloadUrl == release.downloadUrl && id > 0 && state.value.stage != ApkStage.ERROR &&
+                    !(usingDelta && release.delta == null)) {
+                    updateStep { refreshLocked() }; return@withLock
                 }
                 clearLocked()
-                enqueue(release,release.delta?.baseVersion == BuildConfig.VERSION_NAME && context.applicationInfo.splitSourceDirs.isNullOrEmpty())
-                refreshLocked()
+                updateStep {
+                    enqueue(release,release.delta?.baseVersion == BuildConfig.VERSION_NAME && context.applicationInfo.splitSourceDirs.isNullOrEmpty())
+                    refreshLocked()
+                }
             } catch(e: Exception) { failure(e,release) }
         }
     }
@@ -76,22 +80,19 @@ internal object ApkUpdates {
         if(error is CancellationException) throw error
         AppLog.info("アプリ更新","差分を利用できないためAPK全体へ切り替えます: ${error.message}")
         clearLocked()
-        enqueue(release,false)
+        // Persist full mode in the request as well, so retries cannot re-download a failed patch.
+        enqueue(release.copy(delta=null),false)
         state.value=state.value.copy(message="差分を利用できないため、APK全体をダウンロードしています…")
     }
 
     suspend fun refresh() = withContext(Dispatchers.IO) {
         initialization?.join()
-        lock.withLock {
-            try { refreshLocked() }
-            catch(e: Exception) {
-                try {
-                    val release=state.value.release
-                    if(usingDelta && release != null) fallbackToFull(release,e) else failure(e)
-                } catch(fallbackError: Exception) { failure(fallbackError) }
-            }
-        }
+        lock.withLock { updateStep { refreshLocked() } }
     }
+
+    private fun updateStep(operation: ()->Unit) = runApkUpdateStep(operation,
+        canFallback={usingDelta && state.value.release != null},
+        fallback={fallbackToFull(requireNotNull(state.value.release),it)},failed={failure(it)})
 
     private fun refreshLocked() {
         if(!state.value.working || id <= 0) return
@@ -104,17 +105,15 @@ internal object ApkUpdates {
             when(number(DownloadManager.COLUMN_STATUS).toInt()) {
                 DownloadManager.STATUS_SUCCESSFUL -> {
                     if(usingDelta) {
-                        try {
-                            val delta=requireNotNull(release.delta)
-                            require(delta.baseVersion == BuildConfig.VERSION_NAME)
-                            verifyApkBytes(patchFile(),release.copy(size=delta.size,digest=delta.digest,delta=null))
-                            state.value=ApkUpdateState(release,ApkStage.PATCHING,0,release.size,"差分を適用しています…")
-                            applyApkDelta(File(context.applicationInfo.sourceDir),patchFile(),file(),release.size,release.digest) {
-                                state.value=state.value.copy(bytes=it)
-                            }
-                            verify(file(),release)
-                            state.value=ApkUpdateState(release,ApkStage.READY,bytes,total)
-                        } catch(error: Exception) { fallbackToFull(release,error) }
+                        val delta=requireNotNull(release.delta)
+                        require(delta.baseVersion == BuildConfig.VERSION_NAME)
+                        verifyApkBytes(patchFile(),release.copy(size=delta.size,digest=delta.digest,delta=null))
+                        state.value=ApkUpdateState(release,ApkStage.PATCHING,0,release.size,"差分を適用しています…")
+                        applyApkDelta(File(context.applicationInfo.sourceDir),patchFile(),file(),release.size,release.digest) {
+                            state.value=state.value.copy(bytes=it)
+                        }
+                        verify(file(),release)
+                        state.value=ApkUpdateState(release,ApkStage.READY,bytes,total)
                         return
                     }
                     state.value=ApkUpdateState(release,ApkStage.VERIFYING,bytes,total,"APKを確認しています…")
@@ -122,8 +121,7 @@ internal object ApkUpdates {
                     state.value=ApkUpdateState(release,ApkStage.READY,bytes,total)
                 }
                 DownloadManager.STATUS_FAILED -> {
-                    val error=IllegalStateException("APKのダウンロードに失敗しました（${number(DownloadManager.COLUMN_REASON)}）。通信状態と空き容量を確認して再試行してください。")
-                    if(usingDelta) fallbackToFull(release,error) else throw error
+                    error("APKのダウンロードに失敗しました（${number(DownloadManager.COLUMN_REASON)}）。通信状態と空き容量を確認して再試行してください。")
                 }
                 else -> state.value=ApkUpdateState(release,ApkStage.DOWNLOADING,bytes,total,
                     if(number(DownloadManager.COLUMN_STATUS).toInt() == DownloadManager.STATUS_PAUSED) "通信を待っています…"

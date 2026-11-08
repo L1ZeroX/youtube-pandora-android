@@ -42,6 +42,12 @@ internal fun compatibleUpdate(packageName: String, expectedPackage: String, vers
     packageName == expectedPackage && version == expectedVersion && code >= installedCode &&
         signers.isNotEmpty() && signers == installedSigners
 
+internal fun apkVersionCanUpdate(target: String, current: String): Boolean {
+    val wanted=ReleaseVersion.parse(target) ?: return false
+    val installed=ReleaseVersion.parse(current) ?: return false
+    return wanted >= installed
+}
+
 internal fun installedApkUpdate(target: String, fromCode: Int, currentVersion: String, currentCode: Int): Boolean {
     val wanted=ReleaseVersion.parse(target) ?: return false
     val current=ReleaseVersion.parse(currentVersion) ?: return false
