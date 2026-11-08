@@ -21,13 +21,26 @@ driver.write_text('''
 import io.github.l1zerox.pandora.*;
 import java.io.*;
 import java.util.*;
+import java.nio.file.*;
+import org.json.*;
 public class DubbingMarkerHost {
   public static void main(String[] args) throws Exception {
     if (args[0].equals("args")) {
       AudioDecision decision = AudioLanguageKt.audioDecision(
-        List.of(new AudioTrack("aac", "ja", "日本語（自動吹き替え）")), List.of());
+        List.of(new AudioTrack("aac", "ja", "日本語（自動吹き替え）", "", "")), List.of());
       if (!decision.getAutoDubbed()) throw new AssertionError("Localized note was missed");
       for (String arg : AutoDubbedKt.autoDubbedMetadataArgs(decision, true)) System.out.println(arg);
+    } else if (args[0].equals("reports")) {
+      JSONArray cases = new JSONArray(Files.readString(Path.of(args[1])));
+      for (int i=0; i<cases.length(); i++) {
+        JSONObject item = cases.getJSONObject(i);
+        AudioDecision decision = AudioLanguageKt.parseAudioSelection("PANDORA_AUDIO|" + item.getJSONObject("report"));
+        if (decision == null || decision.getAutoDubbed() != item.getBoolean("expected"))
+          throw new AssertionError("Wrong selected audio role in report " + i);
+        if (AutoDubbedKt.autoDubbedMetadataArgs(decision,true).isEmpty() == item.getBoolean("expected"))
+          throw new AssertionError("Wrong MP4 metadata arguments in report " + i);
+      }
+      System.out.println(cases.length() + " actual extractor reports verified by Kotlin");
     } else {
       try (FileInputStream input = new FileInputStream(args[1])) {
         boolean actual = Mp4DubbingMarkerKt.mp4DubbingMarker(input.getChannel(), 0, -1);
@@ -49,6 +62,7 @@ def run(args):
 
 metadata = run([java, "-Dfile.encoding=UTF-8", "-cp", classpath, driver, "args"]).splitlines()
 assert metadata == ["-metadata", "genre=YoutubePandora:AutoDubbed:v1"]
+print(run([java,"-Dfile.encoding=UTF-8","-cp",classpath,driver,"reports",ROOT / "app/build/reports/audio-role-results.json"]).strip())
 for portrait in [False, True]:
     for fast in [False, True]:
         output = WORK / f"dubbed-{portrait}-{fast}.mp4"

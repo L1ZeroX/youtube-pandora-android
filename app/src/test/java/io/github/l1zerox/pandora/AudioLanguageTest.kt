@@ -31,13 +31,38 @@ class AudioLanguageTest {
     }
     @Test fun recognizesLocalizedAndUnicodeAutoDubbingNotesWithoutLabelingOrdinaryJapanese() {
         for(note in listOf("日本語（自動吹き替え）","日本語・自動吹替","日本語 自動ダビング","オートダビング版",
-            "Japanese auto\u2011dubbed, medium","Japanese AUTO_DUBBED","Japanese automatically dubbed","Japanese (auto dubbing)")) {
+            "Japanese auto\u2011dubbed, medium","Japanese AUTO_DUBBED","Japanese automatically dubbed","Japanese (auto dubbing)",
+            "Japanese - dubbed-auto (default)","Japanese dubbed_auto","Japanese dubbed automatically")) {
             assertTrue(note,audioDecision(listOf(japanese.copy(note=note)),emptyList()).autoDubbed)
         }
         for(note in listOf("Japanese","日本語","日本語（オリジナル）","Japanese original","Japanese dubbed")) {
             assertFalse(note,audioDecision(listOf(japanese.copy(note=note)),emptyList()).autoDubbed)
         }
         assertTrue(audioDecision(listOf(japanese.copy(note="日本語（オリジナル）")),emptyList()).original)
+    }
+    @Test fun selectedUrlRoleIdentifiesAutoDubbingWithoutAnyFormatNote() {
+        val report="""PANDORA_AUDIO|{"role":"dubbed-auto","selected":[{"format_id":"137","acodec":"none"},{"format_id":"140-2","acodec":"aac","language":"ja"}],"available":[]}"""
+        val decision=parseAudioSelection(report)!!
+        assertTrue(decision.autoDubbed); assertFalse(decision.original)
+        assertEquals("日本語の自動吹き替えを使用",decision.label)
+        assertTrue(decision.details.contains("format=140-2, language=ja, role=dubbed-auto"))
+        assertEquals(listOf("-metadata","genre=$AUTO_DUBBED_MARKER"),autoDubbedMetadataArgs(decision,true))
+    }
+    @Test fun explicitSelectedRoleWinsOverInheritedOrConflictingNotes() {
+        val report="""PANDORA_AUDIO|{"role":"dubbed-auto","single":{"format_id":"mux","acodec":"aac","language":"ja","format_note":"English original"}}"""
+        assertTrue(parseAudioSelection(report)!!.autoDubbed)
+        assertFalse(parseAudioSelection(report)!!.original)
+        for(role in listOf("original","dubbed")) {
+            val other=report.replace("dubbed-auto",role).replace("English original","Japanese auto-dubbed")
+            assertFalse(parseAudioSelection(other)!!.autoDubbed)
+            assertTrue(autoDubbedMetadataArgs(parseAudioSelection(other),true).isEmpty())
+        }
+    }
+    @Test fun alternateOfferedDubAndVideoOnlyRoleCannotLabelSavedOriginalAudio() {
+        val report="""PANDORA_AUDIO|{"role":"original","single":{"format_id":"original","acodec":"aac","language":"ja"},"available":[{"format_id":"other","acodec":"aac","language":"ja","format_note":"Japanese dubbed-auto"}]}"""
+        assertFalse(parseAudioSelection(report)!!.autoDubbed)
+        assertFalse(parseAudioSelection("""PANDORA_AUDIO|{"role":"dubbed-auto","single":{"acodec":"none","language":"ja"}}""")!!.autoDubbed)
+        assertFalse(parseAudioSelection("""PANDORA_AUDIO|{"role":"unknown","single":{"acodec":"aac","language":"ja"}}""")!!.autoDubbed)
     }
     @Test fun fillsMissingSelectedNotesOnlyFromTheSameFormatId() {
         val report="""PANDORA_AUDIO|{"selected":[{"format_id":"137","acodec":"none"},{"format_id":"140-2","acodec":"aac","language":"ja"}],"available":[{"format_id":"140-0","acodec":"aac","language":"en","format_note":"English original"},{"format_id":"140-2","acodec":"aac","language":"ja","format_note":"日本語（自動吹き替え）"}]}"""
@@ -92,7 +117,9 @@ class AudioLanguageTest {
     @Test fun exportsActualSelectorsAndRepeatedPrintOptionsForBundledExtractorIntegration() {
         val request=YoutubeDLRequest("https://example.com/fixture").apply { addAudioSelectionOptions() }
         val options=request.buildCommand().dropLast(1)
-        assertEquals(2,options.count { it == "--print" })
+        assertEquals(3,options.count { it == "--print" })
+        assertTrue(options.contains(AUDIO_ROLE_PARSE))
+        assertTrue(AUDIO_SELECTION_TEMPLATE.startsWith("after_move:"))
         assertTrue(options.contains("--no-simulate")); assertTrue(options.contains("--progress"))
         val selectors=JSONObject()
         for(format in listOf("MP4","MP3")) for(quality in listOf("720p以下","1080p以下","最高")) for(enabled in listOf(false,true)) {
@@ -101,6 +128,6 @@ class AudioLanguageTest {
         val output=File("build/reports/audio-selection-fixture.json").apply { parentFile?.mkdirs() }
         output.writeText(JSONObject().put("selectors",selectors).put("options",JSONArray(options))
             .put("output",AUDIO_OUTPUT_NAME).put("selectionTemplate",AUDIO_SELECTION_TEMPLATE.substringAfter(':'))
-            .put("filePrefix",AUDIO_FILE_PREFIX).toString())
+            .put("filePrefix",AUDIO_FILE_PREFIX).put("roleParser",AUDIO_ROLE_PARSE.substringAfter(':')).toString())
     }
 }

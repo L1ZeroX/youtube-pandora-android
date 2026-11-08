@@ -114,7 +114,7 @@ class Engine(private val context: Context, private val progress: (String, Float?
                 if(decision == selectedAudio) return
                 selectedAudio=decision
                 Store.edit(video.key) { it.copy(audioInfo=decision.label) }; Store.save()
-                AppLog.info("音声の選択",decision.label)
+                AppLog.info("音声の選択","${decision.label} / ${decision.details}")
             }
             if(preferences.preferJapaneseAudio) {
                 progress("情報を確認中",null,"日本語音声の対応を確認しています…")
@@ -211,7 +211,13 @@ class Engine(private val context: Context, private val progress: (String, Float?
             }
             check()
             progress("端末へ保存中",null,saveRelativePath(preferences.format))
-            return publish(output,"${safeName(video.title)} [${safeName(video.key.substringAfter(':'))}].${preferences.format.lowercase()}",preferences.format)
+            val uri=publish(output,"${safeName(video.title)} [${safeName(video.key.substringAfter(':'))}].${preferences.format.lowercase()}",preferences.format)
+            if(preferences.format == "MP4" && autoDubbedMetadataArgs(selectedAudio,audio != null).isNotEmpty()) {
+                runCatching { SavedAudioMetadata.recordAutoDubbed(context,uri) }
+                    .onSuccess { AppLog.info("音声ラベル","オートダビング版をライブラリーへ記録 / $uri") }
+                    .onFailure { AppLog.error("音声ラベルの記録",it) }
+            }
+            return uri
         } finally { if(!control.paused) work.deleteRecursively() }
     }
     private fun runNative(binary: String, args: List<String>, line: ((String)->Unit)? = null): String {

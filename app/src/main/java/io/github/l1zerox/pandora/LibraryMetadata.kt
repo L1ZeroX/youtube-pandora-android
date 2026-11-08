@@ -9,7 +9,7 @@ import org.json.JSONObject
 
 /** Called on IO. Cache only successful probes, invalidated by provider size/modification time. */
 internal object LibraryMetadata {
-    private const val CACHE_SCHEMA=2
+    private const val CACHE_SCHEMA=3
     fun enrich(context: Context, entry: LibraryEntry, revision: String? = null): LibraryEntry {
         val uri=Uri.parse(entry.uri)
         val version=revision ?: runCatching {
@@ -18,10 +18,11 @@ internal object LibraryMetadata {
             }
         }.getOrNull()
         val cache=context.getSharedPreferences("library_metadata",Context.MODE_PRIVATE)
+        val confirmed=entry.video && SavedAudioMetadata.matches(context,entry.uri,version)
         val saved=runCatching { JSONObject(cache.getString(entry.uri,null) ?: "") }.getOrNull()
         if(version != null && saved?.optString("revision") == version && saved.optInt("schema") == CACHE_SCHEMA && saved.has("autoDubbed")) return entry.copy(
             width=saved.optInt("width"),height=saved.optInt("height"),
-            autoDubbed=entry.video && saved.optBoolean("autoDubbed"),
+            autoDubbed=entry.video && (confirmed || saved.optBoolean("autoDubbed")),
             durationMs=entry.durationMs.takeIf { it > 0 } ?: saved.optLong("duration"))
         val measured=runCatching {
             MediaMetadataRetriever().use { retriever ->
@@ -36,7 +37,7 @@ internal object LibraryMetadata {
             }
         }.getOrDefault(entry)
         // Vendor metadata readers may omit the custom genre. The file's exact marker is still authoritative.
-        val result=if(entry.video && !measured.autoDubbed && readDubbingMarker(context,uri)) measured.copy(autoDubbed=true) else measured
+        val result=if(entry.video && !measured.autoDubbed && (confirmed || readDubbingMarker(context,uri))) measured.copy(autoDubbed=true) else measured
         if(version != null && (if(result.video) result.width > 0 else result.durationMs > 0)) {
             cache.edit().putString(entry.uri,JSONObject().put("schema",CACHE_SCHEMA).put("revision",version).put("width",result.width)
                 .put("height",result.height).put("duration",result.durationMs).put("autoDubbed",result.autoDubbed).toString()).apply()
@@ -52,5 +53,6 @@ internal object LibraryMetadata {
 
     fun remove(context: Context, uri: String) {
         context.getSharedPreferences("library_metadata",Context.MODE_PRIVATE).edit().remove(uri).apply()
+        SavedAudioMetadata.remove(context,uri)
     }
 }

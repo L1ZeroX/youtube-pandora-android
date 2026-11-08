@@ -170,7 +170,8 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
         lifecycle.addObserver(resume)
         onDispose { context.contentResolver.unregisterContentObserver(observer); lifecycle.removeObserver(resume) }
     }
-    LaunchedEffect(refresh) {
+    val savedAudioChanges by SavedAudioMetadata.changes.collectAsStateWithLifecycle()
+    LaunchedEffect(refresh,savedAudioChanges) {
         loading=true
         try { entries=LibraryRepository.load(context) }
         catch(e: CancellationException) { throw e }
