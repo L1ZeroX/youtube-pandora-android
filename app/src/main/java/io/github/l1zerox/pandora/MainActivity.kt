@@ -201,7 +201,7 @@ fun PandoraScreen(artworkRequested: Boolean = false, onArtworkClosed: ()->Unit =
                             Button(onClick={Store.removeSelected()},enabled=!s.busy && s.videos.any { it.selected }) { Text("動画を削除") }
                           }
                           Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End) {
-                            if(BuildConfig.BETA) TextButton(onClick={SavedDownloads.excludeSaved()},enabled=!s.busy) { Text("保存済みを除外") }
+                            TextButton(onClick={SavedDownloads.excludeSaved()},enabled=!s.busy) { Text("保存済みを除外") }
                             TextButton(onClick={Store.state.update { it.copy(videos=it.videos.map { v -> v.copy(selected=true) }) }; Store.save()},enabled=!s.busy) { Text("全選択") }
                             TextButton(onClick={Store.state.update { it.copy(videos=it.videos.map { v -> v.copy(selected=false) }) }; Store.save()},enabled=!s.busy) { Text("解除") }
                           }
@@ -413,7 +413,7 @@ private fun VideoPanel(video: Video, image: Boolean, glass: Float, busy: Boolean
                     ThumbnailGlassLabels(video.site.ifBlank { "サイト不明" },durationText(video.duration),thumbnailBitmap,tone,Modifier.matchParentSize())
                 }
                 Text(video.status,fontSize=12.sp,color=if(video.status == "失敗") colors.error else colors.onSurfaceVariant)
-                if(BuildConfig.BETA) SavedDownloadBadge(video)
+                SavedDownloadBadge(video)
                 if(video.audioInfo.isNotBlank()) Text(video.audioInfo,fontSize=12.sp,color=colors.onSurfaceVariant)
                 if(video.status == "失敗") Text(video.error.ifBlank { "タップして詳細を確認" },
                     Modifier.clickable(onClick=onPreview),maxLines=2,overflow=TextOverflow.Ellipsis,fontSize=11.sp,color=colors.error)

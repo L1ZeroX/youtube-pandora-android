@@ -5,8 +5,6 @@ import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,7 +25,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -77,7 +74,7 @@ internal fun MusicPlayerScreen(player: Player?, title: String, artwork: Bitmap?,
                         }
                         DropdownMenu(expanded=menu,onDismissRequest={menu=false}) {
                             DropdownMenuItem(text={Text("再生リスト")},onClick={menu=false; queue=true})
-                            if(BuildConfig.BETA) DropdownMenuItem(text={Text("スリープタイマー")},onClick={menu=false; timer=true})
+                            DropdownMenuItem(text={Text("スリープタイマー")},onClick={menu=false; timer=true})
                             DropdownMenuItem(text={Text("停止")},enabled=player != null,onClick={menu=false; onStop()})
                         }
                     }
@@ -101,18 +98,9 @@ internal fun MusicPlayerScreen(player: Player?, title: String, artwork: Bitmap?,
             }
         }
     }
-    if(BuildConfig.BETA && timer) SleepTimerDialog { timer=false }
-    if(queue && BuildConfig.BETA) PlaybackQueueDialog(player) { queue=false }
-    if(queue && !BuildConfig.BETA) AlertDialog(onDismissRequest={queue=false},title={Text("再生リスト")},
-        text={LazyColumn(Modifier.heightIn(max=420.dp)) {
-            items(transport.state.queue,key={it.uri}) { item ->
-                TextButton(onClick={transport.select(item.uri); queue=false},enabled=transport.state.canSelect,
-                    modifier=Modifier.fillMaxWidth()) {
-                    Text((if(item.uri == transport.state.uri) "▶  " else "")+item.title,Modifier.fillMaxWidth(),
-                        textAlign=TextAlign.Start,maxLines=2,overflow=TextOverflow.Ellipsis)
-                }
-            }
-        }},confirmButton={TextButton(onClick={queue=false}) { Text("閉じる") }})
+    if(timer) SleepTimerDialog { timer=false }
+    if(queue) PlaybackQueueDialog(player) { queue=false }
+
 }
 
 @Composable

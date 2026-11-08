@@ -45,7 +45,7 @@ class PlaybackService : MediaSessionService() {
         })
         val open=PendingIntent.getActivity(this,40,Intent(this,PlayerActivity::class.java),PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         session=MediaSession.Builder(this,player).setSessionActivity(open).build()
-        if(BuildConfig.BETA) betaTools=PlaybackBetaTools(player)
+        betaTools=PlaybackBetaTools(player)
         PlaybackRuntime.removeLibraryItem={ uri -> removeLibraryMedia(player,uri) }
     }
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session

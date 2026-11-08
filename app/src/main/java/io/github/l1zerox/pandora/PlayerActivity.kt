@@ -100,7 +100,7 @@ class PlayerActivity : ComponentActivity() {
                                 TextButton(onClick={enterPip()},colors=ButtonDefaults.textButtonColors(contentColor=Color.White)) { Text("小窓で再生") }
                             }
                             Spacer(Modifier.weight(1f))
-                            if(BuildConfig.BETA) PlaybackBetaMenu(controller)
+                            PlaybackBetaMenu(controller)
                             PlaybackColorGlass(artworkColor) {
                                 TextButton(enabled=connected,onClick={controller?.stop(); controller?.clearMediaItems(); closePlayerScreen()},
                                     colors=ButtonDefaults.textButtonColors(contentColor=Color.White)) { Text("停止") }
@@ -167,7 +167,7 @@ class PlayerActivity : ComponentActivity() {
         }
         if(player.currentMediaItem?.mediaId == uri) {
             if(!restoring) {
-                if(BuildConfig.BETA && intent.hasExtra("startPosition")) player.seekTo(intent.getLongExtra("startPosition",0).coerceAtLeast(0))
+                if(intent.hasExtra("startPosition")) player.seekTo(intent.getLongExtra("startPosition",0).coerceAtLeast(0))
                 else if(player.playbackState == Player.STATE_ENDED) player.seekTo(0)
                 if(player.playbackState == Player.STATE_IDLE) player.prepare()
                 if(lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) player.play()
@@ -180,11 +180,11 @@ class PlayerActivity : ComponentActivity() {
                 val entries=LibraryRepository.load(this@PlayerActivity)
                 val selected=entries.firstOrNull { it.uri == uri } ?: error("保存先にファイルが見つかりません。")
                 // Keep video, shorts and music separate; background music must never start hidden video.
-                val collection=if(BuildConfig.BETA) intent.getStringExtra("collection").orEmpty() else ""
+                val collection=intent.getStringExtra("collection").orEmpty()
                 val order=runCatching { LibrarySort.valueOf(intent.getStringExtra("librarySort").orEmpty()) }.getOrDefault(LibrarySort.NEWEST)
-                val available=if(BuildConfig.BETA) organizedLibrary(entries,LibraryExtras.state.value,collection,order,intent.getBooleanExtra("dubbedOnly",false)) else entries
+                val available=organizedLibrary(entries,LibraryExtras.state.value,collection,order,intent.getBooleanExtra("dubbedOnly",false))
                 val playlist=available.filter { it.category == selected.category }.let { if(selected in it) it else listOf(selected)+it }
-                val position=if(restoring) restorePosition else if(BuildConfig.BETA) intent.getLongExtra("startPosition",0) else 0
+                val position=if(restoring) restorePosition else intent.getLongExtra("startPosition",0)
                 player.setMediaItems(playlist.map { it.mediaItem() },playlist.indexOf(selected),position.coerceIn(0,selected.durationMs.coerceAtLeast(0)))
                 player.prepare()
                 if(lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) player.play()

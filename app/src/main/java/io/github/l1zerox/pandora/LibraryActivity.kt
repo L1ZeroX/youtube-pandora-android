@@ -14,7 +14,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
@@ -131,16 +130,14 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
         transport.handOffToPlayer()
         context.startActivity(Intent(context,PlayerActivity::class.java).apply {
             if(uri != null) putExtra("uri",uri)
-            if(BuildConfig.BETA) {
-                putExtra("collection",collection)
-                putExtra("librarySort",sortName); putExtra("dubbedOnly",dubbedOnly)
-                if(position != null) putExtra("startPosition",position)
-            }
+            putExtra("collection",collection)
+            putExtra("librarySort",sortName); putExtra("dubbedOnly",dubbedOnly)
+            if(position != null) putExtra("startPosition",position)
         })
     }
     fun openPlayer(uri: String? = null) {
         val entry=entries.firstOrNull { it.uri == uri }
-        if(BuildConfig.BETA && entry != null && entry.video && uri != transport.uri && LibraryExtras.position(entry.uri,entry.durationMs) > 0)
+        if(entry != null && entry.video && uri != transport.uri && LibraryExtras.position(entry.uri,entry.durationMs) > 0)
             resumeEntry=entry
         else launchPlayer(uri)
     }
@@ -183,7 +180,7 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
     }
     val visible=remember(entries,filter,search,collections,collection,sort,dubbedOnly) {
         val base=libraryEntries(entries,emptyList(),filter,search)
-        if(BuildConfig.BETA) organizedLibrary(base,collections,collection,sort,dubbedOnly) else base
+        organizedLibrary(base,collections,collection,sort,dubbedOnly)
     }
     val playingEntry=entries.firstOrNull { it.uri == playback.uri }
     val playingArtwork by produceState<Bitmap?>(null,playingEntry?.uri) {
@@ -245,21 +242,19 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
                 LibraryLayoutButton(layout,headerAccent,onOpen={focusManager.clearFocus(); keyboard?.hide()},
                     onSelect={Store.preferences(preferences.copy(libraryLayout=it.id))})
             }
-            if(BuildConfig.BETA) {
-                Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                    TextButton(onClick={organize=true},modifier=Modifier.weight(1f)) {
-                        val name=if(collection == "favorites") "♥ お気に入り" else collections.playlists.firstOrNull { it.id == collection }?.name ?: "整理・並び替え"
-                        Text(name+(if(dubbedOnly) " · オートダビング版" else ""),maxLines=1,overflow=TextOverflow.Ellipsis)
-                    }
-                    TextButton(onClick={selecting=!selecting; selected=arrayListOf()}) { Text(if(selecting) "選択を終了" else "選択") }
-                    if(playback.uri.isNotBlank()) PlaybackBetaMenu(transport.controller)
+            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                TextButton(onClick={organize=true},modifier=Modifier.weight(1f)) {
+                    val name=if(collection == "favorites") "♥ お気に入り" else collections.playlists.firstOrNull { it.id == collection }?.name ?: "整理・並び替え"
+                    Text(name+(if(dubbedOnly) " · オートダビング版" else ""),maxLines=1,overflow=TextOverflow.Ellipsis)
                 }
-                if(selecting) FlowRow(horizontalArrangement=Arrangement.spacedBy(4.dp),verticalArrangement=Arrangement.Center) {
-                    Text("${selected.size}件選択",Modifier.padding(vertical=12.dp))
-                    TextButton(onClick={selected=ArrayList(visible.map { it.uri })}) { Text("表示中を全選択") }
-                    TextButton(enabled=selected.isNotEmpty(),onClick={addToList=ArrayList(selected)}) { Text("リストへ") }
-                    TextButton(enabled=selected.isNotEmpty(),onClick={confirmBatch=true}) { Text("削除") }
-                }
+                TextButton(onClick={selecting=!selecting; selected=arrayListOf()}) { Text(if(selecting) "選択を終了" else "選択") }
+                if(playback.uri.isNotBlank()) PlaybackBetaMenu(transport.controller)
+            }
+            if(selecting) FlowRow(horizontalArrangement=Arrangement.spacedBy(4.dp),verticalArrangement=Arrangement.Center) {
+                Text("${selected.size}件選択",Modifier.padding(vertical=12.dp))
+                TextButton(onClick={selected=ArrayList(visible.map { it.uri })}) { Text("表示中を全選択") }
+                TextButton(enabled=selected.isNotEmpty(),onClick={addToList=ArrayList(selected)}) { Text("リストへ") }
+                TextButton(enabled=selected.isNotEmpty(),onClick={confirmBatch=true}) { Text("削除") }
             }
             }
             if(preferences.libraryPlayerVisible && playback.uri.isNotBlank()) {
@@ -282,8 +277,8 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
                 horizontalArrangement=Arrangement.spacedBy(10.dp),verticalArrangement=Arrangement.spacedBy(10.dp),contentPadding=PaddingValues(vertical=8.dp)) {
                 items(visible,key={it.uri}) { item ->
                     LibraryCard(item,dark,backdrop,transport,layout,onDelete={if(!importing) deletion=item},
-                        favorite=BuildConfig.BETA && item.uri in collections.favorites,selected=item.uri in selected,
-                        selectionMode=BuildConfig.BETA && selecting,onLongClick={if(BuildConfig.BETA) toggleSelection(item.uri)},
+                        favorite=item.uri in collections.favorites,selected=item.uri in selected,
+                        selectionMode=selecting,onLongClick={toggleSelection(item.uri)},
                         onFavorite={runCatching { LibraryExtras.favorite(item.uri) }.onFailure { error="お気に入りを保存できませんでした。" }},
                         onPlaylist={addToList=arrayListOf(item.uri)},onNext={
                             runCatching { enqueueNext(transport.controller ?: error("先に再生を開始してください。"),item) }
@@ -292,7 +287,7 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
                             runCatching { LibraryExtras.removeFrom(collection,setOf(item.uri)) }.onFailure { error="リストを更新できませんでした。" }
                             Unit
                         }) else null) {
-                        if(BuildConfig.BETA && selecting) toggleSelection(item.uri) else openPlayer(item.uri)
+                        if(selecting) toggleSelection(item.uri) else openPlayer(item.uri)
                     }
                 }
             }
@@ -302,19 +297,17 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
     if(appearance) LibraryAppearanceDialog(wallpaper,preferences,playingEntry ?: visible.firstOrNull(),headerAccent,colors,
         onChange=Store::preferences,onDismiss={appearance=false},previewEntries=visible.take(6))
     UpdatePrompt(allowed=!appearance && deletion == null && !importing && error.isBlank() && !organize && addToList.isEmpty() && !confirmBatch && resumeEntry == null && batch == null)
-    if(BuildConfig.BETA) {
-        if(organize) LibraryOrganizeDialog(collection,sort,dubbedOnly,onCollection={collection=it},onSort={sortName=it.name},
-            onDubbed={dubbedOnly=it},onDismiss={organize=false})
-        if(addToList.isNotEmpty()) AddToPlaylistDialog(addToList,onDismiss={addToList=arrayListOf()},onAdded={addToList=arrayListOf(); selected=arrayListOf(); selecting=false})
-        resumeEntry?.let { entry -> ResumePlaybackDialog(entry,LibraryExtras.position(entry.uri,entry.durationMs),
-            onStart={position -> resumeEntry=null; launchPlayer(entry.uri,position)},onDismiss={resumeEntry=null}) }
-        if(confirmBatch) AlertDialog(onDismissRequest={confirmBatch=false},title={Text("${selected.size}件のファイルを削除しますか？")},
-            text={Text("保存元の動画・音楽も削除します。この操作は元に戻せません。")},
-            confirmButton={TextButton(onClick={
-                LibraryBatchDeletion.start(context,entries.filter { it.uri in selected }); confirmBatch=false
-            }) { Text("まとめて削除") }},dismissButton={TextButton(onClick={confirmBatch=false}) { Text("キャンセル") }})
-        BatchDeletionProgress()
-    }
+    if(organize) LibraryOrganizeDialog(collection,sort,dubbedOnly,onCollection={collection=it},onSort={sortName=it.name},
+        onDubbed={dubbedOnly=it},onDismiss={organize=false})
+    if(addToList.isNotEmpty()) AddToPlaylistDialog(addToList,onDismiss={addToList=arrayListOf()},onAdded={addToList=arrayListOf(); selected=arrayListOf(); selecting=false})
+    resumeEntry?.let { entry -> ResumePlaybackDialog(entry,LibraryExtras.position(entry.uri,entry.durationMs),
+        onStart={position -> resumeEntry=null; launchPlayer(entry.uri,position)},onDismiss={resumeEntry=null}) }
+    if(confirmBatch) AlertDialog(onDismissRequest={confirmBatch=false},title={Text("${selected.size}件のファイルを削除しますか？")},
+        text={Text("保存元の動画・音楽も削除します。この操作は元に戻せません。")},
+        confirmButton={TextButton(onClick={
+            LibraryBatchDeletion.start(context,entries.filter { it.uri in selected }); confirmBatch=false
+        }) { Text("まとめて削除") }},dismissButton={TextButton(onClick={confirmBatch=false}) { Text("キャンセル") }})
+    BatchDeletionProgress()
     deletion?.let { entry -> key(entry.uri) {
         LibraryDeleteDialog(entry,onDismiss={deletion=null},onRemoved={
             entries=entries.filterNot { it.uri == entry.uri }; refresh++
@@ -336,8 +329,8 @@ internal fun LibraryCard(entry: LibraryEntry, dark: Boolean, backdrop: LibraryBa
     var menu by remember { mutableStateOf(false) }
     Surface(shape=RoundedCornerShape(16.dp),color=Color.Transparent,contentColor=palette.content,
         border=BorderStroke(if(selected) 3.dp else 1.dp,palette.content.copy(alpha=if(selected) 1f else .25f)),
-        modifier=Modifier.fillMaxWidth().libraryCardGlass(palette,backdrop).then(
-            if(BuildConfig.BETA) Modifier.combinedClickable(onClick=onClick,onLongClick=onLongClick) else Modifier.clickable(onClick=onClick))) {
+        modifier=Modifier.fillMaxWidth().libraryCardGlass(palette,backdrop)
+            .combinedClickable(onClick=onClick,onLongClick=onLongClick)) {
         LibraryCardBody(entry,bitmap,palette,layout,
             play={if(selectionMode) Checkbox(checked=selected,onCheckedChange={onClick()}) else LibraryPlayButton(entry.uri,playback,palette,onClick)},menu={
                 Box {
@@ -345,13 +338,11 @@ internal fun LibraryCard(entry: LibraryEntry, dark: Boolean, backdrop: LibraryBa
                         Text(if(favorite) "♥⋮" else "⋮",fontSize=22.sp,color=palette.content)
                     }
                     DropdownMenu(expanded=menu,onDismissRequest={menu=false}) {
-                        if(BuildConfig.BETA) {
-                            DropdownMenuItem(text={Text(if(favorite) "お気に入りを解除" else "お気に入りに追加")},onClick={menu=false; onFavorite()})
-                            DropdownMenuItem(text={Text("プレイリストに追加")},onClick={menu=false; onPlaylist()})
-                            DropdownMenuItem(text={Text("次に再生")},onClick={menu=false; onNext()})
-                            DropdownMenuItem(text={Text("選択")},onClick={menu=false; onLongClick()})
-                            if(onRemoveFromList != null) DropdownMenuItem(text={Text("このリストから外す")},onClick={menu=false; onRemoveFromList()})
-                        }
+                        DropdownMenuItem(text={Text(if(favorite) "お気に入りを解除" else "お気に入りに追加")},onClick={menu=false; onFavorite()})
+                        DropdownMenuItem(text={Text("プレイリストに追加")},onClick={menu=false; onPlaylist()})
+                        DropdownMenuItem(text={Text("次に再生")},onClick={menu=false; onNext()})
+                        DropdownMenuItem(text={Text("選択")},onClick={menu=false; onLongClick()})
+                        if(onRemoveFromList != null) DropdownMenuItem(text={Text("このリストから外す")},onClick={menu=false; onRemoveFromList()})
                         DropdownMenuItem(text={Text("削除")},onClick={menu=false; onDelete()})
                     }
                 }

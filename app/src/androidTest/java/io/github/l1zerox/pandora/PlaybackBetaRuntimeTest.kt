@@ -6,7 +6,6 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.*
-import org.junit.Assume.assumeTrue
 import org.junit.Test
 import java.io.File
 import java.nio.ByteBuffer
@@ -15,7 +14,6 @@ import java.nio.ByteOrder
 @androidx.annotation.OptIn(UnstableApi::class)
 class PlaybackBetaRuntimeTest {
     @Test fun bookmarksAreSavedAndEndTimerPausesBeforeTheNextItemEvenWithRepeat() {
-        assumeTrue(BuildConfig.BETA)
         val instrumentation=InstrumentationRegistry.getInstrumentation()
         val context=instrumentation.targetContext
         val file=File(context.cacheDir,"beta-sleep-${System.nanoTime()}.wav")

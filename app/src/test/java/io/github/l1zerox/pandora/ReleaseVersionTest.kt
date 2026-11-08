@@ -4,6 +4,15 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ReleaseVersionTest {
+    @Test fun currentStablePromotionUpgradesReleaseAndEveryLibraryBetaWithoutOfferingArchivedBetas() {
+        val betas=(1..7).map { "0.4.24-beta.$it" }
+        val releases=listOf(release("0.4.23",preview=false),release("0.4.24",preview=false))+betas.map { release(it) }
+        for(installed in listOf("0.4.23")+betas) {
+            assertEquals("0.4.24",newestRelease(releases,installed,beta=false,unifiedOnly=true)!!.version)
+            assertEquals("0.4.24",newestRelease(releases,installed,beta=false,offer=true,unifiedOnly=true)!!.version)
+        }
+        assertNull(newestRelease(releases,"0.4.24",beta=true,offer=true,unifiedOnly=true))
+    }
     @Test fun libraryPromotionUpgradesBothChannelsWithoutOfferingArchivedBeta() {
         val releases=listOf(release("0.4.5",preview=false),release("0.4.6-beta.7"),release("0.4.6",preview=false))
         for(installed in listOf("0.4.5","0.4.6-beta.7"))

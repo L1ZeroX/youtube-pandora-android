@@ -209,7 +209,15 @@ class BubbleService : Service() {
         text=label; isAllCaps=false; textSize=13f; setOnClickListener { action() }
         if(register) panelButtons.add(this)
     }
+    private fun touchesBubble(event: MotionEvent): Boolean {
+        val view=bubble?.takeIf { it.isAttachedToWindow } ?: return false
+        val location=IntArray(2)
+        view.getLocationOnScreen(location)
+        return event.rawX >= location[0] && event.rawX < location[0]+view.width &&
+            event.rawY >= location[1] && event.rawY < location[1]+view.height
+    }
     private fun showPanel() {
+        if(panel != null) return
         val (width,height)=bounds()
         val container=LinearLayout(this).apply {
             orientation=LinearLayout.VERTICAL; setPadding(dp(16),dp(12),dp(16),dp(12))
@@ -285,7 +293,12 @@ class BubbleService : Service() {
             addView(container); isFillViewport=true; isFocusableInTouchMode=true
             background=panelGlassBackground(); clipToOutline=true
             setOnTouchListener { _,event ->
-                if(event.actionMasked == MotionEvent.ACTION_OUTSIDE) { hidePanel(); true } else false
+                if(event.actionMasked == MotionEvent.ACTION_OUTSIDE) {
+                    // The bubble handles its own tap on ACTION_UP. Closing here on DOWN would
+                    // make that same tap reopen the panel instead of toggling it closed.
+                    if(!touchesBubble(event)) hidePanel()
+                    true
+                } else false
             }
         }
         val p=params(minOf(dp(340),width-dp(16)).coerceAtLeast(1),minOf(dp(500),(height*.7f).roundToInt()).coerceAtLeast(1)).apply {
@@ -294,7 +307,16 @@ class BubbleService : Service() {
             softInputMode=WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
             x=((bubbleParams?.x ?: 0)-width/2).coerceAtLeast(0); y=(bubbleParams?.y ?: 0)+dp(72); clamp(this)
         }
-        runCatching { windows.addView(view,p); panel=view; panelParams=p; view.requestFocus(); updatePanel() }.onFailure(::failed)
+        runCatching {
+            windows.addView(view,p); panel=view; panelParams=p
+            // Clamping near an edge can put the panel over the bubble. Keep the small,
+            // non-focusable window above it so a second tap and dragging remain available.
+            bubble?.let { icon -> bubbleParams?.let { position ->
+                windows.removeViewImmediate(icon); windows.addView(icon,position)
+                icon.setPanelExpanded(true)
+            } }
+            view.requestFocus(); updatePanel()
+        }.onFailure(::failed)
     }
     private fun updatePanel() {
         if(panel == null) return
@@ -335,7 +357,7 @@ class BubbleService : Service() {
         val pageCount=((s.videos.size+7)/8).coerceAtLeast(1)
         queuePage=queuePage.coerceIn(0,pageCount-1)
         queue?.text=if(s.videos.isEmpty()) "キューは空です。" else "キュー ${s.videos.size} 件 · ${queuePage+1} / $pageCount ページ"
-        val saved=if(BuildConfig.BETA) SavedDownloads.state.value else emptyList()
+        val saved=SavedDownloads.state.value
         if(queueSnapshot != s.videos || renderedPage != queuePage || savedSnapshot != saved || savedFormat != s.preferences.format) {
             queueSnapshot=s.videos; renderedPage=queuePage
             savedSnapshot=saved; savedFormat=s.preferences.format
@@ -346,7 +368,7 @@ class BubbleService : Service() {
                     text="${video.status}${if(video.selected) "" else "（対象外）"}\n${video.title}"+
                         (if(video.audioInfo.isNotBlank()) "\n${video.audioInfo}" else "")+
                         (if(saved.containsDownload(video,s.preferences.format)) "\n保存済み（${s.preferences.format}）" else "")
-                    maxLines=if(BuildConfig.BETA) 4 else 3; ellipsize=android.text.TextUtils.TruncateAt.END
+                    maxLines=4; ellipsize=android.text.TextUtils.TruncateAt.END
                 },LinearLayout.LayoutParams(0,-2,1f))
                 val remove=button("削除",register=false) { Store.removeQueueVideo(video.key) }.apply {
                     contentDescription="キューから削除: ${video.title}"
@@ -368,6 +390,7 @@ class BubbleService : Service() {
     private fun hidePanel() {
         clipboard.close()
         panel?.let { runCatching { windows.removeView(it) } }; panel=null; panelParams=null
+        bubble?.setPanelExpanded(false)
         title=null; phase=null; progress=null; metrics=null; queue=null; pause=null; cancel=null; start=null
         clipboardStatus=null; panelButtons.clear()
         queueRows=null; queueSnapshot=null; renderedPage=-1; queuePage=0; queueDeletes.clear()
@@ -395,6 +418,7 @@ private class ProgressBubble @JvmOverloads constructor(context: Context, private
     private var state=ScreenState()
     private var palette=bubblePalette()
     private var thumbnail: Bitmap? = null
+    private var panelExpanded=false
     init { isClickable=true; isFocusable=true; importantForAccessibility=IMPORTANT_FOR_ACCESSIBILITY_YES }
     fun update(value: ScreenState, colors: BubblePalette, bitmap: Bitmap?) {
         if(thumbnail !== bitmap) {
@@ -402,8 +426,12 @@ private class ProgressBubble @JvmOverloads constructor(context: Context, private
             imagePaint.shader=bitmap?.let { BitmapShader(it,Shader.TileMode.CLAMP,Shader.TileMode.CLAMP) }
             positionThumbnail()
         }
-        state=value; palette=colors; contentDescription="Pandora DL管理パネルを開く。${bubbleVideo(value)?.title.orEmpty()}。${if(value.paused) "一時停止中" else value.message}"
+        state=value; palette=colors; updateDescription()
         invalidate()
+    }
+    fun setPanelExpanded(value: Boolean) { panelExpanded=value; updateDescription() }
+    private fun updateDescription() {
+        contentDescription="Pandora DL管理パネルを${if(panelExpanded) "閉じる" else "開く"}。${bubbleVideo(state)?.title.orEmpty()}。${if(state.paused) "一時停止中" else state.message}"
     }
     private fun positionThumbnail() {
         val bitmap=thumbnail ?: return

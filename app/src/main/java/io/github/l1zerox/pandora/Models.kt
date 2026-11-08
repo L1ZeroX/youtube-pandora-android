@@ -132,6 +132,6 @@ object Store {
 }
 class PandoraApp : Application() { override fun onCreate() {
     super.onCreate(); CrashDiagnostics.install(this); AppLog.init(this); Store.init(this)
-    if(BuildConfig.BETA) { LibraryExtras.init(this); SavedDownloads.init(this) }
+    LibraryExtras.init(this); SavedDownloads.init(this)
     ApkUpdates.initialize(this); QueuePreviews.start()
 } }

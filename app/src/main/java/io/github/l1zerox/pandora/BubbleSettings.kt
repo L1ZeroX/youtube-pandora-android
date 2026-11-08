@@ -44,7 +44,7 @@ internal fun BubbleSettings(p: Preferences) {
             if(enabled) requestBubblePermissions() else BubbleRuntime.sync(context)
         })
     }
-    Text("タップでDL操作、ドラッグで移動。",fontSize=12.sp)
+    Text("タップで開く・閉じる。ドラッグで移動。",fontSize=12.sp)
     Row(verticalAlignment=Alignment.CenterVertically) {
         Text("コピーしたYouTube URLを追加",Modifier.weight(1f))
         Switch(p.bubbleClipboard,{ Store.preferences(Store.state.value.preferences.copy(bubbleClipboard=it)) })

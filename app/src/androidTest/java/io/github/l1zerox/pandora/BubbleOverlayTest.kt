@@ -5,6 +5,10 @@ import android.content.Intent
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.provider.Settings
+import android.graphics.Rect
+import android.os.SystemClock
+import android.view.InputDevice
+import android.view.MotionEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
@@ -40,6 +44,23 @@ class BubbleOverlayTest {
                 Thread.sleep(100)
             }
             error("Overlay control was not visible")
+        }
+        fun touchBubble() {
+            val node=waitFor { it.contentDescription?.startsWith("Pandora DL管理パネル") == true }
+            val rect=Rect(); node.getBoundsInScreen(rect)
+            val down=SystemClock.uptimeMillis()
+            for(action in listOf(MotionEvent.ACTION_DOWN,MotionEvent.ACTION_UP)) {
+                val event=MotionEvent.obtain(down,SystemClock.uptimeMillis(),action,rect.exactCenterX(),rect.exactCenterY(),0)
+                event.source=InputDevice.SOURCE_TOUCHSCREEN
+                try { assertTrue(automation.injectInputEvent(event,true)) } finally { event.recycle() }
+            }
+        }
+        fun waitForPanelClosed() {
+            repeat(100) {
+                if(automation.windows.none { find(it.root) { node -> node.text?.toString() == "DL管理パネル" } != null }) return
+                Thread.sleep(100)
+            }
+            error("Second bubble tap reopened the panel")
         }
         var scenario: ActivityScenario<MainActivity>? = null
         try {
@@ -86,6 +107,18 @@ class BubbleOverlayTest {
             waitFor { it.text?.contains("42%") == true && it.text?.contains("1.0 MiB/s") == true }
             assertFalse(waitFor { it.text?.toString() == "MP4 動画" }.isEnabled)
             assertFalse(waitFor { it.contentDescription?.startsWith("キューから削除:") == true }.isEnabled)
+            // Accessibility ACTION_CLICK alone bypasses ACTION_OUTSIDE and misses this race.
+            val downloading=Store.state.value
+            repeat(3) {
+                touchBubble(); waitForPanelClosed()
+                waitFor { it.contentDescription?.startsWith("Pandora DL管理パネルを開く") == true }
+                val after=Store.state.value
+                assertTrue(after.busy); assertEquals(downloading.operation,after.operation)
+                assertEquals(downloading.paused,after.paused); assertEquals(downloading.progress,after.progress)
+                assertTrue(after.preferences.bubble)
+                touchBubble(); waitFor { it.text?.toString() == "DL管理パネル" }
+                waitFor { it.contentDescription?.startsWith("Pandora DL管理パネルを閉じる") == true }
+            }
             waitFor { it.text?.toString() == "バブルを終了" }.performAction(AccessibilityNodeInfo.ACTION_CLICK)
             Thread.sleep(500)
             assertTrue("Closing the bubble must not cancel the download",Store.state.value.busy)

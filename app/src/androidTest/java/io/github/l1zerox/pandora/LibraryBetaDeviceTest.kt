@@ -12,7 +12,6 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.*
-import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -21,7 +20,6 @@ class LibraryBetaDeviceTest {
     private val context get()=InstrumentationRegistry.getInstrumentation().targetContext
 
     @Test fun favoritesPlaylistsAndBookmarksSurviveReloadAndRemovalCleansReferences() {
-        assumeTrue(BuildConfig.BETA)
         val prefs=context.getSharedPreferences("library_collections",0)
         val original=prefs.getString("data","{}")
         val uri="content://beta-test/${System.nanoTime()}"
@@ -51,7 +49,6 @@ class LibraryBetaDeviceTest {
     }
 
     @Test fun longPressSelectsWithoutPlayingAndSelectionReplacesThePlayButton() {
-        assumeTrue(BuildConfig.BETA)
         val item=LibraryEntry("content://beta-test/missing","選択する動画","video/mp4",120000)
         val playback=LibraryPlayback(context)
         var selecting by mutableStateOf(false)
