@@ -72,6 +72,8 @@ internal fun LibraryAppearanceDialog(wallpaper: Bitmap?, preferences: Preference
 @Composable
 private fun LibraryAppearanceMenu(preferences: Preferences, onChange: (Preferences)->Unit, modifier: Modifier) {
     Column(modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+        Text("再生パネル",fontWeight=FontWeight.Bold)
+        LibraryPlayerAppearanceControls(preferences,onChange)
         LibraryLayoutChoices(LibraryLayout.fromId(preferences.libraryLayout)) { onChange(preferences.copy(libraryLayout=it.id)) }
         Text("動画・音楽パネル",fontWeight=FontWeight.Bold)
         Text("サムネイルの色を保ったまま、透過とぼかしを調整します。",fontSize=13.sp)
@@ -112,6 +114,14 @@ private fun LibraryAppearanceSample(wallpaper: Bitmap?, artwork: Map<String,Bitm
                     contentColor=if(wallpaper != null) Color.White else previewColors.onSurface) {
                     Text("ライブラリー",Modifier.fillMaxWidth().padding(12.dp),fontSize=20.sp,fontWeight=FontWeight.Bold,
                         textAlign=androidx.compose.ui.text.style.TextAlign.Center)
+                }
+                if(p.libraryPlayerVisible) {
+                    val sample=samples.first()
+                    val image=artwork[sample.uri]
+                    val source=remember(image) { image?.let { libraryThumbnailColor(it) } }
+                    LibraryPlayerPanel(LibraryPlayerState(uri=sample.uri,title=sample.title,artist="再生パネルのプレビュー",
+                        playing=true,position=sample.durationMs/3,duration=sample.durationMs,seekable=true,canPlay=true,canPrevious=true,canNext=true),
+                        image,source,p.libraryPlayerScale,onOpen={},onToggle={},onPrevious={},onNext={},onSeek={})
                 }
                 for(row in samples.take(if(layout.columns > 1) 6 else 2).chunked(layout.columns)) {
                     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp)) {

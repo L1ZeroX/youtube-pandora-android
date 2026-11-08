@@ -32,6 +32,8 @@ internal class LibraryPlayback(private val context: Context, videoOwnership: Mut
         private set
     var error by mutableStateOf("")
         private set
+    var panel by mutableStateOf(LibraryPlayerState())
+        private set
     private var future: ListenableFuture<MediaController>? = null
     private var resumedVideo by videoOwnership
     private val listener=object: Player.Listener {
@@ -57,6 +59,9 @@ internal class LibraryPlayback(private val context: Context, videoOwnership: Mut
         duration=player.duration.coerceAtLeast(0)
         position=player.currentPosition.coerceIn(0,duration.coerceAtLeast(0))
         seekable=duration > 0 && player.isCurrentMediaItemSeekable && player.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
+        panel=LibraryPlayerState(uri,player.mediaMetadata.title?.toString().orEmpty(),player.mediaMetadata.artist?.toString().orEmpty(),
+            playing,position,duration,seekable,uri.isNotBlank() && player.isCommandAvailable(Player.COMMAND_PLAY_PAUSE),
+            player.isCommandAvailable(Player.COMMAND_SEEK_TO_PREVIOUS),player.isCommandAvailable(Player.COMMAND_SEEK_TO_NEXT))
         error=if(player.playerError != null) "再生できません。ファイルの場所・アクセス権を確認してください。" else ""
     }
     fun toggle(expectedUri: String) {
@@ -79,6 +84,8 @@ internal class LibraryPlayback(private val context: Context, videoOwnership: Mut
         player.seekTo(playbackPositionMs(currentDuration,fraction)); refresh()
     }
     fun handOffToPlayer() { resumedVideo=false }
+    fun previous(expectedUri: String) { seekLibraryAdjacent(controller,expectedUri,false); refresh() }
+    fun next(expectedUri: String) { seekLibraryAdjacent(controller,expectedUri,true); refresh() }
     fun disconnect() {
         val player=controller
         val rotating=(context as? Activity)?.isChangingConfigurations == true
@@ -87,6 +94,7 @@ internal class LibraryPlayback(private val context: Context, videoOwnership: Mut
         if(!rotating) resumedVideo=false
         player?.removeListener(listener)
         controller=null
+        panel=panel.copy(canPlay=false,seekable=false,canPrevious=false,canNext=false)
         val pending=future; future=null
         pending?.let { MediaController.releaseFuture(it) }
     }

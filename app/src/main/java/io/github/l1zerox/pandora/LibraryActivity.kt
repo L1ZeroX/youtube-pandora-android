@@ -188,7 +188,6 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
         if(playingEntry != null) value=LibraryRepository.artwork(context,playingEntry)
     }
     val playingColor=remember(playingArtwork) { playingArtwork?.let { libraryThumbnailColor(it) } }
-    val playingPalette=remember(playingColor,dark) { libraryPalette(playingColor,dark) }
     val colors=remember(playingColor,dark) { libraryColorScheme(playingColor,dark,appBackgroundColor(dark)) }
     MaterialTheme(colorScheme=colors) {
     Box(Modifier.fillMaxSize().onGloballyPositioned {
@@ -248,15 +247,12 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
                     TextButton(enabled=selected.isNotEmpty(),onClick={confirmBatch=true}) { Text("削除") }
                 }
             }
-            if(playback.uri.isNotBlank()) Surface(color=Color.Transparent,contentColor=playingPalette.content,
-                shape=RoundedCornerShape(16.dp),modifier=Modifier.fillMaxWidth().libraryCardGlass(playingPalette,backdrop)) {
-                Column(Modifier.padding(horizontal=12.dp,vertical=6.dp)) {
-                    Row(verticalAlignment=Alignment.CenterVertically) {
-                        Text(playback.title,Modifier.weight(1f).clickable { openPlayer() },maxLines=1,overflow=TextOverflow.Ellipsis)
-                        LibraryPlayButton(playback.uri,transport,playingPalette) { openPlayer() }
-                    }
-                    if(transport.uri == playback.uri) LibrarySeekBar(playback.uri,transport,playingPalette,playingColor,backdrop,compact=true)
-                }
+            if(preferences.libraryPlayerVisible && playback.uri.isNotBlank()) {
+                val panel=if(transport.panel.uri == playback.uri) transport.panel.copy(title=playback.title)
+                    else LibraryPlayerState(uri=playback.uri,title=playback.title)
+                LibraryPlayerPanel(panel,playingArtwork,playingColor,preferences.libraryPlayerScale,
+                    onOpen={openPlayer()},onToggle={transport.toggle(panel.uri)},
+                    onPrevious={transport.previous(panel.uri)},onNext={transport.next(panel.uri)},onSeek={transport.seek(panel.uri,it)})
             }
             if(transport.error.isNotBlank()) Text(transport.error,fontSize=13.sp)
             if(error.isNotBlank()) Text(error,color=if(hasWallpaper) Color.White else MaterialTheme.colorScheme.error,fontSize=13.sp)

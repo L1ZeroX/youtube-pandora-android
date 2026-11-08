@@ -4,10 +4,33 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
+
+@Composable
+internal fun LibraryPlayerAppearanceControls(preferences: Preferences, onChange: (Preferences)->Unit) {
+    Column {
+        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+            Text("再生パネルを表示",Modifier.weight(1f))
+            Switch(checked=preferences.libraryPlayerVisible,onCheckedChange={onChange(preferences.copy(libraryPlayerVisible=it))},
+                modifier=Modifier.semantics { contentDescription="再生パネルを表示" })
+        }
+        val scale=libraryPlayerScale(preferences.libraryPlayerScale)
+        Text("大きさ ${(scale*100).roundToInt()}%",fontSize=13.sp)
+        Slider(value=scale,valueRange=.7f..1f,steps=5,enabled=preferences.libraryPlayerVisible,
+            onValueChange={onChange(preferences.copy(libraryPlayerScale=libraryPlayerScale(it)))},
+            modifier=Modifier.fillMaxWidth().semantics { contentDescription="再生パネルの大きさ" })
+        Text("非表示にしても再生は続きます。",fontSize=11.sp)
+        TextButton(onClick={onChange(preferences.copy(libraryPlayerVisible=true,libraryPlayerScale=DEFAULT_LIBRARY_PLAYER_SCALE))}) {
+            Text("再生パネルを初期設定に戻す")
+        }
+        Spacer(Modifier.height(8.dp))
+    }
+}
 
 @Composable
 internal fun LibraryAppearanceControls(preferences: Preferences, onChange: (Preferences)->Unit) {
