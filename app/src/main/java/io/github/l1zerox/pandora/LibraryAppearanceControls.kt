@@ -24,8 +24,14 @@ internal fun LibraryPlayerAppearanceControls(preferences: Preferences, onChange:
         Slider(value=scale,valueRange=.7f..1f,steps=5,enabled=preferences.libraryPlayerVisible,
             onValueChange={onChange(preferences.copy(libraryPlayerScale=libraryPlayerScale(it)))},
             modifier=Modifier.fillMaxWidth().semantics { contentDescription="再生パネルの大きさ" })
+        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+            Text("再生バーのエフェクト",Modifier.weight(1f))
+            Switch(checked=preferences.libraryPlayerWave,enabled=preferences.libraryPlayerVisible,
+                onCheckedChange={onChange(preferences.copy(libraryPlayerWave=it))},
+                modifier=Modifier.semantics { contentDescription="再生バーのエフェクト" })
+        }
         Text("非表示にしても再生は続きます。",fontSize=11.sp)
-        TextButton(onClick={onChange(preferences.copy(libraryPlayerVisible=true,libraryPlayerScale=DEFAULT_LIBRARY_PLAYER_SCALE))}) {
+        TextButton(onClick={onChange(preferences.copy(libraryPlayerVisible=true,libraryPlayerScale=DEFAULT_LIBRARY_PLAYER_SCALE,libraryPlayerWave=true))}) {
             Text("再生パネルを初期設定に戻す")
         }
         Spacer(Modifier.height(8.dp))

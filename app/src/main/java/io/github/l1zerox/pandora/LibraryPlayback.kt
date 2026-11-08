@@ -61,7 +61,7 @@ internal class LibraryPlayback(private val context: Context, videoOwnership: Mut
         seekable=duration > 0 && player.isCurrentMediaItemSeekable && player.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
         panel=LibraryPlayerState(uri,player.mediaMetadata.title?.toString().orEmpty(),player.mediaMetadata.artist?.toString().orEmpty(),
             playing,position,duration,seekable,uri.isNotBlank() && player.isCommandAvailable(Player.COMMAND_PLAY_PAUSE),
-            player.isCommandAvailable(Player.COMMAND_SEEK_TO_PREVIOUS),player.isCommandAvailable(Player.COMMAND_SEEK_TO_NEXT))
+            player.isCommandAvailable(Player.COMMAND_SEEK_TO_PREVIOUS),player.isCommandAvailable(Player.COMMAND_SEEK_TO_NEXT),player.isPlaying)
         error=if(player.playerError != null) "再生できません。ファイルの場所・アクセス権を確認してください。" else ""
     }
     fun toggle(expectedUri: String) {
@@ -94,7 +94,7 @@ internal class LibraryPlayback(private val context: Context, videoOwnership: Mut
         if(!rotating) resumedVideo=false
         player?.removeListener(listener)
         controller=null
-        panel=panel.copy(canPlay=false,seekable=false,canPrevious=false,canNext=false)
+        panel=panel.copy(canPlay=false,seekable=false,canPrevious=false,canNext=false,advancing=false)
         val pending=future; future=null
         pending?.let { MediaController.releaseFuture(it) }
     }

@@ -120,8 +120,8 @@ private fun LibraryAppearanceSample(wallpaper: Bitmap?, artwork: Map<String,Bitm
                     val image=artwork[sample.uri]
                     val source=remember(image) { image?.let { libraryThumbnailColor(it) } }
                     LibraryPlayerPanel(LibraryPlayerState(uri=sample.uri,title=sample.title,artist="再生パネルのプレビュー",
-                        playing=true,position=sample.durationMs/3,duration=sample.durationMs,seekable=true,canPlay=true,canPrevious=true,canNext=true),
-                        image,source,p.libraryPlayerScale,onOpen={},onToggle={},onPrevious={},onNext={},onSeek={})
+                        playing=true,position=sample.durationMs/3,duration=sample.durationMs,seekable=true,canPlay=true,canPrevious=true,canNext=true,advancing=true),
+                        image,source,p.libraryPlayerScale,onOpen={},onToggle={},onPrevious={},onNext={},onSeek={},waveform=p.libraryPlayerWave)
                 }
                 for(row in samples.take(if(layout.columns > 1) 6 else 2).chunked(layout.columns)) {
                     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp)) {

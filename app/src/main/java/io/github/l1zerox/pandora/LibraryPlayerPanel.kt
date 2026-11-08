@@ -34,7 +34,8 @@ internal fun libraryPlayerScale(value: Float)=if(value.isFinite()) value.coerceI
 
 internal data class LibraryPlayerState(val uri: String = "", val title: String = "", val artist: String = "",
     val playing: Boolean = false, val position: Long = 0, val duration: Long = 0,
-    val seekable: Boolean = false, val canPlay: Boolean = false, val canPrevious: Boolean = false, val canNext: Boolean = false)
+    val seekable: Boolean = false, val canPlay: Boolean = false, val canPrevious: Boolean = false, val canNext: Boolean = false,
+    val advancing: Boolean = false)
 
 // At least this much shade covers every artwork pixel, including completely white covers.
 internal const val LIBRARY_PLAYER_SHADE=.62f
@@ -49,7 +50,7 @@ internal fun libraryPlayerAccent(source: Color?): Color {
 @Composable
 internal fun LibraryPlayerPanel(state: LibraryPlayerState, artwork: Bitmap?, source: Color?, scale: Float,
     onOpen: ()->Unit, onToggle: ()->Unit, onPrevious: ()->Unit, onNext: ()->Unit, onSeek: (Float)->Unit,
-    modifier: Modifier = Modifier) {
+    modifier: Modifier = Modifier, waveform: Boolean = true) {
     val size=libraryPlayerScale(scale)
     val accent=remember(source) { libraryPlayerAccent(source) }
     var drag by remember(state.uri) { mutableStateOf<Float?>(null) }
@@ -74,7 +75,8 @@ internal fun LibraryPlayerPanel(state: LibraryPlayerState, artwork: Bitmap?, sou
             CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
                 PlaybackPositionSlider(mediaKey=state.uri,value=fraction,onValueChange={drag=it},
                     onValueChangeFinished={drag?.let(onSeek); drag=null},enabled=state.seekable,color=accent,
-                    description="再生パネルの再生位置",modifier=Modifier.fillMaxWidth(),compact=true)
+                    description="再生パネルの再生位置",modifier=Modifier.fillMaxWidth(),compact=true,
+                    waveform=waveform,playing=state.advancing && drag == null)
             }
             val elapsed=durationText((if(drag != null) playbackPositionMs(state.duration,fraction) else state.position)/1000.0)
             val total=if(state.duration > 0) durationText(state.duration/1000.0) else "--:--"

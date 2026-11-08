@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.dp
 @Composable
 internal fun PlaybackPositionSlider(mediaKey: String, value: Float, onValueChange: (Float)->Unit,
     onValueChangeFinished: ()->Unit, enabled: Boolean, color: Color, description: String,
-    modifier: Modifier = Modifier, compact: Boolean = false) {
+    modifier: Modifier = Modifier, compact: Boolean = false, waveform: Boolean = false, playing: Boolean = false) {
     val tint=if(enabled) color else color.copy(alpha=.38f)
     val colors=SliderDefaults.colors(thumbColor=color,activeTrackColor=color,inactiveTrackColor=color.copy(alpha=.22f),
         disabledThumbColor=tint,disabledActiveTrackColor=tint,disabledInactiveTrackColor=tint.copy(alpha=.22f))
@@ -36,7 +36,8 @@ internal fun PlaybackPositionSlider(mediaKey: String, value: Float, onValueChang
             },
             track={ state ->
                 // Material uses this same SliderState for thumb placement, taps, drags and accessibility.
-                SliderDefaults.Track(sliderState=state,modifier=Modifier.height(3.dp).testTag("playback-position-track"),
+                if(waveform) WavyPlaybackTrack(state,enabled,playing,color)
+                else SliderDefaults.Track(sliderState=state,modifier=Modifier.height(3.dp).testTag("playback-position-track"),
                     enabled=enabled,colors=colors,drawStopIndicator=null,thumbTrackGapSize=0.dp,trackInsideCornerSize=0.dp)
             })
     }

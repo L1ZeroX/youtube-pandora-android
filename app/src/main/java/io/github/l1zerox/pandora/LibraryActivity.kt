@@ -248,11 +248,12 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
                 }
             }
             if(preferences.libraryPlayerVisible && playback.uri.isNotBlank()) {
-                val panel=if(transport.panel.uri == playback.uri) transport.panel.copy(title=playback.title)
+                val panel=if(transport.panel.uri == playback.uri) transport.panel.copy(title=playback.title,advancing=transport.panel.advancing && !appearance)
                     else LibraryPlayerState(uri=playback.uri,title=playback.title)
                 LibraryPlayerPanel(panel,playingArtwork,playingColor,preferences.libraryPlayerScale,
                     onOpen={openPlayer()},onToggle={transport.toggle(panel.uri)},
-                    onPrevious={transport.previous(panel.uri)},onNext={transport.next(panel.uri)},onSeek={transport.seek(panel.uri,it)})
+                    onPrevious={transport.previous(panel.uri)},onNext={transport.next(panel.uri)},onSeek={transport.seek(panel.uri,it)},
+                    waveform=preferences.libraryPlayerWave)
             }
             if(transport.error.isNotBlank()) Text(transport.error,fontSize=13.sp)
             if(error.isNotBlank()) Text(error,color=if(hasWallpaper) Color.White else MaterialTheme.colorScheme.error,fontSize=13.sp)

@@ -26,15 +26,16 @@ class PlaybackPositionSliderTest {
         var width by mutableStateOf(88.dp)
         var value by mutableFloatStateOf(0f)
         var direction by mutableStateOf(LayoutDirection.Ltr)
+        var waveform by mutableStateOf(false)
         screen.setContent { CompositionLocalProvider(LocalLayoutDirection provides direction) { MaterialTheme {
             Column(Modifier.width(width)) {
-                PlaybackPositionSlider("a",value,{value=it},{},true,Color.Red,"位置テスト",Modifier.fillMaxWidth(),compact)
+                PlaybackPositionSlider("a",value,{value=it},{},true,Color.Red,"位置テスト",Modifier.fillMaxWidth(),compact,waveform=waveform)
             }
         } } }
-        for(small in listOf(true,false)) for(size in listOf(88.dp,320.dp))
+        for(wave in listOf(false,true)) for(small in listOf(true,false)) for(size in listOf(88.dp,320.dp))
             for(layoutDirection in listOf(LayoutDirection.Ltr,LayoutDirection.Rtl))
                 for(fraction in listOf(0f,16f/263f,.5f,1f)) {
-                    screen.runOnIdle { compact=small; width=size; direction=layoutDirection; value=fraction }
+                    screen.runOnIdle { waveform=wave; compact=small; width=size; direction=layoutDirection; value=fraction }
                     val marker=screen.onNodeWithTag("playback-position-marker",useUnmergedTree=true).fetchSemanticsNode().boundsInRoot
                     val track=screen.onNodeWithTag("playback-position-track",useUnmergedTree=true).fetchSemanticsNode().boundsInRoot
                     val expected=track.left+track.width*(if(layoutDirection == LayoutDirection.Rtl) 1-fraction else fraction)
@@ -50,7 +51,7 @@ class PlaybackPositionSliderTest {
         val committed=mutableListOf<Float>()
         screen.setContent { MaterialTheme {
             Column(Modifier.width(320.dp)) {
-                PlaybackPositionSlider("a",value,{value=it},{committed+=value},enabled,Color.Red,"位置テスト",Modifier.fillMaxWidth(),true)
+                PlaybackPositionSlider("a",value,{value=it},{committed+=value},enabled,Color.Red,"位置テスト",Modifier.fillMaxWidth(),true,waveform=true)
             }
         } }
         val slider=screen.onNodeWithContentDescription("位置テスト")
@@ -79,7 +80,7 @@ class PlaybackPositionSliderTest {
             val uri=current
             var value by remember(uri) { mutableFloatStateOf(.25f) }
             Column(Modifier.width(320.dp)) {
-                PlaybackPositionSlider(uri,value,{value=it},{if(uri == current) commands+=uri},true,Color.Red,"位置テスト",Modifier.fillMaxWidth(),true)
+                PlaybackPositionSlider(uri,value,{value=it},{if(uri == current) commands+=uri},true,Color.Red,"位置テスト",Modifier.fillMaxWidth(),true,waveform=true)
             }
         } }
         val slider=screen.onNodeWithContentDescription("位置テスト")
