@@ -1,5 +1,17 @@
 # 検証状況
 
+## v0.4.24-beta.2（2026-11-08）
+
+オートダビングの判定が英語のauto-dubbed/auto dubbedに限定されていた点を修正。Unicodeのハイフンや全角文字、日本語の自動吹き替え・自動ダビング・オートダビング、automatically dubbedなど、明示的な自動吹き替え表記に対応する。元音声・通常の日本語音声・単なるdubbed表記は対象外。選択した音声のformat_noteが省略された場合は一致するformat_idから補完し、requested_formatsがない結合形式はformat_idの構成要素を照合する。他の候補に自動吹き替えがあるだけではラベルを付けない。
+
+音声の選択結果を取得する--printを優先設定オン・オフ双方で使用する。--no-simulateと--no-quietを維持し、従来の形式セレクターと通常取得のファイル名は変更しない。日本語以外でも明示的に自動吹き替えと確認できた音声は判定タグを記録する。動画・ショートの既存ラベルUIとフィルターへ反映する。
+
+MediaMetadataRetrieverが文字列genreを返さない場合に備え、MP4のmoov/udta/meta/ilst/©gen/dataを直接検査する。映像・音声のデータ部分を走査せず、64bitオフセットで読み飛ばす。取得量はタグ512バイト、箱4096個までに制限し、親領域外のサイズ、不正な拡張サイズ、途中切れ、無関係な領域のタグ文字列を拒否する。AssetFileDescriptorの開始位置・長さに限定し、非シーク可能な保存先は従来のメタデータ結果へフォールバックする。キャッシュ形式を更新し、旧キャッシュのfalseが固定されないよう再解析する。ファイルの書き換えや、日本語の言語タグだけによる推測はしない。
+
+単体テスト198件成功。英語・日本語表記、選択した形式だけの補完、元音声の誤表示防止、UTF-8/UTF-16のタグ、拡張サイズ・5GBの映像領域のスキップ、不正データの制限を確認。同梱yt-dlpとの連携テスト32項目（ループバックでの実ダウンロード・再開3件を含む）成功。scripts/test_dubbing_metadata.pyではアプリのKotlin処理から引数を取得し、ホストFFmpegで縦・横動画、先頭・末尾メタデータのMP4を生成、ffprobeとアプリの読み取り処理でタグを確認した。通常日本語の負例を含む5ケース成功。端末テストには古いfalseキャッシュの更新を追加し、コンパイル確認のみ。Lintはエラー0・警告66件。Android端末は未接続のため表示の実機確認、報告された特定動画での再現確認は未実施。
+
+参照: [yt-dlpのYouTube音声メタデータ](https://github.com/yt-dlp/yt-dlp/blob/2026.10.26/yt_dlp/extractor/youtube/_video.py)、[AndroidのMP4メタデータ読み取り](https://android.googlesource.com/platform/frameworks/av/+/refs/heads/main/media/module/extractors/mp4/MPEG4Extractor.cpp)。
+
 ## v0.4.24-beta.1（2026-11-08）
 
 正式版v0.4.23をベースとし、新機能のUI・初期化・再生サービスへの追加処理はBuildConfig.BETAで有効にする。正式版のversionName/codeは0.4.23/44を維持し、新しいベータ版は0.4.24-beta.1/45とする。既存のアプリID、署名、設定・キュー・MediaStore保存先は維持する。新しい記録は専用SharedPreferencesを使う。

@@ -31,6 +31,10 @@ class AutoDubbedDeviceTest {
                 assertEquals(size == "180x320",first.short)
                 assertTrue(LibraryMetadata.enrich(context,entry,"fixture").autoDubbed)
                 val cache=context.getSharedPreferences("library_metadata",0)
+                assertTrue(file.inputStream().use { mp4DubbingMarker(it.channel) })
+                val missingLabel=JSONObject(cache.getString(uri,"{}")!!).put("schema",1).put("autoDubbed",false)
+                cache.edit().putString(uri,missingLabel.toString()).commit()
+                assertTrue(LibraryMetadata.enrich(context,entry,"fixture").autoDubbed)
                 val old=JSONObject(cache.getString(uri,"{}")!!).apply { remove("autoDubbed") }
                 cache.edit().putString(uri,old.toString()).commit()
                 assertTrue(LibraryMetadata.enrich(context,entry,"fixture").autoDubbed)

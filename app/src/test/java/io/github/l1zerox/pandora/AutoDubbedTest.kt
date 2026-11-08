@@ -12,7 +12,7 @@ class AutoDubbedTest {
         for(note in listOf("Japanese (original)","Japanese","")) {
             assertTrue(autoDubbedMetadataArgs(audioDecision(listOf(AudioTrack("aac","ja",note)),emptyList()),true).isEmpty())
         }
-        assertTrue(autoDubbedMetadataArgs(dubbed.copy(usesJapanese=false),true).isEmpty())
+        assertFalse(autoDubbedMetadataArgs(dubbed.copy(usesJapanese=false),true).isEmpty())
         assertTrue(autoDubbedMetadataArgs(dubbed.copy(original=true),true).isEmpty())
     }
 

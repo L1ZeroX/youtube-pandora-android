@@ -128,10 +128,11 @@ class Engine(private val context: Context, private val progress: (String, Float?
                 addOption("-o", File(work,if(preferences.preferJapaneseAudio) AUDIO_OUTPUT_NAME else "source.%(ext)s").absolutePath)
                 addOption("--merge-output-format", "mkv")
                 addOption("--continue")
-                if(preferences.preferJapaneseAudio) addJapaneseAudioOptions()
+                // Observe the chosen audio even with priority off; observation never changes -f.
+                addAudioSelectionOptions()
                 addOption("--progress-template","download:PANDORA_PROGRESS|%(progress.status)s|%(progress.downloaded_bytes)s|%(progress.total_bytes)s|%(progress.total_bytes_estimate)s|%(progress.speed)s|%(progress.eta)s")
             }
-            execute(req,if(preferences.preferJapaneseAudio) ::reportAudio else null)
+            execute(req,::reportAudio)
             }
             if(preferences.preferJapaneseAudio && selectedAudio == null) {
                 val label="音声の言語を判別できず、通常の取得結果を使用"

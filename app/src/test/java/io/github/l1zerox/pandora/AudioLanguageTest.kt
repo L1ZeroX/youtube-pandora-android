@@ -29,6 +29,35 @@ class AudioLanguageTest {
         assertEquals(true,result.japaneseAvailable); assertFalse(result.usesJapanese)
         assertTrue(result.label.contains("選択できず"))
     }
+    @Test fun recognizesLocalizedAndUnicodeAutoDubbingNotesWithoutLabelingOrdinaryJapanese() {
+        for(note in listOf("日本語（自動吹き替え）","日本語・自動吹替","日本語 自動ダビング","オートダビング版",
+            "Japanese auto\u2011dubbed, medium","Japanese AUTO_DUBBED","Japanese automatically dubbed","Japanese (auto dubbing)")) {
+            assertTrue(note,audioDecision(listOf(japanese.copy(note=note)),emptyList()).autoDubbed)
+        }
+        for(note in listOf("Japanese","日本語","日本語（オリジナル）","Japanese original","Japanese dubbed")) {
+            assertFalse(note,audioDecision(listOf(japanese.copy(note=note)),emptyList()).autoDubbed)
+        }
+        assertTrue(audioDecision(listOf(japanese.copy(note="日本語（オリジナル）")),emptyList()).original)
+    }
+    @Test fun fillsMissingSelectedNotesOnlyFromTheSameFormatId() {
+        val report="""PANDORA_AUDIO|{"selected":[{"format_id":"137","acodec":"none"},{"format_id":"140-2","acodec":"aac","language":"ja"}],"available":[{"format_id":"140-0","acodec":"aac","language":"en","format_note":"English original"},{"format_id":"140-2","acodec":"aac","language":"ja","format_note":"日本語（自動吹き替え）"}]}"""
+        val selected=parseAudioSelection(report)!!
+        assertTrue(selected.autoDubbed); assertTrue(selected.usesJapanese); assertFalse(selected.original)
+        val originalReport=report.replace("\"140-2\",\"acodec\":\"aac\",\"language\":\"ja\"}],","\"140-0\",\"acodec\":\"aac\",\"language\":\"en\"}],")
+        val selectedOriginal=parseAudioSelection(originalReport)!!
+        assertFalse(selectedOriginal.autoDubbed); assertTrue(selectedOriginal.original)
+    }
+    @Test fun mergedFormatIdsRecoverAudioSelectionWhenRequestedFormatDetailsAreAbsent() {
+        val report="""PANDORA_AUDIO|{"selected":null,"single":{"format_id":"137+140-2","language":"en","acodec":"aac"},"available":[{"format_id":"137","acodec":"none"},{"format_id":"140-2","acodec":"aac","language":"ja","format_note":"Japanese auto-dubbed"}]}"""
+        assertTrue(parseAudioSelection(report)!!.autoDubbed)
+        assertTrue(parseAudioSelection(report)!!.usesJapanese)
+    }
+    @Test fun explicitlyDubbedAudioCanBeIdentifiedEvenWhenItIsNotJapanese() {
+        val decision=audioDecision(listOf(AudioTrack("aac","fr","French auto-dubbed")),emptyList())
+        assertTrue(decision.autoDubbed); assertFalse(decision.usesJapanese)
+        assertEquals("自動吹き替え音声を使用",decision.label)
+        assertFalse(autoDubbedMetadataArgs(decision,true).isEmpty())
+    }
     @Test fun parsesMergedAndCombinedSelectionsWithoutUsingTheRootLanguageAsTheChosenTrack() {
         val merged="""PANDORA_AUDIO|{"selected":[{"acodec":"none","language":"en"},{"acodec":"opus","language":"ja","format_note":"Japanese auto-dubbed"}],"single":{"acodec":"aac","language":"en"},"available":[{"acodec":"opus","language":"ja"}]}"""
         assertTrue(parseAudioSelection(merged)!!.usesJapanese)
@@ -61,7 +90,7 @@ class AudioLanguageTest {
         assertNull(selectedAudioSource(work,AUDIO_FILE_PREFIX+File(work,"output.mp4").absolutePath))
     }
     @Test fun exportsActualSelectorsAndRepeatedPrintOptionsForBundledExtractorIntegration() {
-        val request=YoutubeDLRequest("https://example.com/fixture").apply { addJapaneseAudioOptions() }
+        val request=YoutubeDLRequest("https://example.com/fixture").apply { addAudioSelectionOptions() }
         val options=request.buildCommand().dropLast(1)
         assertEquals(2,options.count { it == "--print" })
         assertTrue(options.contains("--no-simulate")); assertTrue(options.contains("--progress"))
