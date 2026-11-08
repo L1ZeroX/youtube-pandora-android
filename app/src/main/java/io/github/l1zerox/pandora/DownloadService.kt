@@ -130,7 +130,7 @@ class DownloadService : Service() {
                 }
                 active.workspace=transferWorkspace(cacheDir,video,active.preferences)
                 val uri=processor.download(video,active.preferences,active.workspace)
-                runCatching { SavedDownloads.record(video,active.preferences.format,uri) }
+                runCatching { SavedDownloads.record(video,active.preferences.format,uri,active.preferences.saveRange.identity()) }
                     .onFailure { AppLog.error("保存済み履歴",it) }
                 Store.state.update { state ->
                     state.copy(videos=state.videos.map {

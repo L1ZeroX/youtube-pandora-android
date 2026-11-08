@@ -83,6 +83,7 @@ class BubbleService : Service() {
     private var cancel: Button? = null
     private var clipboardStatus: TextView? = null
     private var panelArtwork: Bitmap? = null
+    private var rangeSettings: Button? = null
     private var panelColor: androidx.compose.ui.graphics.Color? = null
     private val panelButtons=mutableListOf<Button>()
     private var palette=bubblePalette()
@@ -237,6 +238,10 @@ class BubbleService : Service() {
         formats.addView(mp4,LinearLayout.LayoutParams(0,-2,1f)); formats.addView(mp3,LinearLayout.LayoutParams(0,-2,1f))
         container.addView(formats)
         formatHint=text(12f).also { container.addView(it) }
+        rangeSettings=button("保存範囲") {
+            runCatching { startActivity(Intent(this,MainActivity::class.java).setAction(OPEN_SAVE_RANGE)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)) }.onFailure(::failed)
+        }.also { container.addView(it) }
         artworkSettings=button("アルバムアート設定") {
             runCatching { startActivity(Intent(this,MainActivity::class.java).setAction(OPEN_ARTWORK)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)) }.onFailure(::failed)
@@ -333,6 +338,8 @@ class BubbleService : Service() {
         artworkSettings?.visibility=if(s.preferences.format == "MP3") View.VISIBLE else View.GONE
         artworkSettings?.text="アルバムアート: ${s.preferences.artworkMode} · 変更"
         artworkSettings?.isEnabled=!s.busy
+        rangeSettings?.text=getString(R.string.bubble_save_range,s.preferences.saveRange.summary())
+        rangeSettings?.isEnabled=!s.busy
         formatHint?.text=if(s.busy) "DL中・一時停止中は形式変更とキュー削除をロックします。変更する場合はキャンセルしてください。"
             else "選んだ形式で待機キューを保存します。削除は一覧のみで、保存済みファイルは残ります。"
         val progressColor=artworkGlassAccent(panelColor).toArgb()
@@ -394,7 +401,7 @@ class BubbleService : Service() {
         title=null; phase=null; progress=null; metrics=null; queue=null; pause=null; cancel=null; start=null
         clipboardStatus=null; panelButtons.clear()
         queueRows=null; queueSnapshot=null; renderedPage=-1; queuePage=0; queueDeletes.clear()
-        previousPage=null; nextPage=null; mp4=null; mp3=null; formatHint=null; artworkSettings=null
+        previousPage=null; nextPage=null; mp4=null; mp3=null; formatHint=null; artworkSettings=null; rangeSettings=null
     }
     private fun panelGlassBackground()=ArtworkGlassDrawable(panelArtwork,artworkGlassTint(panelColor),
         resources.displayMetrics.density,strongFrost=true)

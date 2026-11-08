@@ -19,7 +19,7 @@ import kotlinx.coroutines.flow.update
 import org.json.JSONArray
 import org.json.JSONObject
 
-internal data class SavedDownload(val source: String, val format: String, val uri: String)
+internal data class SavedDownload(val source: String, val format: String, val uri: String, val range: String = "")
 internal fun savedSource(video: Video): String = youtubeVideoId(video.url)?.let { "youtube:$it" } ?: mediaIdentity(video.url)
 
 /** Older app exports used either [youtube_ID] or [ID], with MediaStore's optional duplicate suffix. */
@@ -31,7 +31,8 @@ internal fun legacySavedSource(name: String): String? {
     return "youtube:$id"
 }
 
-internal fun List<SavedDownload>.containsDownload(video: Video, format: String)=any { it.source == savedSource(video) && it.format == format }
+internal fun List<SavedDownload>.containsDownload(video: Video, format: String, range: String = "")=
+    any { it.source == savedSource(video) && it.format == format && it.range == range }
 
 internal object SavedDownloads {
     val state=MutableStateFlow<List<SavedDownload>>(emptyList())
@@ -48,7 +49,7 @@ internal object SavedDownloads {
         known=runCatching {
             val data=JSONArray(prefs().getString("items","[]"))
             (0 until data.length()).map { data.getJSONObject(it).let { item ->
-                SavedDownload(item.getString("source"),item.getString("format"),item.getString("uri"))
+                SavedDownload(item.getString("source"),item.getString("format"),item.getString("uri"),item.optString("range"))
             } }
         }.getOrDefault(emptyList())
         val observer=object: ContentObserver(Handler(Looper.getMainLooper())) {
@@ -80,12 +81,12 @@ internal object SavedDownloads {
             }
         } catch(e: Exception) { AppLog.error("保存済み確認",e) }
     }
-    fun record(video: Video, format: String, uri: String) {
+    fun record(video: Video, format: String, uri: String, range: String = "") {
         synchronized(lock) {
-            val entry=SavedDownload(savedSource(video),format,uri)
+            val entry=SavedDownload(savedSource(video),format,uri,range)
             known=(known.filterNot { it.uri == uri }+entry).takeLast(20000)
             val array=JSONArray()
-            known.forEach { array.put(JSONObject().put("source",it.source).put("format",it.format).put("uri",it.uri)) }
+            known.forEach { array.put(JSONObject().put("source",it.source).put("format",it.format).put("uri",it.uri).put("range",it.range)) }
             prefs().edit().putString("items",array.toString()).apply()
             state.value=state.value.filterNot { it.uri == uri }+entry
         }
@@ -94,7 +95,7 @@ internal object SavedDownloads {
     fun excludeSaved() {
         Store.state.update { screen ->
             if(screen.busy) screen else screen.copy(videos=screen.videos.map { video ->
-                if(state.value.containsDownload(video,screen.preferences.format)) video.copy(selected=false) else video
+                if(state.value.containsDownload(video,screen.preferences.format,screen.preferences.saveRange.identity())) video.copy(selected=false) else video
             })
         }
         Store.save()
@@ -106,5 +107,6 @@ internal fun SavedDownloadBadge(video: Video) {
     val saved by SavedDownloads.state.collectAsStateWithLifecycle()
     val screen by Store.state.collectAsStateWithLifecycle()
     val format=screen.preferences.format
-    if(saved.containsDownload(video,format)) Text("保存済み（$format）· 再DLする場合のみ選択",fontSize=12.sp)
+    if(saved.containsDownload(video,format,screen.preferences.saveRange.identity()))
+        Text("保存済み（$format${if(screen.preferences.saveRange.enabled) "・同じ範囲" else ""}）· 再DLする場合のみ選択",fontSize=12.sp)
 }

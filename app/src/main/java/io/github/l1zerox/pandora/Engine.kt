@@ -104,6 +104,8 @@ class Engine(private val context: Context, private val progress: (String, Float?
             resolved=json.optString("_type") !in listOf("url","url_transparent"))
     }
     fun download(video: Video, preferences: Preferences, workspace: File? = null): String {
+        // Reject a known out-of-bounds start before spending time downloading the source.
+        resolveSaveRange(preferences.saveRange,video.duration)
         val work = (workspace ?: File(context.cacheDir, "download-${UUID.randomUUID()}")).apply { mkdirs() }
         try {
             var selectedAudio: AudioDecision? = null
@@ -158,7 +160,10 @@ class Engine(private val context: Context, private val progress: (String, Float?
             }
             val output = File(work, "output.${preferences.format.lowercase()}")
             AppLog.info("動画解析","映像=${visual?.optString("codec_name")} / ${visual?.optInt("width")}x${visual?.optInt("height")} / fps=${visual?.optString("avg_frame_rate")} (nominal=${visual?.optString("r_frame_rate")}) / 音声=${audio?.optString("codec_name")} / 時間=$duration 秒")
-            val args = conversionInputArgs(source.absolutePath).toMutableList()
+            val range=resolveSaveRange(preferences.saveRange,duration)
+            val outputDuration=range?.duration ?: if(range == null) duration else 0.0
+            if(range != null) AppLog.info("保存範囲",preferences.saveRange.summary())
+            val args = conversionInputArgs(source.absolutePath,range).toMutableList()
             var interpolating = false
             var attachedCover = false
             if(preferences.format == "MP3") {
@@ -171,47 +176,59 @@ class Engine(private val context: Context, private val progress: (String, Float?
             } else {
                 require(visual != null) { "映像がありません。MP3を選択してください。" }
                 val motionFilter = if(preferences.fps == INTERPOLATED_FPS) {
-                    interpolationFilter(frameRate(visual.optString("avg_frame_rate")) ?: frameRate(visual.optString("r_frame_rate")),duration)
+                    interpolationFilter(frameRate(visual.optString("avg_frame_rate")) ?: frameRate(visual.optString("r_frame_rate")),outputDuration)
                 } else null
                 interpolating = motionFilter != null
                 if(interpolating) {
                     require(runNative("libffmpeg.so",listOf("-hide_banner","-filters")).contains("minterpolate")) { "この端末のFFmpegはフレーム補間に対応していません。" }
                     AppLog.info("フレーム補間","中間フレームを生成して60fpsにします（CPU）。")
                 }
-                val copy = canCopyVideo(visual.optString("codec_name"),visual.optString("pix_fmt"),preferences.fps,
+                val copy = range == null && canCopyVideo(visual.optString("codec_name"),visual.optString("pix_fmt"),preferences.fps,
                     visual.optString("avg_frame_rate"),visual.optString("r_frame_rate"))
                 AppLog.info("変換方式",if(copy) "映像を再圧縮せずMP4へ保存" else "CPU変換 / 入力1スレッド・フィルター1・映像出力2 / ${preferences.fps}")
                 args += listOf("-map","0:v:0","-map","0:a:0?") + videoEncodingArgs(copy,preferences.fps,motionFilter)
-                args += if(audio?.optString("codec_name") == "aac") listOf("-c:a","copy") else listOf("-c:a","aac","-b:a","192k")
+                args += if(range == null && audio?.optString("codec_name") == "aac") listOf("-c:a","copy") else listOf("-c:a","aac","-b:a","192k")
                 args += listOf("-movflags","+faststart")
                 if(selectedAudio?.usesJapanese == true && audio != null) args += listOf("-metadata:s:a:0","language=jpn")
                 args += autoDubbedMetadataArgs(selectedAudio,audio != null)
             }
-            val conversionDetail = if(interpolating) "フレーム補間中（CPU・60fps）" else "${preferences.format} 変換中"
+            args += range?.outputArgs() ?: emptyList()
+            val conversionDetail = (if(interpolating) "フレーム補間中（CPU・60fps）" else "${preferences.format} 変換中") +
+                (if(range != null) " · ${preferences.saveRange.summary()}" else "")
             progress("変換中", null, conversionDetail)
             val conversionStart=System.nanoTime()
             args += listOf("-progress","pipe:1","-nostats",output.absolutePath)
             runNative("libffmpeg.so",args) { line ->
                 if(line.startsWith("out_time_us=")) line.substringAfter('=').toDoubleOrNull()?.let {
-                    val detail="PANDORA_CONVERT|${it/1e6}|$duration|${(System.nanoTime()-conversionStart)/1e9}"
+                    val detail="PANDORA_CONVERT|${it/1e6}|$outputDuration|${(System.nanoTime()-conversionStart)/1e9}"
                     progress("変換中",transferProgress(detail)?.fraction,detail)
                 }
             }
             require(output.exists() && output.length() > 0) { "変換後のファイルがありません。" }
+            val verifiedOutput=if(attachedCover || interpolating || range != null)
+                JSONObject(runNative("libffprobe.so",listOf("-v","error","-show_streams","-show_format","-of","json",output.absolutePath))) else null
+            if(range != null) {
+                val outputStreams=requireNotNull(verifiedOutput).getJSONArray("streams")
+                val expectedType=if(preferences.format == "MP3") "audio" else "video"
+                require(positiveDuration(parsedDuration(verifiedOutput.optJSONObject("format")?.optString("duration"))) != null &&
+                    (0 until outputStreams.length()).any { outputStreams.getJSONObject(it).optString("codec_type") == expectedType }) {
+                    "指定範囲に保存できる映像・音声がありません。開始・終了時刻を確認してください。"
+                }
+            }
             if(attachedCover) {
-                val verified=JSONObject(runNative("libffprobe.so",listOf("-v","error","-show_streams","-of","json",output.absolutePath))).getJSONArray("streams")
+                val verified=requireNotNull(verifiedOutput).getJSONArray("streams")
                 require((0 until verified.length()).any { verified.getJSONObject(it).optJSONObject("disposition")?.optInt("attached_pic") == 1 }) {
                     "MP3へのアルバムアート埋め込みを確認できませんでした。"
                 }
             }
             if(interpolating) {
-                val verified=JSONObject(runNative("libffprobe.so",listOf("-v","quiet","-print_format","json","-show_streams",output.absolutePath))).getJSONArray("streams")
+                val verified=requireNotNull(verifiedOutput).getJSONArray("streams")
                 val rate=(0 until verified.length()).map { verified.getJSONObject(it) }.first { it.optString("codec_type") == "video" }.optString("avg_frame_rate")
                 require(kotlin.math.abs((frameRate(rate) ?: 0.0)-60) < .01) { "補間後の60fps検証に失敗しました。" }
             }
             check()
             progress("端末へ保存中",null,saveRelativePath(preferences.format))
-            val uri=publish(output,"${safeName(video.title)} [${safeName(video.key.substringAfter(':'))}].${preferences.format.lowercase()}",preferences.format)
+            val uri=publish(output,"${safeName(video.title)} [${safeName(video.key.substringAfter(':'))}]${range?.fileSuffix().orEmpty()}.${preferences.format.lowercase()}",preferences.format)
             if(preferences.format == "MP4" && autoDubbedMetadataArgs(selectedAudio,audio != null).isNotEmpty()) {
                 runCatching { SavedAudioMetadata.recordAutoDubbed(context,uri) }
                     .onSuccess { AppLog.info("音声ラベル","オートダビング版をライブラリーへ記録 / $uri") }

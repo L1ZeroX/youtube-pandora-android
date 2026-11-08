@@ -20,7 +20,7 @@ data class Preferences(val format: String = "MP4", val quality: String = "1080p�
     val libraryGlass: Float = .45f, val libraryBlur: Int = 10, val preferJapaneseAudio: Boolean = false,
     val libraryLayout: String = "standard", val libraryPlayerVisible: Boolean = true,
     val libraryPlayerScale: Float = DEFAULT_LIBRARY_PLAYER_SCALE, val libraryPlayerWave: Boolean = true,
-    val libraryPlayerEffect: String = "wave")
+    val libraryPlayerEffect: String = "wave", val saveRange: SaveRange = SaveRange())
 data class ScreenState(val videos: List<Video> = emptyList(), val busy: Boolean = false,
     val message: String = "URLを貼り付けて情報を取得してください。", val progress: Float? = null,
     val detail: String = "", val current: String = "", val done: Int = 0, val total: Int = 0,
@@ -73,7 +73,7 @@ object Store {
             libraryPanelTransparency(p.optDouble("libraryGlass",.45).toFloat()),p.optInt("libraryBlur",10).coerceIn(0,20),p.optBoolean("preferJapaneseAudio",false),
             LibraryLayout.fromId(p.optString("libraryLayout")).id,p.optBoolean("libraryPlayerVisible",true),
             libraryPlayerScale(p.optDouble("libraryPlayerScale",DEFAULT_LIBRARY_PLAYER_SCALE.toDouble()).toFloat()),p.optBoolean("libraryPlayerWave",true),
-            PlaybackEffect.fromId(p.optString("libraryPlayerEffect")).id)
+            PlaybackEffect.fromId(p.optString("libraryPlayerEffect")).id,readSaveRange(p.optJSONObject("saveRange")))
         val videos = runCatching {
             val array = JSONArray(data.getString("queue", "[]"))
             (0 until array.length()).map { index ->
@@ -125,6 +125,7 @@ object Store {
             .put("libraryPlayerVisible",p.libraryPlayerVisible).put("libraryPlayerScale",libraryPlayerScale(p.libraryPlayerScale))
             .put("libraryPlayerWave",p.libraryPlayerWave)
             .put("libraryPlayerEffect",PlaybackEffect.fromId(p.libraryPlayerEffect).id)
+            .put("saveRange",p.saveRange.json())
         val videos = JSONArray()
         s.videos.forEach { v -> videos.put(JSONObject().put("key",v.key).put("url",v.url).put("title",v.title)
             .put("site",v.site).put("duration",v.duration).put("thumbnail",v.thumbnail).put("selected",v.selected)

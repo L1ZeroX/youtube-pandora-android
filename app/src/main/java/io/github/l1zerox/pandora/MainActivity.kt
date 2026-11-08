@@ -56,15 +56,19 @@ import kotlin.math.max
 
 class MainActivity : ComponentActivity() {
     private var artworkRequested by mutableStateOf(false)
+    private var rangeRequested by mutableStateOf(false)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState); enableEdgeToEdge()
         artworkRequested=savedInstanceState?.getBoolean("artworkRequested") ?: false
+        rangeRequested=savedInstanceState?.getBoolean("rangeRequested") ?: false
         if(savedInstanceState == null) acceptShare(intent)
-        setContent { PandoraScreen(artworkRequested) { artworkRequested=false } }
+        setContent { PandoraScreen(artworkRequested=artworkRequested,onArtworkClosed={artworkRequested=false},
+            rangeRequested=rangeRequested,onRangeClosed={rangeRequested=false}) }
     }
     override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); acceptShare(intent) }
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putBoolean("artworkRequested",artworkRequested)
+        outState.putBoolean("rangeRequested",rangeRequested)
         super.onSaveInstanceState(outState)
     }
     override fun onStart() { super.onStart(); BubbleRuntime.enter(this) }
@@ -72,6 +76,7 @@ class MainActivity : ComponentActivity() {
     override fun onStop() { super.onStop(); BubbleRuntime.leave(this) }
     private fun acceptShare(intent: Intent?) {
         if(intent?.action == OPEN_ARTWORK) artworkRequested=true
+        if(intent?.action == OPEN_SAVE_RANGE) rangeRequested=true
         if(intent?.action == Intent.ACTION_SEND) {
             val text = intent.getStringExtra(Intent.EXTRA_TEXT).orEmpty()
             val count=Store.receiveShare(text)
@@ -81,7 +86,8 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun PandoraScreen(artworkRequested: Boolean = false, onArtworkClosed: ()->Unit = {}) {
+fun PandoraScreen(artworkRequested: Boolean = false, onArtworkClosed: ()->Unit = {},
+    rangeRequested: Boolean = false, onRangeClosed: ()->Unit = {}) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val s by Store.state.collectAsStateWithLifecycle()
@@ -90,6 +96,7 @@ fun PandoraScreen(artworkRequested: Boolean = false, onArtworkClosed: ()->Unit =
     var text by rememberSaveable { mutableStateOf("") }
     var settings by rememberSaveable { mutableStateOf(false) }
     var backgroundSettings by rememberSaveable { mutableStateOf(false) }
+    var rangeDialog by rememberSaveable { mutableStateOf(false) }
     var logs by rememberSaveable { mutableStateOf(false) }
     val logSnapshot by AppLog.state.collectAsStateWithLifecycle()
     val updateState by AppUpdates.state.collectAsStateWithLifecycle()
@@ -223,6 +230,11 @@ fun PandoraScreen(artworkRequested: Boolean = false, onArtworkClosed: ()->Unit =
                                 ArtworkSettings(p,s.busy)
                             }
                             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                                Text("保存範囲",Modifier.weight(1f))
+                                OutlinedButton(onClick={rangeDialog=true},enabled=!s.busy,
+                                    modifier=Modifier.semantics { contentDescription="保存範囲を変更" }) { Text(p.saveRange.summary()) }
+                            }
+                            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                                 Column(Modifier.weight(1f)) {
                                     Text("オートダビング版を優先")
                                     Text("吹き替えを自動判別。なければ元音声を優先。",fontSize=11.sp,color=colors.onSurfaceVariant)
@@ -231,7 +243,8 @@ fun PandoraScreen(artworkRequested: Boolean = false, onArtworkClosed: ()->Unit =
                                     modifier=Modifier.semantics { contentDescription="オートダビング版を優先" })
                             }
                             Text("保存先: 内部ストレージ/${saveRelativePath(p.format)}",fontSize=12.sp)
-                            Text("互換性のある映像は再圧縮せず保存します。フレーム補間はCPUで中間の動きを生成するため時間がかかります。",fontSize=11.sp,color=colors.onSurfaceVariant)
+                            Text(if(p.saveRange.enabled) "範囲保存では取得後に映像・音声を変換します。ダウンロード量は減りません。"
+                                else "互換性のある映像は再圧縮せず保存します。フレーム補間はCPUで中間の動きを生成するため時間がかかります。",fontSize=11.sp,color=colors.onSurfaceVariant)
                         }
                     }
                     item { Text("Android版 ${BuildConfig.VERSION_NAME} · yt-dlp",fontSize=11.sp,color=colors.onSurfaceVariant) }
@@ -243,7 +256,13 @@ fun PandoraScreen(artworkRequested: Boolean = false, onArtworkClosed: ()->Unit =
         },confirmButton={TextButton(onClick=onArtworkClosed) { Text("完了") }})
         if(error.isNotEmpty()) AlertDialog(onDismissRequest={error=""},title={Text("確認")},text={Text(error)},confirmButton={TextButton(onClick={error=""}) { Text("閉じる") }})
         if(logs) LogDialog { logs=false }
-        UpdatePrompt(allowed=!settings && !backgroundSettings && !logs && !artworkRequested && preview == null && error.isEmpty() && pending == null)
+        if(rangeDialog || rangeRequested) SaveRangeDialog(p.saveRange,!s.busy,onApply={ selected ->
+            if(!Store.state.value.busy) {
+                Store.preferences(Store.state.value.preferences.copy(saveRange=selected))
+                rangeDialog=false; onRangeClosed()
+            }
+        },onDismiss={rangeDialog=false; onRangeClosed()})
+        UpdatePrompt(allowed=!settings && !backgroundSettings && !logs && !artworkRequested && !rangeDialog && !rangeRequested && preview == null && error.isEmpty() && pending == null)
         preview?.let { selected ->
             val video=s.videos.firstOrNull { it.key == selected.key } ?: selected
             var thumbnailTone by remember(video.thumbnail) { mutableStateOf<Color?>(null) }

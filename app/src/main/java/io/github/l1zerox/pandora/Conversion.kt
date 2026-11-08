@@ -33,8 +33,9 @@ internal fun canCopyVideo(codec: String, pixelFormat: String, selectedFps: Strin
     return abs(average-target) < 0.000001 && abs(nominal-target) < 0.000001
 }
 
-internal fun conversionInputArgs(source: String) = listOf("-y","-nostdin","-hide_banner",
-    "-filter_threads","1","-filter_complex_threads","1","-threads","1","-i",source)
+internal fun conversionInputArgs(source: String, range: ResolvedSaveRange? = null) = listOf("-y","-nostdin","-hide_banner",
+    "-filter_threads","1","-filter_complex_threads","1","-threads","1") +
+    (range?.inputArgs() ?: emptyList()) + listOf("-i",source)
 
 internal fun videoEncodingArgs(copy: Boolean, selectedFps: String, motionFilter: String? = null): List<String> {
     if(copy) return listOf("-c:v","copy")
