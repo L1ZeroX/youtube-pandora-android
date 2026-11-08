@@ -25,6 +25,7 @@ internal fun UpdatePrompt(allowed: Boolean = true) {
     val foreground=lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
     val state by AppUpdates.state.collectAsStateWithLifecycle()
     val screen by Store.state.collectAsStateWithLifecycle()
+    val extractor by ExtractorUpdates.owner(LocalContext.current).state.collectAsStateWithLifecycle()
     LaunchedEffect(foreground) {
         if(foreground) {
             AppUpdates.check()
@@ -36,7 +37,8 @@ internal fun UpdatePrompt(allowed: Boolean = true) {
             }
         }
     }
-    if(foreground && allowed && !screen.busy && (state.release != null || state.message.isNotEmpty()))
+    ExtractorUpdatePrompt(foreground,allowed && (extractor.updating || !state.checking && state.release == null && state.message.isEmpty()))
+    if(foreground && allowed && !screen.busy && !extractor.updating && (state.release != null || state.message.isNotEmpty()))
         UpdateDialog(state,AppUpdates::dismiss)
 }
 

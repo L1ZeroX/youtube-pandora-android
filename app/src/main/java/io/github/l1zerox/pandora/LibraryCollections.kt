@@ -4,24 +4,37 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 internal data class UserPlaylist(val id: String, val name: String, val uris: List<String> = emptyList())
-internal data class LibraryCollections(val favorites: Set<String> = emptySet(), val playlists: List<UserPlaylist> = emptyList()) {
-    fun without(uri: String)=copy(favorites=favorites-uri,playlists=playlists.map { it.copy(uris=it.uris-uri) })
+internal data class LibraryCollections(val favorites: Set<String> = emptySet(), val playlists: List<UserPlaylist> = emptyList(), val folders: List<UserPlaylist> = emptyList()) {
+    fun without(uri: String)=copy(favorites=favorites-uri,playlists=playlists.map { it.copy(uris=it.uris-uri) },folders=folders.map { it.copy(uris=it.uris-uri) })
     fun addTo(id: String, uris: List<String>)=copy(playlists=playlists.map {
         if(it.id == id) it.copy(uris=(it.uris+uris).distinct()) else it
     })
+    fun moveToFolder(id: String, uris: List<String>): LibraryCollections {
+        require(id.isEmpty() || folders.any { it.id == id }) { "フォルダーが見つかりません。" }
+        val moving=uris.toSet()
+        return copy(folders=folders.map { folder -> folder.copy(uris=
+            (folder.uris.filterNot { it in moving } + if(folder.id == id) uris else emptyList()).distinct()) })
+    }
     fun json(): String=JSONObject().put("favorites",JSONArray(favorites.toList())).put("playlists",JSONArray().also { array ->
         playlists.forEach { array.put(JSONObject().put("id",it.id).put("name",it.name).put("uris",JSONArray(it.uris))) }
+    }).put("folders",JSONArray().also { array ->
+        folders.forEach { array.put(JSONObject().put("id",it.id).put("name",it.name).put("uris",JSONArray(it.uris))) }
     }).toString()
     companion object {
         fun parse(text: String): LibraryCollections=runCatching {
             val json=JSONObject(text)
             fun strings(array: JSONArray?)=if(array == null) emptyList() else (0 until array.length()).mapNotNull { array.optString(it).takeIf(String::isNotBlank) }.distinct()
-            val lists=json.optJSONArray("playlists") ?: JSONArray()
-            LibraryCollections(strings(json.optJSONArray("favorites")).toSet(),(0 until lists.length()).mapNotNull { index ->
+            fun lists(key: String): List<UserPlaylist> {
+                val lists=json.optJSONArray(key) ?: JSONArray()
+                return (0 until lists.length()).mapNotNull { index ->
                 val item=lists.optJSONObject(index) ?: return@mapNotNull null
                 val id=item.optString("id"); val name=item.optString("name").trim().take(60)
                 if(id.isBlank() || name.isBlank()) null else UserPlaylist(id,name,strings(item.optJSONArray("uris")))
-            }.distinctBy { it.id })
+                }.distinctBy { it.id }
+            }
+            val assigned=mutableSetOf<String>()
+            val folders=lists("folders").map { it.copy(uris=it.uris.filter { uri -> assigned.add(uri) }) }
+            LibraryCollections(strings(json.optJSONArray("favorites")).toSet(),lists("playlists"),folders)
         }.getOrDefault(LibraryCollections())
     }
 }
@@ -30,7 +43,10 @@ internal enum class LibrarySort(val label: String) { NEWEST("追加が新しい�
 internal fun organizedLibrary(entries: List<LibraryEntry>, data: LibraryCollections, collection: String, sort: LibrarySort,
     dubbedOnly: Boolean): List<LibraryEntry> {
     val playlist=data.playlists.firstOrNull { it.id == collection }
-    val members=when { collection == "favorites" -> data.favorites; playlist != null -> playlist.uris.toSet(); else -> null }
+    val folder=data.folders.firstOrNull { it.id == collection }
+    val members=when { collection == "unfiled" -> entries.map { it.uri }.toSet()-data.folders.flatMap { it.uris }.toSet()
+        folder != null -> folder.uris.toSet()
+        collection == "favorites" -> data.favorites; playlist != null -> playlist.uris.toSet(); else -> null }
     val filtered=entries.filter { (members == null || it.uri in members) && (!dubbedOnly || it.autoDubbed && it.video) }
     if(playlist != null && sort == LibrarySort.NEWEST) return filtered.sortedBy { playlist.uris.indexOf(it.uri) }
     val order=when(sort) {

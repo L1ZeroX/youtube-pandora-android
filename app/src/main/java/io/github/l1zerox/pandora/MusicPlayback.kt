@@ -13,7 +13,7 @@ internal data class MusicPlaybackState(val uri: String = "", val artist: String 
     val position: Long = 0, val duration: Long = 0, val seekable: Boolean = false, val canPlay: Boolean = false,
     val canPrevious: Boolean = false, val canNext: Boolean = false, val canShuffle: Boolean = false,
     val canRepeat: Boolean = false, val shuffle: Boolean = false, val repeat: Int = Player.REPEAT_MODE_OFF,
-    val queue: List<MusicQueueItem> = emptyList(), val canSelect: Boolean = false)
+    val queue: List<MusicQueueItem> = emptyList(), val canSelect: Boolean = false, val advancing: Boolean = false)
 
 /** Operates the Activity's existing MediaController; never creates another player or session. */
 internal class MusicPlayback(private val player: Player?) {
@@ -34,7 +34,7 @@ internal class MusicPlayback(private val player: Player?) {
             p.mediaItemCount > 0 && p.isCommandAvailable(Player.COMMAND_PLAY_PAUSE),
             p.isCommandAvailable(Player.COMMAND_SEEK_TO_PREVIOUS),p.isCommandAvailable(Player.COMMAND_SEEK_TO_NEXT),
             p.isCommandAvailable(Player.COMMAND_SET_SHUFFLE_MODE),p.isCommandAvailable(Player.COMMAND_SET_REPEAT_MODE),
-            p.shuffleModeEnabled,p.repeatMode,queue,p.isCommandAvailable(Player.COMMAND_SEEK_TO_MEDIA_ITEM))
+            p.shuffleModeEnabled,p.repeatMode,queue,p.isCommandAvailable(Player.COMMAND_SEEK_TO_MEDIA_ITEM),p.isPlaying)
     }
     fun toggle() {
         val p=player ?: return

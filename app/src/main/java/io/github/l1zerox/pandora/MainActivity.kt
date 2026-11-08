@@ -322,7 +322,7 @@ fun PandoraScreen(artworkRequested: Boolean = false, onArtworkClosed: ()->Unit =
                     Text("ライブラリーのパネル",fontWeight=FontWeight.Bold)
                     LibraryAppearanceControls(p,Store::preferences)
                     BubbleSettings(p)
-                    OutlinedButton(onClick={settings=false; start("UPDATE")},enabled=!s.busy) { Text("yt-dlpを更新") }
+                    OutlinedButton(onClick={settings=false; ExtractorUpdates.owner(context).check(manual=true)},enabled=!s.busy) { Text("yt-dlpを更新") }
                     OutlinedButton(onClick={settings=false;logs=true}) { Text("処理ログを見る") }
                     Text("アプリの更新 · 現在 ${BuildConfig.VERSION_NAME}")
                     Text("新しいバージョンは起動時にお知らせします。",fontSize=12.sp)

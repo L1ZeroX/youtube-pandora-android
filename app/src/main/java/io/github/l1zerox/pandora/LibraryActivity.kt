@@ -116,6 +116,8 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
     val transport=rememberLibraryPlayback()
     val collections by LibraryExtras.state.collectAsStateWithLifecycle()
     val batch by LibraryBatchDeletion.state.collectAsStateWithLifecycle()
+    var folderDialog by rememberSaveable { mutableStateOf(false) }
+    var moveToFolder by rememberSaveable { mutableStateOf<List<String>>(arrayListOf()) }
     var collection by rememberSaveable { mutableStateOf("") }
     var sortName by rememberSaveable { mutableStateOf(LibrarySort.NEWEST.name) }
     val sort=LibrarySort.valueOf(sortName)
@@ -208,7 +210,7 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
             val controlsSummary=listOfNotNull(
                 filter.takeUnless { it == "すべて" },
                 "検索中".takeIf { search.isNotBlank() },
-                if(collection == "favorites") "お気に入り" else collections.playlists.firstOrNull { it.id == collection }?.name,
+                if(collection == "favorites") "お気に入り" else (collections.playlists+collections.folders).firstOrNull { it.id == collection }?.name ?: "未分類".takeIf { collection == "unfiled" },
                 "オートダビング版".takeIf { dubbedOnly },
                 "${selected.size}件選択".takeIf { selecting }
             ).joinToString(" · ")
@@ -222,6 +224,7 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
                     Text(if(importing) "追加中…" else "ファイルを追加")
                 }
             }
+            OutlinedButton(onClick={folderDialog=true}) { Text("フォルダー") }
             if(searchExpanded) {
                 OutlinedTextField(search,{search=it},Modifier.fillMaxWidth().focusRequester(searchFocus),singleLine=true,
                     label={Text("タイトルで検索")},keyboardOptions=KeyboardOptions(imeAction=ImeAction.Search),
@@ -244,7 +247,7 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
             }
             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                 TextButton(onClick={organize=true},modifier=Modifier.weight(1f)) {
-                    val name=if(collection == "favorites") "♥ お気に入り" else collections.playlists.firstOrNull { it.id == collection }?.name ?: "整理・並び替え"
+                    val name=if(collection == "favorites") "♥ お気に入り" else (collections.playlists+collections.folders).firstOrNull { it.id == collection }?.name ?: "未分類".takeIf { collection == "unfiled" } ?: "整理・並び替え"
                     Text(name+(if(dubbedOnly) " · オートダビング版" else ""),maxLines=1,overflow=TextOverflow.Ellipsis)
                 }
                 TextButton(onClick={selecting=!selecting; selected=arrayListOf()}) { Text(if(selecting) "選択を終了" else "選択") }
@@ -254,6 +257,7 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
                 Text("${selected.size}件選択",Modifier.padding(vertical=12.dp))
                 TextButton(onClick={selected=ArrayList(visible.map { it.uri })}) { Text("表示中を全選択") }
                 TextButton(enabled=selected.isNotEmpty(),onClick={addToList=ArrayList(selected)}) { Text("リストへ") }
+                TextButton(enabled=selected.isNotEmpty(),onClick={moveToFolder=ArrayList(selected)}) { Text("フォルダーへ") }
                 TextButton(enabled=selected.isNotEmpty(),onClick={confirmBatch=true}) { Text("削除") }
             }
             }
@@ -280,7 +284,7 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
                         favorite=item.uri in collections.favorites,selected=item.uri in selected,
                         selectionMode=selecting,onLongClick={toggleSelection(item.uri)},
                         onFavorite={runCatching { LibraryExtras.favorite(item.uri) }.onFailure { error="お気に入りを保存できませんでした。" }},
-                        onPlaylist={addToList=arrayListOf(item.uri)},onNext={
+                        onPlaylist={addToList=arrayListOf(item.uri)},onFolder={moveToFolder=arrayListOf(item.uri)},onNext={
                             runCatching { enqueueNext(transport.controller ?: error("先に再生を開始してください。"),item) }
                                 .onFailure { error=it.message ?: "再生順を変更できませんでした。" }
                         },onRemoveFromList=if(collections.playlists.any { it.id == collection }) ({
@@ -296,7 +300,10 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
     }
     if(appearance) LibraryAppearanceDialog(wallpaper,preferences,playingEntry ?: visible.firstOrNull(),headerAccent,colors,
         onChange=Store::preferences,onDismiss={appearance=false},previewEntries=visible.take(6))
-    UpdatePrompt(allowed=!appearance && deletion == null && !importing && error.isBlank() && !organize && addToList.isEmpty() && !confirmBatch && resumeEntry == null && batch == null)
+    UpdatePrompt(allowed=!appearance && deletion == null && !importing && error.isBlank() && !organize && addToList.isEmpty() && !confirmBatch && resumeEntry == null && batch == null && !folderDialog && moveToFolder.isEmpty())
+    if(folderDialog) LibraryFolderDialog(collection,onSelect={collection=it},onDismiss={folderDialog=false})
+    if(moveToFolder.isNotEmpty()) LibraryFolderDialog(collection,onSelect={},onDismiss={moveToFolder=arrayListOf()},
+        moving=moveToFolder,onMoved={moveToFolder=arrayListOf(); selected=arrayListOf(); selecting=false})
     if(organize) LibraryOrganizeDialog(collection,sort,dubbedOnly,onCollection={collection=it},onSort={sortName=it.name},
         onDubbed={dubbedOnly=it},onDismiss={organize=false})
     if(addToList.isNotEmpty()) AddToPlaylistDialog(addToList,onDismiss={addToList=arrayListOf()},onAdded={addToList=arrayListOf(); selected=arrayListOf(); selecting=false})
@@ -321,7 +328,7 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
 internal fun LibraryCard(entry: LibraryEntry, dark: Boolean, backdrop: LibraryBackdrop, playback: LibraryPlayback,
     layout: LibraryLayout = LibraryLayout.STANDARD, onDelete: ()->Unit, favorite: Boolean = false, selected: Boolean = false,
     selectionMode: Boolean = false, onLongClick: ()->Unit = {}, onFavorite: ()->Unit = {}, onPlaylist: ()->Unit = {},
-    onNext: ()->Unit = {}, onRemoveFromList: (()->Unit)? = null, onClick: ()->Unit) {
+    onNext: ()->Unit = {}, onFolder: ()->Unit = {}, onRemoveFromList: (()->Unit)? = null, onClick: ()->Unit) {
     val context=LocalContext.current
     val bitmap by produceState<Bitmap?>(null,entry.uri) { value=null; value=LibraryRepository.artwork(context,entry) }
     val source=remember(bitmap) { bitmap?.let { libraryThumbnailColor(it) } }
@@ -339,6 +346,7 @@ internal fun LibraryCard(entry: LibraryEntry, dark: Boolean, backdrop: LibraryBa
                     }
                     DropdownMenu(expanded=menu,onDismissRequest={menu=false}) {
                         DropdownMenuItem(text={Text(if(favorite) "お気に入りを解除" else "お気に入りに追加")},onClick={menu=false; onFavorite()})
+                        DropdownMenuItem(text={Text("フォルダーへ移動")},onClick={menu=false; onFolder()})
                         DropdownMenuItem(text={Text("プレイリストに追加")},onClick={menu=false; onPlaylist()})
                         DropdownMenuItem(text={Text("次に再生")},onClick={menu=false; onNext()})
                         DropdownMenuItem(text={Text("選択")},onClick={menu=false; onLongClick()})

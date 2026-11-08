@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.R as MediaUiR
@@ -116,6 +117,7 @@ private fun MusicArtwork(artwork: Bitmap?, palette: MusicPalette, modifier: Modi
 @Composable
 private fun MusicControls(title: String, error: String, transport: MusicPlayback, palette: MusicPalette) {
     val state=transport.state
+    val preferences by Store.state.collectAsStateWithLifecycle()
     var drag by remember(state.uri) { mutableStateOf<Float?>(null) }
     val fraction=drag ?: playbackFraction(state.position,state.duration)
     LaunchedEffect(state.seekable) { if(!state.seekable) drag=null }
@@ -125,7 +127,9 @@ private fun MusicControls(title: String, error: String, transport: MusicPlayback
         if(error.isNotBlank()) Text(error,color=Color.White,fontSize=13.sp,modifier=Modifier.padding(top=8.dp))
         PlaybackPositionSlider(mediaKey=state.uri,value=fraction,onValueChange={drag=it},
             onValueChangeFinished={drag?.let { transport.seek(state.uri,it) }; drag=null},enabled=state.seekable,
-            color=palette.accent,description="音楽の再生位置",modifier=Modifier.fillMaxWidth().padding(top=12.dp))
+            color=palette.accent,description="音楽の再生位置",modifier=Modifier.fillMaxWidth().padding(top=12.dp),
+            waveform=preferences.preferences.libraryPlayerWave,playing=state.advancing && drag == null,
+            effect=PlaybackEffect.fromId(preferences.preferences.libraryPlayerEffect))
         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
             Text(durationText((if(drag != null) playbackPositionMs(state.duration,fraction) else state.position)/1000.0),fontSize=12.sp,color=palette.secondary)
             Text(if(state.duration > 0) durationText(state.duration/1000.0) else "--:--",fontSize=12.sp,color=palette.secondary)

@@ -34,6 +34,18 @@ internal object LibraryExtras {
     fun removeFrom(id: String, uris: Set<String>)=change { it.copy(playlists=it.playlists.map { list ->
         if(list.id == id) list.copy(uris=list.uris.filterNot { uri -> uri in uris }) else list
     }) }
+    fun createFolder(name: String, uris: List<String> = emptyList()): String {
+        val cleaned=name.trim().take(60); require(cleaned.isNotEmpty()) { "名前を入力してください。" }
+        val id="folder:"+UUID.randomUUID().toString()
+        change { it.copy(folders=it.folders+UserPlaylist(id,cleaned)).moveToFolder(id,uris) }
+        return id
+    }
+    fun renameFolder(id: String, name: String) {
+        val cleaned=name.trim().take(60); require(cleaned.isNotEmpty())
+        change { it.copy(folders=it.folders.map { f -> if(f.id == id) f.copy(name=cleaned) else f }) }
+    }
+    fun deleteFolder(id: String)=change { it.copy(folders=it.folders.filterNot { f -> f.id == id }) }
+    fun moveToFolder(id: String, uris: List<String>)=change { it.moveToFolder(id,uris) }
     fun forget(uri: String) {
         change { it.without(uri) }; bookmarks.edit().remove(uri).apply()
     }

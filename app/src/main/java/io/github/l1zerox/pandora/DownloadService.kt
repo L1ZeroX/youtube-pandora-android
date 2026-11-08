@@ -28,6 +28,10 @@ class DownloadService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val action=intent?.action ?: return START_NOT_STICKY
         val state=Store.state.value
+        if(action == "UPDATE" && (job != null || state.busy)) {
+            ExtractorUpdates.finished(this,false,"実行中の処理が終わってから再試行してください。")
+            return START_NOT_STICKY
+        }
         when(action) {
             "STOP", "CANCEL" -> {
                 if(job != null) {
@@ -56,11 +60,16 @@ class DownloadService : Service() {
         }
         return START_NOT_STICKY
     }
+    private var extractorUpdated=false
     private fun launchOperation(operation: String, input: String = "", resuming: Boolean = false) {
-        conversion=false; lastUpdate=0
+        conversion=false; lastUpdate=0; extractorUpdated=false
         try {
             startForeground(101,notification(if(resuming) "再開しています…" else "準備中",null),ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
-        } catch(e: Exception) { AppLog.error("処理開始",e); finish("処理を開始できませんでした。アプリを開いて再度お試しください。"); return }
+        } catch(e: Exception) {
+            AppLog.error("処理開始",e)
+            if(operation == "UPDATE") ExtractorUpdates.finished(this,false,"更新処理を開始できませんでした。")
+            finish("処理を開始できませんでした。アプリを開いて再度お試しください。"); return
+        }
         Store.state.update { it.copy(busy=true,paused=false,stopping=false,operation=operation,
             message=if(resuming) "再開しています…" else "準備中…",progress=null,detail="",speed="",eta=null,
             done=if(resuming) it.done else 0,total=if(resuming) it.total else 0) }
@@ -75,7 +84,7 @@ class DownloadService : Service() {
                 AppLog.info("処理開始","$operation / 再開=$resuming")
                 processor.init(installBundled=operation != "UPDATE")
                 when(operation) {
-                    "UPDATE" -> { processor.update(); message="yt-dlpを更新しました。" }
+                    "UPDATE" -> { processor.update(); extractorUpdated=true; message="yt-dlpを更新しました。" }
                     "FETCH", "REFRESH" -> {
                         val urls=validUrls(input); require(urls.isNotEmpty()) { "URLを入力してください。" }
                         var failures=0
@@ -180,6 +189,7 @@ class DownloadService : Service() {
     }
     private fun releaseWakeLock() { if(wakeLock?.isHeld == true) wakeLock?.release(); wakeLock=null }
     private fun finish(message: String) {
+        if(Store.state.value.operation == "UPDATE") ExtractorUpdates.finished(this,extractorUpdated,message)
         batch=null; job=null
         AppLog.info("処理終了",message)
         Store.state.update { it.copy(busy=false,paused=false,stopping=false,operation="",message=message,current="",progress=null,detail="",speed="",eta=null) }

@@ -45,7 +45,7 @@ internal fun LibraryOrganizeDialog(collection: String, sort: LibrarySort, dubbed
             LibrarySort.entries.forEach { option ->
                 Row(Modifier.fillMaxWidth().clickable { onSort(option) },verticalAlignment=Alignment.CenterVertically) {
                     RadioButton(selected=sort == option,onClick={onSort(option)})
-                    Text(if(collection.isNotBlank() && collection != "favorites" && option == LibrarySort.NEWEST) "リストの登録順" else option.label)
+                    Text(if(data.playlists.any { it.id == collection } && option == LibrarySort.NEWEST) "リストの登録順" else option.label)
                 }
             }
             Row(Modifier.fillMaxWidth().clickable { onDubbed(!dubbed) },verticalAlignment=Alignment.CenterVertically) {
@@ -69,12 +69,12 @@ internal fun LibraryOrganizeDialog(collection: String, sort: LibrarySort, dubbed
 }
 
 @Composable
-private fun PlaylistNameDialog(initial: String, onDismiss: ()->Unit, onSave: (String)->Unit) {
+internal fun PlaylistNameDialog(initial: String, onDismiss: ()->Unit, onSave: (String)->Unit, kind: String = "プレイリスト") {
     var name by rememberSaveable { mutableStateOf(initial) }
     var error by remember { mutableStateOf("") }
-    AlertDialog(onDismissRequest=onDismiss,title={Text(if(initial.isBlank()) "プレイリストを作成" else "名前を変更")},
+    AlertDialog(onDismissRequest=onDismiss,title={Text(if(initial.isBlank()) "$kind を作成" else "名前を変更")},
         text={Column {
-            OutlinedTextField(name,{name=it.take(60)},singleLine=true,label={Text("リスト名")})
+            OutlinedTextField(name,{name=it.take(60)},singleLine=true,label={Text("名前")})
             if(error.isNotBlank()) Text(error,color=MaterialTheme.colorScheme.error)
         }},confirmButton={TextButton(enabled=name.isNotBlank(),onClick={
             runCatching { onSave(name) }.onFailure { error="保存できませんでした。もう一度お試しください。" }

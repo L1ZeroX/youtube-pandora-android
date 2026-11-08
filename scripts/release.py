@@ -11,7 +11,7 @@ import zipfile
 import re
 
 beta = "--beta" in sys.argv
-version = "0.4.25-beta.4" if beta else "0.4.24"
+version = "0.4.25-beta.5" if beta else "0.4.24"
 root = Path(__file__).resolve().parent.parent
 config = json.loads((root / '.tools/environment.json').read_text())
 private = root / '.signing'

@@ -31,6 +31,7 @@ class MusicPlaybackTest {
                 "getDuration" -> duration
                 "getCurrentPosition" -> position
                 "getPlayWhenReady" -> ready
+                "isPlaying" -> ready && playbackState == Player.STATE_READY
                 "getPlaybackState" -> playbackState
                 "isCurrentMediaItemSeekable" -> seekable
                 "isCommandAvailable" -> args!![0] !in denied
@@ -49,6 +50,15 @@ class MusicPlaybackTest {
             }
         } as Player
         val transport=MusicPlayback(player).apply { refresh(queueChanged=true) }
+    }
+    @Test fun effectOnlyAdvancesDuringActualPlayback() {
+        val s=Session()
+        assertTrue(s.transport.state.advancing)
+        s.playbackState=Player.STATE_BUFFERING; s.transport.refresh()
+        assertTrue(s.transport.state.playing); assertFalse(s.transport.state.advancing)
+        s.playbackState=Player.STATE_READY; s.ready=false; s.transport.refresh()
+        assertFalse(s.transport.state.advancing)
+        s.ready=true; s.transport.refresh(); assertTrue(s.transport.state.advancing)
     }
     @Test fun stateTracksPlaybackPositionArtistAndQueueWithoutCreatingAPlayer() {
         val s=Session()
