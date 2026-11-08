@@ -27,10 +27,7 @@ internal fun LibraryFolderDialog(collection: String, onSelect: (String)->Unit, o
     AlertDialog(onDismissRequest=onDismiss,title={Text(if(moving.isEmpty()) "フォルダー" else "${moving.size}件をフォルダーへ移動")},text={
         Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(4.dp)) {
             Text("ライブラリー内で整理します。保存元のファイルの場所は変わりません。")
-            if(moving.isEmpty()) TextButton(onClick={choose("")}) { Text("すべてのファイル") }
-            TextButton(onClick={choose(if(moving.isEmpty()) "unfiled" else "")}) {
-                Text(if(moving.isEmpty()) "未分類" else "フォルダーから外す（未分類へ）")
-            }
+            if(moving.isEmpty()) TextButton(onClick={choose(LIBRARY_FOLDER_ROOT)}) { Text("フォルダー一覧") }
             data.folders.forEach { folder -> key(folder.id) {
                 Row(Modifier.fillMaxWidth()) {
                     TextButton(onClick={choose(folder.id)},modifier=Modifier.weight(1f)) {
@@ -49,6 +46,10 @@ internal fun LibraryFolderDialog(collection: String, onSelect: (String)->Unit, o
                 }
             } }
             TextButton(onClick={create=true}) { Text("＋ フォルダーを作成") }
+            HorizontalDivider()
+            TextButton(onClick={choose(if(moving.isEmpty()) "unfiled" else "")}) {
+                Text(if(moving.isEmpty()) "未分類" else "フォルダーから外す（未分類へ）")
+            }
             if(error.isNotBlank()) Text(error,color=MaterialTheme.colorScheme.error)
         }
     },confirmButton={TextButton(onClick=onDismiss) { Text("閉じる") }})
@@ -63,7 +64,7 @@ internal fun LibraryFolderDialog(collection: String, onSelect: (String)->Unit, o
     if(deleting.isNotBlank()) AlertDialog(onDismissRequest={deleting=""},title={Text("フォルダーを削除しますか？")},
         text={Text("中の動画・音楽は削除せず、未分類へ戻します。")},confirmButton={TextButton(onClick={
             runCatching { LibraryExtras.deleteFolder(deleting) }.onSuccess {
-                if(collection == deleting) onSelect("unfiled")
+                if(collection == deleting) onSelect(LIBRARY_FOLDER_ROOT)
             }.onFailure { error="フォルダーを削除できませんでした。" }
             deleting=""
         }) { Text("フォルダーを削除") }},dismissButton={TextButton(onClick={deleting=""}) { Text("キャンセル") }})

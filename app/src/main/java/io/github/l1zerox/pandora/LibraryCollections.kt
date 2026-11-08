@@ -40,11 +40,19 @@ internal data class LibraryCollections(val favorites: Set<String> = emptySet(), 
 }
 
 internal enum class LibrarySort(val label: String) { NEWEST("追加が新しい順"), OLDEST("追加が古い順"), TITLE("タイトル順"), LONGEST("長い順"), SHORTEST("短い順") }
+internal const val LIBRARY_FOLDER_ROOT="folder-root"
+internal fun isFolderCollection(collection: String)=collection == LIBRARY_FOLDER_ROOT || collection == "unfiled" || collection.startsWith("folder:")
+internal fun folderParent(collection: String)=if(collection == LIBRARY_FOLDER_ROOT) "" else LIBRARY_FOLDER_ROOT
+internal data class LibraryFolderRow(val id: String, val name: String, val count: Int)
+internal fun libraryFolderRows(entries: List<LibraryEntry>, data: LibraryCollections, dubbedOnly: Boolean): List<LibraryFolderRow> {
+    val available=entries.filter { !dubbedOnly || it.autoDubbed && it.video }.map { it.uri }.toSet()
+    return data.folders.map { LibraryFolderRow(it.id,it.name,it.uris.toSet().count { uri -> uri in available }) }
+}
 internal fun organizedLibrary(entries: List<LibraryEntry>, data: LibraryCollections, collection: String, sort: LibrarySort,
     dubbedOnly: Boolean): List<LibraryEntry> {
     val playlist=data.playlists.firstOrNull { it.id == collection }
     val folder=data.folders.firstOrNull { it.id == collection }
-    val members=when { collection == "unfiled" -> entries.map { it.uri }.toSet()-data.folders.flatMap { it.uris }.toSet()
+    val members=when { collection == "unfiled" || collection == LIBRARY_FOLDER_ROOT -> entries.map { it.uri }.toSet()-data.folders.flatMap { it.uris }.toSet()
         folder != null -> folder.uris.toSet()
         collection == "favorites" -> data.favorites; playlist != null -> playlist.uris.toSet(); else -> null }
     val filtered=entries.filter { (members == null || it.uri in members) && (!dubbedOnly || it.autoDubbed && it.video) }

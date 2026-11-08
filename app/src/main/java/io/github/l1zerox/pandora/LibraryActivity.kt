@@ -8,6 +8,7 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -18,6 +19,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
@@ -119,6 +121,8 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
     var folderDialog by rememberSaveable { mutableStateOf(false) }
     var moveToFolder by rememberSaveable { mutableStateOf<List<String>>(arrayListOf()) }
     var collection by rememberSaveable { mutableStateOf("") }
+    val folderBrowsing=isFolderCollection(collection)
+    val folderRoot=collection == LIBRARY_FOLDER_ROOT
     var sortName by rememberSaveable { mutableStateOf(LibrarySort.NEWEST.name) }
     val sort=LibrarySort.valueOf(sortName)
     var dubbedOnly by rememberSaveable { mutableStateOf(false) }
@@ -128,6 +132,19 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
     var addToList by rememberSaveable { mutableStateOf(arrayListOf<String>()) }
     var confirmBatch by rememberSaveable { mutableStateOf(false) }
     var resumeEntry by rememberSaveable(stateSaver=LibraryEntrySaver) { mutableStateOf<LibraryEntry?>(null) }
+    fun navigateCollection(id: String) {
+        collection=id; selected=arrayListOf(); selecting=false
+        if(isFolderCollection(id)) controlsExpanded=false
+        focusManager.clearFocus(); keyboard?.hide()
+    }
+    fun navigateBack() {
+        if(folderBrowsing) navigateCollection(folderParent(collection)) else onBack()
+    }
+    BackHandler(enabled=folderBrowsing && !folderDialog && moveToFolder.isEmpty() && !organize && !appearance && deletion == null && !confirmBatch && resumeEntry == null && addToList.isEmpty()) { navigateBack() }
+    LaunchedEffect(collection) { gridState.scrollToItem(0) }
+    LaunchedEffect(collection,collections.folders) {
+        if(collection.startsWith("folder:") && collections.folders.none { it.id == collection }) navigateCollection(LIBRARY_FOLDER_ROOT)
+    }
     fun launchPlayer(uri: String? = null, position: Long? = null) {
         transport.handOffToPlayer()
         context.startActivity(Intent(context,PlayerActivity::class.java).apply {
@@ -180,10 +197,11 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
         catch(e: Exception) { error="一覧を読み込めませんでした。「更新」で再試行してください。"; AppLog.error("ライブラリー",e) }
         finally { loading=false }
     }
-    val visible=remember(entries,filter,search,collections,collection,sort,dubbedOnly) {
-        val base=libraryEntries(entries,emptyList(),filter,search)
-        organizedLibrary(base,collections,collection,sort,dubbedOnly)
+    val filteredEntries=remember(entries,filter,search) { libraryEntries(entries,emptyList(),filter,search) }
+    val visible=remember(filteredEntries,collections,collection,sort,dubbedOnly) {
+        organizedLibrary(filteredEntries,collections,collection,sort,dubbedOnly)
     }
+    val folderRows=remember(filteredEntries,collections,dubbedOnly) { libraryFolderRows(filteredEntries,collections,dubbedOnly) }
     val playingEntry=entries.firstOrNull { it.uri == playback.uri }
     val playingArtwork by produceState<Bitmap?>(null,playingEntry?.uri) {
         value=null
@@ -206,11 +224,11 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
             MaterialTheme(colorScheme=if(hasWallpaper) colors.copy(primary=Color.White,onSurface=Color.White,
                 onSurfaceVariant=Color.White,outline=Color.White.copy(alpha=.7f)) else colors) {
             Column(Modifier.padding(12.dp)) {
-            LibraryHeader(headerAccent,loading,onBack,onRefresh={error=""; refresh++})
+            LibraryHeader(headerAccent,loading,::navigateBack,onRefresh={error=""; refresh++})
             val controlsSummary=listOfNotNull(
                 filter.takeUnless { it == "すべて" },
                 "検索中".takeIf { search.isNotBlank() },
-                if(collection == "favorites") "お気に入り" else (collections.playlists+collections.folders).firstOrNull { it.id == collection }?.name ?: "未分類".takeIf { collection == "unfiled" },
+                if(folderRoot) "フォルダー一覧" else if(collection == "favorites") "お気に入り" else (collections.playlists+collections.folders).firstOrNull { it.id == collection }?.name ?: "未分類".takeIf { collection == "unfiled" },
                 "オートダビング版".takeIf { dubbedOnly },
                 "${selected.size}件選択".takeIf { selecting }
             ).joinToString(" · ")
@@ -224,7 +242,7 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
                     Text(if(importing) "追加中…" else "ファイルを追加")
                 }
             }
-            OutlinedButton(onClick={folderDialog=true}) { Text("フォルダー") }
+            OutlinedButton(onClick={navigateCollection(LIBRARY_FOLDER_ROOT)}) { Text("📁 フォルダー") }
             if(searchExpanded) {
                 OutlinedTextField(search,{search=it},Modifier.fillMaxWidth().focusRequester(searchFocus),singleLine=true,
                     label={Text("タイトルで検索")},keyboardOptions=KeyboardOptions(imeAction=ImeAction.Search),
@@ -247,7 +265,7 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
             }
             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                 TextButton(onClick={organize=true},modifier=Modifier.weight(1f)) {
-                    val name=if(collection == "favorites") "♥ お気に入り" else (collections.playlists+collections.folders).firstOrNull { it.id == collection }?.name ?: "未分類".takeIf { collection == "unfiled" } ?: "整理・並び替え"
+                    val name=if(folderRoot) "フォルダー一覧" else if(collection == "favorites") "♥ お気に入り" else (collections.playlists+collections.folders).firstOrNull { it.id == collection }?.name ?: "未分類".takeIf { collection == "unfiled" } ?: "整理・並び替え"
                     Text(name+(if(dubbedOnly) " · オートダビング版" else ""),maxLines=1,overflow=TextOverflow.Ellipsis)
                 }
                 TextButton(onClick={selecting=!selecting; selected=arrayListOf()}) { Text(if(selecting) "選択を終了" else "選択") }
@@ -261,6 +279,9 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
                 TextButton(enabled=selected.isNotEmpty(),onClick={confirmBatch=true}) { Text("削除") }
             }
             }
+            if(folderBrowsing) LibraryFolderPath(
+                name=if(folderRoot) null else if(collection == "unfiled") "未分類" else collections.folders.firstOrNull { it.id == collection }?.name,
+                onRoot={navigateCollection(LIBRARY_FOLDER_ROOT)},onAll={navigateCollection("")},onManage={folderDialog=true})
             if(preferences.libraryPlayerVisible && playback.uri.isNotBlank()) {
                 val panel=if(transport.panel.uri == playback.uri) transport.panel.copy(title=playback.title,advancing=transport.panel.advancing && !appearance)
                     else LibraryPlayerState(uri=playback.uri,title=playback.title)
@@ -272,13 +293,27 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
             if(transport.error.isNotBlank()) Text(transport.error,fontSize=13.sp)
             if(error.isNotBlank()) Text(error,color=if(hasWallpaper) Color.White else MaterialTheme.colorScheme.error,fontSize=13.sp)
             if(loading) LinearProgressIndicator(Modifier.fillMaxWidth())
-            if(visible.isEmpty() && !loading) Text(if(entries.isEmpty()) "保存した動画・音楽がここに表示されます。" else "該当するファイルはありません。",Modifier.padding(vertical=24.dp))
+            if(visible.isEmpty() && !loading && !folderRoot) Text(if(entries.isEmpty()) "保存した動画・音楽がここに表示されます。" else "該当するファイルはありません。",Modifier.padding(vertical=24.dp))
             }
             }
             }
             val controlsPull=rememberLibraryControlsPull(controlsExpanded,atTop={!gridState.canScrollBackward},onExpand={controlsExpanded=true})
             LazyVerticalGrid(columns=GridCells.Fixed(layout.columns),state=gridState,modifier=Modifier.weight(1f).nestedScroll(controlsPull),
                 horizontalArrangement=Arrangement.spacedBy(10.dp),verticalArrangement=Arrangement.spacedBy(10.dp),contentPadding=PaddingValues(vertical=8.dp)) {
+                if(folderRoot) {
+                    items(folderRows,key={"folder-row:${it.id}"},span={GridItemSpan(maxLineSpan)}) { folder ->
+                        LibraryFolderTile(folder,headerAccent,dark,backdrop,onOpen={navigateCollection(folder.id)})
+                    }
+                    if(folderRows.isEmpty()) item(key="no-folders",span={GridItemSpan(maxLineSpan)}) {
+                        LibraryFolderCaption("フォルダー管理からフォルダーを作成できます。",dark,backdrop)
+                    }
+                    item(key="unfiled-heading",span={GridItemSpan(maxLineSpan)}) {
+                        LibraryFolderCaption("未分類 · ${visible.size}件",dark,backdrop)
+                    }
+                    if(visible.isEmpty() && !loading) item(key="unfiled-empty",span={GridItemSpan(maxLineSpan)}) {
+                        LibraryFolderCaption("未分類のファイルはありません。",dark,backdrop)
+                    }
+                }
                 items(visible,key={it.uri}) { item ->
                     LibraryCard(item,dark,backdrop,transport,layout,onDelete={if(!importing) deletion=item},
                         favorite=item.uri in collections.favorites,selected=item.uri in selected,
@@ -301,10 +336,10 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
     if(appearance) LibraryAppearanceDialog(wallpaper,preferences,playingEntry ?: visible.firstOrNull(),headerAccent,colors,
         onChange=Store::preferences,onDismiss={appearance=false},previewEntries=visible.take(6))
     UpdatePrompt(allowed=!appearance && deletion == null && !importing && error.isBlank() && !organize && addToList.isEmpty() && !confirmBatch && resumeEntry == null && batch == null && !folderDialog && moveToFolder.isEmpty())
-    if(folderDialog) LibraryFolderDialog(collection,onSelect={collection=it},onDismiss={folderDialog=false})
+    if(folderDialog) LibraryFolderDialog(collection,onSelect=::navigateCollection,onDismiss={folderDialog=false})
     if(moveToFolder.isNotEmpty()) LibraryFolderDialog(collection,onSelect={},onDismiss={moveToFolder=arrayListOf()},
         moving=moveToFolder,onMoved={moveToFolder=arrayListOf(); selected=arrayListOf(); selecting=false})
-    if(organize) LibraryOrganizeDialog(collection,sort,dubbedOnly,onCollection={collection=it},onSort={sortName=it.name},
+    if(organize) LibraryOrganizeDialog(collection,sort,dubbedOnly,onCollection=::navigateCollection,onSort={sortName=it.name},
         onDubbed={dubbedOnly=it},onDismiss={organize=false})
     if(addToList.isNotEmpty()) AddToPlaylistDialog(addToList,onDismiss={addToList=arrayListOf()},onAdded={addToList=arrayListOf(); selected=arrayListOf(); selecting=false})
     resumeEntry?.let { entry -> ResumePlaybackDialog(entry,LibraryExtras.position(entry.uri,entry.durationMs),
