@@ -50,6 +50,8 @@ internal object LibraryDeletion {
     suspend fun finish(context: Context, entry: LibraryEntry) = withContext(Dispatchers.IO+NonCancellable) {
         LibraryRepository.forgetImport(context,entry.uri)
         withContext(Dispatchers.Main) { PlaybackRuntime.removeLibraryItem?.invoke(entry.uri) }
+        // Removing the current item can emit a final bookmark; clear it after those callbacks.
+        if(BuildConfig.BETA) runCatching { LibraryExtras.forget(entry.uri) }.onFailure { AppLog.error("ライブラリー設定の整理",it) }
     }
 
     suspend fun removeImport(context: Context, entry: LibraryEntry) {

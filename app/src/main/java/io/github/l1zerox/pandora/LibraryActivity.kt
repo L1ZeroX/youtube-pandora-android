@@ -15,6 +15,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -111,9 +113,42 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
     var deletion by rememberSaveable(stateSaver=LibraryEntrySaver) { mutableStateOf<LibraryEntry?>(null) }
     val playback by PlaybackRuntime.state.collectAsStateWithLifecycle()
     val transport=rememberLibraryPlayback()
-    fun openPlayer(uri: String? = null) {
+    val collections by LibraryExtras.state.collectAsStateWithLifecycle()
+    val batch by LibraryBatchDeletion.state.collectAsStateWithLifecycle()
+    var collection by rememberSaveable { mutableStateOf("") }
+    var sortName by rememberSaveable { mutableStateOf(LibrarySort.NEWEST.name) }
+    val sort=LibrarySort.valueOf(sortName)
+    var dubbedOnly by rememberSaveable { mutableStateOf(false) }
+    var organize by rememberSaveable { mutableStateOf(false) }
+    var selected by rememberSaveable { mutableStateOf(arrayListOf<String>()) }
+    var selecting by rememberSaveable { mutableStateOf(false) }
+    var addToList by rememberSaveable { mutableStateOf(arrayListOf<String>()) }
+    var confirmBatch by rememberSaveable { mutableStateOf(false) }
+    var resumeEntry by rememberSaveable(stateSaver=LibraryEntrySaver) { mutableStateOf<LibraryEntry?>(null) }
+    fun launchPlayer(uri: String? = null, position: Long? = null) {
         transport.handOffToPlayer()
-        context.startActivity(Intent(context,PlayerActivity::class.java).apply { if(uri != null) putExtra("uri",uri) })
+        context.startActivity(Intent(context,PlayerActivity::class.java).apply {
+            if(uri != null) putExtra("uri",uri)
+            if(BuildConfig.BETA) {
+                putExtra("collection",collection)
+                putExtra("librarySort",sortName); putExtra("dubbedOnly",dubbedOnly)
+                if(position != null) putExtra("startPosition",position)
+            }
+        })
+    }
+    fun openPlayer(uri: String? = null) {
+        val entry=entries.firstOrNull { it.uri == uri }
+        if(BuildConfig.BETA && entry != null && entry.video && uri != transport.uri && LibraryExtras.position(entry.uri,entry.durationMs) > 0)
+            resumeEntry=entry
+        else launchPlayer(uri)
+    }
+    fun toggleSelection(uri: String) {
+        selecting=true
+        selected=ArrayList(if(uri in selected) selected-uri else selected+uri)
+    }
+    LaunchedEffect(batch?.deleted) {
+        val removed=batch?.deleted.orEmpty()
+        if(removed.isNotEmpty()) { entries=entries.filterNot { it.uri in removed }; selected=ArrayList(selected.filterNot { it in removed }) }
     }
     val lifecycle=LocalLifecycleOwner.current.lifecycle
     val picker=rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
@@ -142,7 +177,10 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
         catch(e: Exception) { error="一覧を読み込めませんでした。「更新」で再試行してください。"; AppLog.error("ライブラリー",e) }
         finally { loading=false }
     }
-    val visible=remember(entries,filter,search) { libraryEntries(entries,emptyList(),filter,search) }
+    val visible=remember(entries,filter,search,collections,collection,sort,dubbedOnly) {
+        val base=libraryEntries(entries,emptyList(),filter,search)
+        if(BuildConfig.BETA) organizedLibrary(base,collections,collection,sort,dubbedOnly) else base
+    }
     val playingEntry=entries.firstOrNull { it.uri == playback.uri }
     val playingArtwork by produceState<Bitmap?>(null,playingEntry?.uri) {
         value=null
@@ -193,6 +231,22 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
                 LibraryLayoutButton(layout,headerAccent,onOpen={focusManager.clearFocus(); keyboard?.hide()},
                     onSelect={Store.preferences(preferences.copy(libraryLayout=it.id))})
             }
+            if(BuildConfig.BETA) {
+                Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                    TextButton(onClick={organize=true},modifier=Modifier.weight(1f)) {
+                        val name=if(collection == "favorites") "♥ お気に入り" else collections.playlists.firstOrNull { it.id == collection }?.name ?: "整理・並び替え"
+                        Text(name+(if(dubbedOnly) " · オートダビング版" else ""),maxLines=1,overflow=TextOverflow.Ellipsis)
+                    }
+                    TextButton(onClick={selecting=!selecting; selected=arrayListOf()}) { Text(if(selecting) "選択を終了" else "選択") }
+                    if(playback.uri.isNotBlank()) PlaybackBetaMenu(transport.controller)
+                }
+                if(selecting) FlowRow(horizontalArrangement=Arrangement.spacedBy(4.dp),verticalArrangement=Arrangement.Center) {
+                    Text("${selected.size}件選択",Modifier.padding(vertical=12.dp))
+                    TextButton(onClick={selected=ArrayList(visible.map { it.uri })}) { Text("表示中を全選択") }
+                    TextButton(enabled=selected.isNotEmpty(),onClick={addToList=ArrayList(selected)}) { Text("リストへ") }
+                    TextButton(enabled=selected.isNotEmpty(),onClick={confirmBatch=true}) { Text("削除") }
+                }
+            }
             if(playback.uri.isNotBlank()) Surface(color=Color.Transparent,contentColor=playingPalette.content,
                 shape=RoundedCornerShape(16.dp),modifier=Modifier.fillMaxWidth().libraryCardGlass(playingPalette,backdrop)) {
                 Column(Modifier.padding(horizontal=12.dp,vertical=6.dp)) {
@@ -213,8 +267,18 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
             LazyVerticalGrid(columns=GridCells.Fixed(layout.columns),state=gridState,modifier=Modifier.weight(1f),
                 horizontalArrangement=Arrangement.spacedBy(10.dp),verticalArrangement=Arrangement.spacedBy(10.dp),contentPadding=PaddingValues(vertical=8.dp)) {
                 items(visible,key={it.uri}) { item ->
-                    LibraryCard(item,dark,backdrop,transport,layout,onDelete={if(!importing) deletion=item}) {
-                        openPlayer(item.uri)
+                    LibraryCard(item,dark,backdrop,transport,layout,onDelete={if(!importing) deletion=item},
+                        favorite=BuildConfig.BETA && item.uri in collections.favorites,selected=item.uri in selected,
+                        selectionMode=BuildConfig.BETA && selecting,onLongClick={if(BuildConfig.BETA) toggleSelection(item.uri)},
+                        onFavorite={runCatching { LibraryExtras.favorite(item.uri) }.onFailure { error="お気に入りを保存できませんでした。" }},
+                        onPlaylist={addToList=arrayListOf(item.uri)},onNext={
+                            runCatching { enqueueNext(transport.controller ?: error("先に再生を開始してください。"),item) }
+                                .onFailure { error=it.message ?: "再生順を変更できませんでした。" }
+                        },onRemoveFromList=if(collections.playlists.any { it.id == collection }) ({
+                            runCatching { LibraryExtras.removeFrom(collection,setOf(item.uri)) }.onFailure { error="リストを更新できませんでした。" }
+                            Unit
+                        }) else null) {
+                        if(BuildConfig.BETA && selecting) toggleSelection(item.uri) else openPlayer(item.uri)
                     }
                 }
             }
@@ -223,7 +287,20 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
     }
     if(appearance) LibraryAppearanceDialog(wallpaper,preferences,playingEntry ?: visible.firstOrNull(),headerAccent,colors,
         onChange=Store::preferences,onDismiss={appearance=false},previewEntries=visible.take(6))
-    UpdatePrompt(allowed=!appearance && deletion == null && !importing && error.isBlank())
+    UpdatePrompt(allowed=!appearance && deletion == null && !importing && error.isBlank() && !organize && addToList.isEmpty() && !confirmBatch && resumeEntry == null && batch == null)
+    if(BuildConfig.BETA) {
+        if(organize) LibraryOrganizeDialog(collection,sort,dubbedOnly,onCollection={collection=it},onSort={sortName=it.name},
+            onDubbed={dubbedOnly=it},onDismiss={organize=false})
+        if(addToList.isNotEmpty()) AddToPlaylistDialog(addToList,onDismiss={addToList=arrayListOf()},onAdded={addToList=arrayListOf(); selected=arrayListOf(); selecting=false})
+        resumeEntry?.let { entry -> ResumePlaybackDialog(entry,LibraryExtras.position(entry.uri,entry.durationMs),
+            onStart={position -> resumeEntry=null; launchPlayer(entry.uri,position)},onDismiss={resumeEntry=null}) }
+        if(confirmBatch) AlertDialog(onDismissRequest={confirmBatch=false},title={Text("${selected.size}件のファイルを削除しますか？")},
+            text={Text("保存元の動画・音楽も削除します。この操作は元に戻せません。")},
+            confirmButton={TextButton(onClick={
+                LibraryBatchDeletion.start(context,entries.filter { it.uri in selected }); confirmBatch=false
+            }) { Text("まとめて削除") }},dismissButton={TextButton(onClick={confirmBatch=false}) { Text("キャンセル") }})
+        BatchDeletionProgress()
+    }
     deletion?.let { entry -> key(entry.uri) {
         LibraryDeleteDialog(entry,onDismiss={deletion=null},onRemoved={
             entries=entries.filterNot { it.uri == entry.uri }; refresh++
@@ -232,27 +309,38 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun LibraryCard(entry: LibraryEntry, dark: Boolean, backdrop: LibraryBackdrop, playback: LibraryPlayback,
-    layout: LibraryLayout = LibraryLayout.STANDARD, onDelete: ()->Unit, onClick: ()->Unit) {
+    layout: LibraryLayout = LibraryLayout.STANDARD, onDelete: ()->Unit, favorite: Boolean = false, selected: Boolean = false,
+    selectionMode: Boolean = false, onLongClick: ()->Unit = {}, onFavorite: ()->Unit = {}, onPlaylist: ()->Unit = {},
+    onNext: ()->Unit = {}, onRemoveFromList: (()->Unit)? = null, onClick: ()->Unit) {
     val context=LocalContext.current
     val bitmap by produceState<Bitmap?>(null,entry.uri) { value=null; value=LibraryRepository.artwork(context,entry) }
     val source=remember(bitmap) { bitmap?.let { libraryThumbnailColor(it) } }
     val palette=remember(source,dark) { libraryPalette(source,dark) }
     var menu by remember { mutableStateOf(false) }
     Surface(shape=RoundedCornerShape(16.dp),color=Color.Transparent,contentColor=palette.content,
-        border=BorderStroke(1.dp,palette.content.copy(alpha=.25f)),
-        modifier=Modifier.fillMaxWidth().libraryCardGlass(palette,backdrop).clickable(onClick=onClick)) {
+        border=BorderStroke(if(selected) 3.dp else 1.dp,palette.content.copy(alpha=if(selected) 1f else .25f)),
+        modifier=Modifier.fillMaxWidth().libraryCardGlass(palette,backdrop).then(
+            if(BuildConfig.BETA) Modifier.combinedClickable(onClick=onClick,onLongClick=onLongClick) else Modifier.clickable(onClick=onClick))) {
         LibraryCardBody(entry,bitmap,palette,layout,
-            play={LibraryPlayButton(entry.uri,playback,palette,onClick)},menu={
+            play={if(selectionMode) Checkbox(checked=selected,onCheckedChange={onClick()}) else LibraryPlayButton(entry.uri,playback,palette,onClick)},menu={
                 Box {
                     IconButton(onClick={menu=true},modifier=Modifier.semantics { contentDescription="${entry.title}のメニュー" }) {
-                        Text("⋮",fontSize=22.sp,color=palette.content)
+                        Text(if(favorite) "♥⋮" else "⋮",fontSize=22.sp,color=palette.content)
                     }
                     DropdownMenu(expanded=menu,onDismissRequest={menu=false}) {
+                        if(BuildConfig.BETA) {
+                            DropdownMenuItem(text={Text(if(favorite) "お気に入りを解除" else "お気に入りに追加")},onClick={menu=false; onFavorite()})
+                            DropdownMenuItem(text={Text("プレイリストに追加")},onClick={menu=false; onPlaylist()})
+                            DropdownMenuItem(text={Text("次に再生")},onClick={menu=false; onNext()})
+                            DropdownMenuItem(text={Text("選択")},onClick={menu=false; onLongClick()})
+                            if(onRemoveFromList != null) DropdownMenuItem(text={Text("このリストから外す")},onClick={menu=false; onRemoveFromList()})
+                        }
                         DropdownMenuItem(text={Text("削除")},onClick={menu=false; onDelete()})
                     }
                 }
-            },footer={if(playback.uri == entry.uri) LibrarySeekBar(entry.uri,playback,palette,source,backdrop,compact=layout != LibraryLayout.STANDARD)})
+            },footer={if(!selectionMode && playback.uri == entry.uri) LibrarySeekBar(entry.uri,playback,palette,source,backdrop,compact=layout != LibraryLayout.STANDARD)})
     }
 }

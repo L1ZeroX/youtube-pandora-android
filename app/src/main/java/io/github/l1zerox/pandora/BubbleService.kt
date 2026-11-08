@@ -68,6 +68,8 @@ class BubbleService : Service() {
     private var queueSnapshot: List<Video>? = null
     private var queuePage=0
     private var renderedPage=-1
+    private var savedSnapshot: List<SavedDownload> = emptyList()
+    private var savedFormat=""
     private var previousPage: Button? = null
     private var nextPage: Button? = null
     private val queueDeletes=mutableListOf<Button>()
@@ -333,15 +335,18 @@ class BubbleService : Service() {
         val pageCount=((s.videos.size+7)/8).coerceAtLeast(1)
         queuePage=queuePage.coerceIn(0,pageCount-1)
         queue?.text=if(s.videos.isEmpty()) "キューは空です。" else "キュー ${s.videos.size} 件 · ${queuePage+1} / $pageCount ページ"
-        if(queueSnapshot != s.videos || renderedPage != queuePage) {
+        val saved=if(BuildConfig.BETA) SavedDownloads.state.value else emptyList()
+        if(queueSnapshot != s.videos || renderedPage != queuePage || savedSnapshot != saved || savedFormat != s.preferences.format) {
             queueSnapshot=s.videos; renderedPage=queuePage
+            savedSnapshot=saved; savedFormat=s.preferences.format
             rows.removeAllViews(); queueDeletes.clear()
             for(video in s.videos.drop(queuePage*8).take(8)) {
                 val row=LinearLayout(this).apply { gravity=Gravity.CENTER_VERTICAL }
                 row.addView(text(13f).apply {
                     text="${video.status}${if(video.selected) "" else "（対象外）"}\n${video.title}"+
-                        if(video.audioInfo.isNotBlank()) "\n${video.audioInfo}" else ""
-                    maxLines=3; ellipsize=android.text.TextUtils.TruncateAt.END
+                        (if(video.audioInfo.isNotBlank()) "\n${video.audioInfo}" else "")+
+                        (if(saved.containsDownload(video,s.preferences.format)) "\n保存済み（${s.preferences.format}）" else "")
+                    maxLines=if(BuildConfig.BETA) 4 else 3; ellipsize=android.text.TextUtils.TruncateAt.END
                 },LinearLayout.LayoutParams(0,-2,1f))
                 val remove=button("削除",register=false) { Store.removeQueueVideo(video.key) }.apply {
                     contentDescription="キューから削除: ${video.title}"

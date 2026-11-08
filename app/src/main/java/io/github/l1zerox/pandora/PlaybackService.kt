@@ -30,6 +30,7 @@ internal fun removeLibraryMedia(player: Player, uri: String) {
 @androidx.annotation.OptIn(UnstableApi::class)
 class PlaybackService : MediaSessionService() {
     private var session: MediaSession? = null
+    private var betaTools: PlaybackBetaTools? = null
     override fun onCreate() {
         super.onCreate()
         val player=ExoPlayer.Builder(this)
@@ -44,10 +45,12 @@ class PlaybackService : MediaSessionService() {
         })
         val open=PendingIntent.getActivity(this,40,Intent(this,PlayerActivity::class.java),PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         session=MediaSession.Builder(this,player).setSessionActivity(open).build()
+        if(BuildConfig.BETA) betaTools=PlaybackBetaTools(player)
         PlaybackRuntime.removeLibraryItem={ uri -> removeLibraryMedia(player,uri) }
     }
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
     override fun onDestroy() {
+        betaTools?.close(); betaTools=null
         PlaybackRuntime.removeLibraryItem=null
         session?.run { player.release(); release() }; session=null
         PlaybackRuntime.state.value=PlaybackStatus()

@@ -1,5 +1,21 @@
 # 検証状況
 
+## v0.4.24-beta.1（2026-11-08）
+
+正式版v0.4.23をベースとし、新機能のUI・初期化・再生サービスへの追加処理はBuildConfig.BETAで有効にする。正式版のversionName/codeは0.4.23/44を維持し、新しいベータ版は0.4.24-beta.1/45とする。既存のアプリID、署名、設定・キュー・MediaStore保存先は維持する。新しい記録は専用SharedPreferencesを使う。
+
+LibraryExtrasはお気に入りと名前付きプレイリストをJSONで保存し、動画URIごとの再生位置を記録する。冒頭5秒未満・残り3秒以内・10秒以下の短い素材・長さ不明では再開候補にしない。LibraryCollectionsは選択リストとオートダビング条件の積集合に対して並び替える。プレイリストの登録順も保持する。PlayerActivityは選んだコレクション・並び順・種類に沿った再生キューを作り、指定した再開位置を渡す。
+
+PlaybackBetaToolsは既存ExoPlayerのリスナーとして動き、新しいプレイヤーは生成しない。スリープタイマーはサービス内の単調時計による締切とpauseAtEndOfMediaItemsを使用し、画面を閉じても音楽のタイマーを監視する。次に再生と順序変更はaddMediaItem/moveMediaItemを使い、再生位置をリセットしない。既存項目を重複追加せず、シャッフル時の順序不一致を防ぎ、コマンドが許可されていなければ変更しない。動画・ショート・音楽のカテゴリ分離は継続する。
+
+SavedDownloadsはアプリ保存先の公開済み・サイズが正のMediaStore項目だけを扱う。新規保存はURLと形式を記録し、旧YouTubeファイルは末尾のID形式から補完する。数字のみ・ニコニコ形式のIDは旧YouTubeと誤認しない。YouTubeの短縮URL・ショートURL・時刻指定を同じIDへ対応付け、MP4とMP3を区別する。MediaStoreの変更を監視し、削除後の存在しない項目を保存済み一覧から除く。ダウンロード成功後の記録失敗は既存ダウンロードを失敗扱いにしない。
+
+一括削除は既存LibraryDeletionを順番に実行する。Applicationのコルーチンスコープで画面回転をまたぎ、Androidの許可待ちをComposeの保存可能な要求IDとActivityResultで受け渡す。拒否・失敗を削除済みに含めず、実際に削除できたURIだけを一覧から取り除く。ファイル削除の完了後、再生キューとお気に入り・プレイリストの参照を整理する。
+
+単体テスト189件で既存処理と新しいJSON保存・ソート・絞り込み・再開条件・保存済み判定・タイマー締切・再生順変更・削除結果の区別を検証する。端末テストに設定の保存／再読み込み、長押しと選択中の再生抑止、実プレイヤーでの再開記録・曲末停止を追加し、コンパイルで確認する。実機・エミュレーターは未接続のため、端末テストの実行、見た目、ドラッグ、再生継続、タイマー、削除許可画面は未確認。
+
+参照: [Media3のプレイリスト操作](https://developer.android.com/media/media3/exoplayer/playlists)、[ExoPlayer](https://developer.android.com/reference/androidx/media3/exoplayer/ExoPlayer)。
+
 ## v0.4.23（2026-11-08）
 
 ライブラリーのコンパクトな再生バーと音楽画面のカスタムSliderをPlaybackPositionSliderへ共通化した。使用中のMaterial3 1.3.2のSliderImplはthumb用BoxへSliderの高さの最小制約を渡す一方、その中の小さい丸いBoxを左上に配置する。このため高さ32dpのライブラリーでは丸がバーより上へ寄り得る。つまみのコンテナを操作領域の高さに満たし、幅4dp・高さ20dp/28dpの縦線を中央に置いた。
