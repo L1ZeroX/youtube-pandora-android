@@ -261,7 +261,7 @@ fun PandoraScreen(artworkRequested: Boolean = false, onArtworkClosed: ()->Unit =
                 Store.preferences(Store.state.value.preferences.copy(saveRange=selected))
                 rangeDialog=false; onRangeClosed()
             }
-        },onDismiss={rangeDialog=false; onRangeClosed()})
+        },onDismiss={rangeDialog=false; onRangeClosed()},videos=s.videos)
         UpdatePrompt(allowed=!settings && !backgroundSettings && !logs && !artworkRequested && !rangeDialog && !rangeRequested && preview == null && error.isEmpty() && pending == null)
         preview?.let { selected ->
             val video=s.videos.firstOrNull { it.key == selected.key } ?: selected

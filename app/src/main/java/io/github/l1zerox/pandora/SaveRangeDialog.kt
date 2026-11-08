@@ -12,23 +12,60 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-internal fun SaveRangeDialog(initial: SaveRange, editable: Boolean, onApply: (SaveRange)->Unit, onDismiss: ()->Unit) {
+internal fun SaveRangeDialog(initial: SaveRange, editable: Boolean, onApply: (SaveRange)->Unit, onDismiss: ()->Unit,
+    videos: List<Video> = emptyList()) {
     var enabled by rememberSaveable { mutableStateOf(initial.enabled) }
     var start by rememberSaveable { mutableStateOf(saveTimeText(initial.startSeconds)) }
     var end by rememberSaveable { mutableStateOf(initial.endSeconds?.let(::saveTimeText).orEmpty()) }
     var error by rememberSaveable { mutableStateOf("") }
+    var referenceKey by rememberSaveable { mutableStateOf("") }
+    var choosingReference by remember { mutableStateOf(false) }
+    val references=saveRangeBarReferences(videos)
+    val reference=references.firstOrNull { it.key == referenceKey } ?: references.firstOrNull()
+    val maximum=saveRangeBarMaximum(reference?.duration)
     AlertDialog(onDismissRequest=onDismiss,title={Text("保存範囲")},text={
         Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment=Alignment.CenterVertically) {
                 Text("時間を指定",Modifier.weight(1f))
-                Switch(checked=enabled,onCheckedChange={enabled=it; error=""},enabled=editable,
+                Switch(checked=enabled,onCheckedChange={
+                    enabled=it; error=""
+                    if(it && maximum != null && end.isBlank() && (start.isBlank() || parseSaveTime(start) == 0L))
+                        end=saveTimeText(maximum)
+                },enabled=editable,
                     modifier=Modifier.semantics { contentDescription="保存範囲を指定" })
             }
             if(enabled) {
+                if(reference != null && maximum != null) {
+                    Text("バーで範囲を選択",fontSize=14.sp)
+                    if(references.size > 1) Box {
+                        OutlinedButton(onClick={choosingReference=true},enabled=editable,modifier=Modifier.fillMaxWidth()) {
+                            Text("基準: ${reference.title} ▾",maxLines=2,overflow=TextOverflow.Ellipsis)
+                        }
+                        DropdownMenu(expanded=choosingReference,onDismissRequest={choosingReference=false}) {
+                            references.forEach { video -> DropdownMenuItem(text={
+                                Text("${video.title} · ${durationText(video.duration)}",maxLines=2,overflow=TextOverflow.Ellipsis)
+                            },onClick={referenceKey=video.key; choosingReference=false},enabled=editable) }
+                        }
+                    } else Text(reference.title,maxLines=2,overflow=TextOverflow.Ellipsis,fontSize=12.sp)
+                    val selection=saveRangeBarSelection(start,end,maximum)
+                    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
+                        Text("開始 ${saveTimeText(selection.start)}",fontSize=12.sp)
+                        Text(if(end.isBlank()) "終了 最後まで" else "終了 ${saveTimeText(selection.end)}",fontSize=12.sp)
+                    }
+                    key(reference.key,maximum) {
+                        SaveRangeSlider(selection,maximum,editable) { changed ->
+                            start=saveTimeText(changed.start)
+                            end=changed.endText(selection,end)
+                            error=""
+                        }
+                    }
+                    Text("左右のつまみで1秒単位に指定。バーは基準動画の長さまで表示します。",fontSize=12.sp)
+                } else Text("長さが分かる動画をキューで選択すると、バーでも指定できます。時刻の入力はそのまま使えます。",fontSize=12.sp)
                 OutlinedTextField(value=start,onValueChange={start=it.take(24); error=""},label={Text("開始時刻")},
                     placeholder={Text("0:30")},singleLine=true,enabled=editable,modifier=Modifier.fillMaxWidth(),
                     keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Ascii))
