@@ -263,7 +263,7 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
                 LibraryPlayerPanel(panel,playingArtwork,playingColor,preferences.libraryPlayerScale,
                     onOpen={openPlayer()},onToggle={transport.toggle(panel.uri)},
                     onPrevious={transport.previous(panel.uri)},onNext={transport.next(panel.uri)},onSeek={transport.seek(panel.uri,it)},
-                    waveform=preferences.libraryPlayerWave)
+                    waveform=preferences.libraryPlayerWave,effect=PlaybackEffect.fromId(preferences.libraryPlayerEffect))
             }
             if(transport.error.isNotBlank()) Text(transport.error,fontSize=13.sp)
             if(error.isNotBlank()) Text(error,color=if(hasWallpaper) Color.White else MaterialTheme.colorScheme.error,fontSize=13.sp)

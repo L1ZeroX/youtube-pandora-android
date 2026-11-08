@@ -8,9 +8,10 @@ import shutil
 import subprocess
 import sys
 import zipfile
+import re
 
 beta = "--beta" in sys.argv
-version = "0.4.24-beta.7" if beta else "0.4.24"
+version = "0.4.25-beta.1" if beta else "0.4.24"
 root = Path(__file__).resolve().parent.parent
 config = json.loads((root / '.tools/environment.json').read_text())
 private = root / '.signing'
@@ -39,11 +40,23 @@ subprocess.run([str(tools / 'apksigner.bat'), 'sign', '--ks', str(key), '--ks-ke
                 '--out', str(apk), str(aligned)], env=env, check=True)
 subprocess.run([str(tools / 'apksigner.bat'), 'verify', '--verbose', str(apk)], env=env, check=True)
 (release / f"SHA256SUMS-v{version}.txt").write_text(hashlib.sha256(apk.read_bytes()).hexdigest() + '  ' + apk.name + '\n')
+if '--delta-from' in sys.argv:
+    from apk_delta import create_patch
+    base = Path(sys.argv[sys.argv.index('--delta-from') + 1]).resolve(strict=True)
+    badging = subprocess.check_output([str(tools / 'aapt.exe'), 'dump', 'badging', str(base)], text=True, encoding='utf-8')
+    base_version = re.search(r"versionName='([^']+)'", badging).group(1)
+    assert re.fullmatch(r'\d+\.\d+\.\d+(?:-beta\.\d+)?', base_version) and base_version != version
+    assert "package: name='io.github.l1zerox.pandora'" in badging
+    patch = release / f'YoutubePandora-Android-v{version}-from-v{base_version}.pdelta.gz'
+    result = create_patch(base, apk, patch)
+    with (release / f'SHA256SUMS-v{version}.txt').open('a', encoding='utf-8') as sums:
+        sums.write(result['sha256'] + '  ' + patch.name + '\n')
+    print('Delta: ' + str(result))
 source = release / f"YoutubePandora-Android-v{version}-source.zip"
 with zipfile.ZipFile(source, 'w', zipfile.ZIP_DEFLATED) as archive:
-    # Include new Kotlin source before commit, restricted to app/src; never export signing material.
+    # Include new implementation/build scripts before commit; never export signing material.
     paths = subprocess.check_output(['git', 'ls-files', '-z'], cwd=root).decode().split('\0')
-    paths += subprocess.check_output(['git', 'ls-files', '--others', '--exclude-standard', '-z', '--', 'app/src'], cwd=root).decode().split('\0')
+    paths += subprocess.check_output(['git', 'ls-files', '--others', '--exclude-standard', '-z', '--', 'app/src', 'scripts'], cwd=root).decode().split('\0')
     for name in sorted(set(filter(None, paths))):
         path = root / name
         if path.is_file():

@@ -76,7 +76,7 @@ class AppUpdateActivity : ComponentActivity() {
                         Text("アプリを更新",style=MaterialTheme.typography.headlineMedium)
                         Text(update.release?.let { "現在 ${BuildConfig.VERSION_NAME} → ${it.version}" } ?: "更新ファイルはありません。")
                         when(update.stage) {
-                            ApkStage.DOWNLOADING -> {
+                            ApkStage.DOWNLOADING, ApkStage.PATCHING -> {
                                 val fraction=if(update.total > 0) (update.bytes.toFloat()/update.total).coerceIn(0f,1f) else null
                                 if(fraction == null) LinearProgressIndicator(Modifier.fillMaxWidth())
                                 else LinearProgressIndicator(progress={fraction},modifier=Modifier.fillMaxWidth())
@@ -100,7 +100,7 @@ class AppUpdateActivity : ComponentActivity() {
                         if(update.release != null) OutlinedButton(onClick={
                             autoInstall=false
                             lifecycleScope.launch { runCatching { ApkUpdates.clear() }.onSuccess { finish() }.onFailure { message=it.message.orEmpty() } }
-                        },enabled=!installBusy && update.stage != ApkStage.VERIFYING) {
+                        },enabled=!installBusy && update.stage !in listOf(ApkStage.VERIFYING,ApkStage.PATCHING)) {
                             Text(if(update.working) "ダウンロードをキャンセル" else "更新ファイルを削除")
                         }
                         TextButton(onClick={finish()},enabled=!installBusy) { Text("戻る") }

@@ -50,7 +50,7 @@ internal fun libraryPlayerAccent(source: Color?): Color {
 @Composable
 internal fun LibraryPlayerPanel(state: LibraryPlayerState, artwork: Bitmap?, source: Color?, scale: Float,
     onOpen: ()->Unit, onToggle: ()->Unit, onPrevious: ()->Unit, onNext: ()->Unit, onSeek: (Float)->Unit,
-    modifier: Modifier = Modifier, waveform: Boolean = true) {
+    modifier: Modifier = Modifier, waveform: Boolean = true, effect: PlaybackEffect = PlaybackEffect.WAVE) {
     val size=libraryPlayerScale(scale)
     val accent=remember(source) { libraryPlayerAccent(source) }
     var drag by remember(state.uri) { mutableStateOf<Float?>(null) }
@@ -76,7 +76,7 @@ internal fun LibraryPlayerPanel(state: LibraryPlayerState, artwork: Bitmap?, sou
                 PlaybackPositionSlider(mediaKey=state.uri,value=fraction,onValueChange={drag=it},
                     onValueChangeFinished={drag?.let(onSeek); drag=null},enabled=state.seekable,color=accent,
                     description="再生パネルの再生位置",modifier=Modifier.fillMaxWidth(),compact=true,
-                    waveform=waveform,playing=state.advancing && drag == null)
+                    waveform=waveform,playing=state.advancing && drag == null,effect=effect)
             }
             val elapsed=durationText((if(drag != null) playbackPositionMs(state.duration,fraction) else state.position)/1000.0)
             val total=if(state.duration > 0) durationText(state.duration/1000.0) else "--:--"

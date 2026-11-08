@@ -30,8 +30,19 @@ internal fun LibraryPlayerAppearanceControls(preferences: Preferences, onChange:
                 onCheckedChange={onChange(preferences.copy(libraryPlayerWave=it))},
                 modifier=Modifier.semantics { contentDescription="再生バーのエフェクト" })
         }
+        PlaybackEffect.entries.forEach { effect ->
+            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                RadioButton(selected=PlaybackEffect.fromId(preferences.libraryPlayerEffect) == effect,
+                    onClick={onChange(preferences.copy(libraryPlayerEffect=effect.id))},
+                    enabled=preferences.libraryPlayerVisible && preferences.libraryPlayerWave,
+                    modifier=Modifier.semantics { contentDescription=effect.label })
+                TextButton(onClick={onChange(preferences.copy(libraryPlayerEffect=effect.id))},
+                    enabled=preferences.libraryPlayerVisible && preferences.libraryPlayerWave,
+                    colors=ButtonDefaults.textButtonColors(contentColor=LocalContentColor.current)) { Text(effect.label) }
+            }
+        }
         Text("非表示にしても再生は続きます。",fontSize=11.sp)
-        TextButton(onClick={onChange(preferences.copy(libraryPlayerVisible=true,libraryPlayerScale=DEFAULT_LIBRARY_PLAYER_SCALE,libraryPlayerWave=true))}) {
+        TextButton(onClick={onChange(preferences.copy(libraryPlayerVisible=true,libraryPlayerScale=DEFAULT_LIBRARY_PLAYER_SCALE,libraryPlayerWave=true,libraryPlayerEffect="wave"))}) {
             Text("再生パネルを初期設定に戻す")
         }
         Spacer(Modifier.height(8.dp))

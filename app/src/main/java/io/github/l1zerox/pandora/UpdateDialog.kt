@@ -54,6 +54,9 @@ internal fun UpdateDialog(state: UpdateState, dismiss: ()->Unit) {
             if(release != null) {
                 Text("現在 ${BuildConfig.VERSION_NAME} → ${release.version}${if(release.preview) "（試用版）" else ""}")
                 Text(release.notes,fontSize=13.sp)
+                release.delta?.let { delta ->
+                    Text("差分更新 約%.1f MB（通常 約%.1f MB）。利用できない場合はAPK全体を取得します。".format(delta.size/1048576.0,release.size/1048576.0),fontSize=12.sp)
+                }
                 Text("アプリ内でAPKを取得し、Androidの更新確認画面を開きます。設定・キューは引き継ぎます。",fontSize=12.sp)
                 TextButton(onClick={open(release.pageUrl)}) { Text("GitHubで更新内容を見る") }
             } else Text(state.message)

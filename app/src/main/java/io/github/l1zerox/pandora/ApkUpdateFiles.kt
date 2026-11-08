@@ -5,18 +5,22 @@ import java.security.MessageDigest
 import org.json.JSONObject
 
 internal fun AppRelease.updateJson(): String = JSONObject().put("version",version).put("page",pageUrl)
-    .put("url",downloadUrl).put("notes",notes).put("preview",preview).put("size",size).put("digest",digest).toString()
+    .put("url",downloadUrl).put("notes",notes).put("preview",preview).put("size",size).put("digest",digest)
+    .put("delta",delta?.let { JSONObject().put("base",it.baseVersion).put("url",it.url).put("size",it.size).put("digest",it.digest) }).toString()
 
 internal fun parseApkRelease(text: String?): AppRelease? = runCatching {
     val json=JSONObject(text ?: return null)
     AppRelease(json.getString("version"),json.getString("page"),json.getString("url"),json.optString("notes"),
-        json.optBoolean("preview"),json.optLong("size"),json.optString("digest")).also { require(validApkRelease(it)) }
+        json.optBoolean("preview"),json.optLong("size"),json.optString("digest"),json.optJSONObject("delta")?.let {
+            ApkDeltaRelease(it.getString("base"),it.getString("url"),it.getLong("size"),it.getString("digest"))
+        }).also { require(validApkRelease(it)) }
 }.getOrNull()
 
 internal fun validApkRelease(release: AppRelease): Boolean = ReleaseVersion.parse(release.version) != null &&
     release.downloadUrl == "$RELEASES_URL/download/v${release.version}/YoutubePandora-Android-v${release.version}.apk" &&
     release.pageUrl == "$RELEASES_URL/tag/v${release.version}" && release.size >= 0 &&
-    (release.digest in listOf("","null") || Regex("sha256:[a-fA-F0-9]{64}").matches(release.digest))
+    (release.digest in listOf("","null") || Regex("sha256:[a-fA-F0-9]{64}").matches(release.digest)) &&
+    (release.delta?.let { validApkDelta(it,release.version,release.size,release.digest) } != false)
 
 internal fun verifyApkBytes(file: File, release: AppRelease) {
     require(file.isFile && file.length() > 0) { "APKがありません。もう一度ダウンロードしてください。" }

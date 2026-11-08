@@ -41,7 +41,8 @@ internal fun playbackWaveOffset(x: Float, playedWidth: Float, wavelength: Float,
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun WavyPlaybackTrack(state: SliderState, enabled: Boolean, playing: Boolean, color: Color) {
+internal fun WavyPlaybackTrack(state: SliderState, enabled: Boolean, playing: Boolean, color: Color,
+    effect: PlaybackEffect = PlaybackEffect.WAVE) {
     val lifecycle=LocalLifecycleOwner.current.lifecycle
     var visible by remember(lifecycle) { mutableStateOf(lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) }
     DisposableEffect(lifecycle) {
@@ -52,25 +53,43 @@ internal fun WavyPlaybackTrack(state: SliderState, enabled: Boolean, playing: Bo
     val moving=enabled && playing && visible && state.value > state.valueRange.start && state.value < state.valueRange.endInclusive
     val phase=remember { Animatable(0f) }
     val strength=animateFloatAsState(if(moving) 1f else 0f,tween(220),label="playback-wave-strength")
-    LaunchedEffect(moving) {
+    LaunchedEffect(moving,effect) {
         if(moving) {
             phase.snapTo(0f)
             // Compose's animation clock respects the system animator duration scale.
-            phase.animateTo(1f,infiniteRepeatable(tween(1400,easing=LinearEasing),RepeatMode.Restart))
+            phase.animateTo(if(effect == PlaybackEffect.NOTIFICATION) 5f else 1f,
+                infiniteRepeatable(tween(if(effect == PlaybackEffect.NOTIFICATION) 18_000 else 1400,easing=LinearEasing),RepeatMode.Restart))
         }
     }
     val rtl=LocalLayoutDirection.current == LayoutDirection.Rtl
     val path=remember { Path() }
     val active=if(enabled) color else color.copy(alpha=.38f)
-    Canvas(Modifier.fillMaxWidth().height(12.dp).testTag("playback-position-track")) {
+    Canvas(Modifier.fillMaxWidth().height(if(effect == PlaybackEffect.NOTIFICATION) 26.dp else 12.dp).testTag("playback-position-track")) {
         val range=state.valueRange.endInclusive-state.valueRange.start
         val fraction=if(range > 0) ((state.value-state.valueRange.start)/range).coerceIn(0f,1f) else 0f
         val played=size.width*fraction
         val baseline=size.height/2
-        val stroke=3.dp.toPx()
+        val stroke=(if(effect == PlaybackEffect.NOTIFICATION) 5 else 3).dp.toPx()
         scale(scaleX=if(rtl) -1f else 1f,scaleY=1f) {
             if(played < size.width) drawLine(active.copy(alpha=active.alpha*.22f),Offset(played,baseline),Offset(size.width,baseline),stroke,StrokeCap.Round)
             if(played > 0) {
+                if(effect == PlaybackEffect.NOTIFICATION) {
+                    drawLine(active,Offset(0f,baseline),Offset(played,baseline),stroke,StrokeCap.Round)
+                    for(layer in 0..1) {
+                        path.reset(); path.moveTo(0f,baseline)
+                        val samples=ceil(played/2.dp.toPx()).toInt().coerceAtLeast(1)
+                        for(index in 1..samples) {
+                            val x=played*index/samples
+                            val height=notificationWaveHeight(x,played,(if(layer == 0) 170 else 140).dp.toPx(),
+                                (if(layer == 0) 9 else 6).dp.toPx()*strength.value,
+                                phase.value*(if(layer == 0) 1f else .8f)+layer*.35f)
+                            path.lineTo(x,baseline-stroke/2-height)
+                        }
+                        path.lineTo(played,baseline); path.close()
+                        drawPath(path,active.copy(alpha=active.alpha*(if(layer == 0) .5f else .9f)))
+                    }
+                    return@scale
+                }
                 val amplitude=4.dp.toPx()*strength.value
                 if(amplitude < .01f) drawLine(active,Offset(0f,baseline),Offset(played,baseline),stroke,StrokeCap.Round)
                 else {

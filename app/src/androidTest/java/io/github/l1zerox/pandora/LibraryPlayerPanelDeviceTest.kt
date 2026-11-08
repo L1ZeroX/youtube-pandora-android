@@ -25,16 +25,17 @@ class LibraryPlayerPanelDeviceTest {
         val original=Store.state.value
         val prefs=context.getSharedPreferences("pandora",0)
         try {
-            val changed=original.preferences.copy(libraryPlayerVisible=false,libraryPlayerScale=.9f,libraryPlayerWave=false)
+            val changed=original.preferences.copy(libraryPlayerVisible=false,libraryPlayerScale=.9f,libraryPlayerWave=false,libraryPlayerEffect="notification")
             Store.preferences(changed); Store.init(context)
             assertEquals(changed,Store.state.value.preferences)
             val old=JSONObject(prefs.getString("preferences","{}")!!).apply {
-                remove("libraryPlayerVisible"); remove("libraryPlayerScale"); remove("libraryPlayerWave")
+                remove("libraryPlayerVisible"); remove("libraryPlayerScale"); remove("libraryPlayerWave"); remove("libraryPlayerEffect")
             }
             prefs.edit().putString("preferences",old.toString()).commit(); Store.init(context)
             assertTrue(Store.state.value.preferences.libraryPlayerVisible)
             assertEquals(.7f,Store.state.value.preferences.libraryPlayerScale,0f)
             assertTrue(Store.state.value.preferences.libraryPlayerWave)
+            assertEquals("wave",Store.state.value.preferences.libraryPlayerEffect)
         } finally { Store.state.value=original; Store.save() }
     }
 

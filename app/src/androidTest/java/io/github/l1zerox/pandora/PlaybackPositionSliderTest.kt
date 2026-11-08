@@ -27,15 +27,16 @@ class PlaybackPositionSliderTest {
         var value by mutableFloatStateOf(0f)
         var direction by mutableStateOf(LayoutDirection.Ltr)
         var waveform by mutableStateOf(false)
+        var effect by mutableStateOf(PlaybackEffect.WAVE)
         screen.setContent { CompositionLocalProvider(LocalLayoutDirection provides direction) { MaterialTheme {
             Column(Modifier.width(width)) {
-                PlaybackPositionSlider("a",value,{value=it},{},true,Color.Red,"位置テスト",Modifier.fillMaxWidth(),compact,waveform=waveform)
+                PlaybackPositionSlider("a",value,{value=it},{},true,Color.Red,"位置テスト",Modifier.fillMaxWidth(),compact,waveform=waveform,effect=effect)
             }
         } } }
-        for(wave in listOf(false,true)) for(small in listOf(true,false)) for(size in listOf(88.dp,320.dp))
+        for(style in PlaybackEffect.entries) for(wave in listOf(false,true)) for(small in listOf(true,false)) for(size in listOf(88.dp,320.dp))
             for(layoutDirection in listOf(LayoutDirection.Ltr,LayoutDirection.Rtl))
                 for(fraction in listOf(0f,16f/263f,.5f,1f)) {
-                    screen.runOnIdle { waveform=wave; compact=small; width=size; direction=layoutDirection; value=fraction }
+                    screen.runOnIdle { effect=style; waveform=wave; compact=small; width=size; direction=layoutDirection; value=fraction }
                     val marker=screen.onNodeWithTag("playback-position-marker",useUnmergedTree=true).fetchSemanticsNode().boundsInRoot
                     val track=screen.onNodeWithTag("playback-position-track",useUnmergedTree=true).fetchSemanticsNode().boundsInRoot
                     val expected=track.left+track.width*(if(layoutDirection == LayoutDirection.Rtl) 1-fraction else fraction)
@@ -51,7 +52,7 @@ class PlaybackPositionSliderTest {
         val committed=mutableListOf<Float>()
         screen.setContent { MaterialTheme {
             Column(Modifier.width(320.dp)) {
-                PlaybackPositionSlider("a",value,{value=it},{committed+=value},enabled,Color.Red,"位置テスト",Modifier.fillMaxWidth(),true,waveform=true)
+                PlaybackPositionSlider("a",value,{value=it},{committed+=value},enabled,Color.Red,"位置テスト",Modifier.fillMaxWidth(),true,waveform=true,effect=PlaybackEffect.NOTIFICATION)
             }
         } }
         val slider=screen.onNodeWithContentDescription("位置テスト")
