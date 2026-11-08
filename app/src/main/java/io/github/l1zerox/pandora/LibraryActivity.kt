@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -106,6 +107,7 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
     var filter by rememberSaveable { mutableStateOf("すべて") }
     var search by rememberSaveable { mutableStateOf("") }
     var searchExpanded by rememberSaveable { mutableStateOf(false) }
+    var controlsExpanded by rememberSaveable { mutableStateOf(false) }
     val searchFocus=remember { FocusRequester() }
     val focusManager=LocalFocusManager.current
     val keyboard=LocalSoftwareKeyboardController.current
@@ -143,6 +145,7 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
         else launchPlayer(uri)
     }
     fun toggleSelection(uri: String) {
+        controlsExpanded=true
         selecting=true
         selected=ArrayList(if(uri in selected) selected-uri else selected+uri)
     }
@@ -205,6 +208,17 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
                 onSurfaceVariant=Color.White,outline=Color.White.copy(alpha=.7f)) else colors) {
             Column(Modifier.padding(12.dp)) {
             LibraryHeader(headerAccent,loading,onBack,onRefresh={error=""; refresh++})
+            val controlsSummary=listOfNotNull(
+                filter.takeUnless { it == "すべて" },
+                "検索中".takeIf { search.isNotBlank() },
+                if(collection == "favorites") "お気に入り" else collections.playlists.firstOrNull { it.id == collection }?.name,
+                "オートダビング版".takeIf { dubbedOnly },
+                "${selected.size}件選択".takeIf { selecting }
+            ).joinToString(" · ")
+            LibraryControlsPanel(controlsExpanded,controlsSummary,onExpandedChange={
+                controlsExpanded=it
+                if(!it) { focusManager.clearFocus(); keyboard?.hide() }
+            }) {
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically) {
                 Text("保存した動画と音楽",fontSize=13.sp)
                 OutlinedButton(onClick={picker.launch(arrayOf("video/*","audio/*"))},enabled=!importing) {
@@ -247,6 +261,7 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
                     TextButton(enabled=selected.isNotEmpty(),onClick={confirmBatch=true}) { Text("削除") }
                 }
             }
+            }
             if(preferences.libraryPlayerVisible && playback.uri.isNotBlank()) {
                 val panel=if(transport.panel.uri == playback.uri) transport.panel.copy(title=playback.title,advancing=transport.panel.advancing && !appearance)
                     else LibraryPlayerState(uri=playback.uri,title=playback.title)
@@ -262,7 +277,8 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
             }
             }
             }
-            LazyVerticalGrid(columns=GridCells.Fixed(layout.columns),state=gridState,modifier=Modifier.weight(1f),
+            val controlsPull=rememberLibraryControlsPull(controlsExpanded,atTop={!gridState.canScrollBackward},onExpand={controlsExpanded=true})
+            LazyVerticalGrid(columns=GridCells.Fixed(layout.columns),state=gridState,modifier=Modifier.weight(1f).nestedScroll(controlsPull),
                 horizontalArrangement=Arrangement.spacedBy(10.dp),verticalArrangement=Arrangement.spacedBy(10.dp),contentPadding=PaddingValues(vertical=8.dp)) {
                 items(visible,key={it.uri}) { item ->
                     LibraryCard(item,dark,backdrop,transport,layout,onDelete={if(!importing) deletion=item},
