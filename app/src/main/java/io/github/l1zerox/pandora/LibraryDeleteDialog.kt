@@ -15,8 +15,10 @@ import kotlinx.coroutines.CancellationException
 
 internal val LibraryEntrySaver=listSaver<LibraryEntry?,String>(
     save={ item -> if(item == null) emptyList() else listOf(item.uri,item.title,item.mime,item.durationMs.toString(),
-        item.added.toString(),item.imported.toString(),item.width.toString(),item.height.toString(),item.autoDubbed.toString()) },
-    restore={ if(it.isEmpty()) null else LibraryEntry(it[0],it[1],it[2],it[3].toLong(),it[4].toLong(),it[5].toBoolean(),it[6].toInt(),it[7].toInt(),it.getOrNull(8).toBoolean()) })
+        item.added.toString(),item.imported.toString(),item.width.toString(),item.height.toString(),item.autoDubbed.toString(),
+        item.artist,item.album,item.albumArtist,item.track.toString(),item.disc.toString()) },
+    restore={ if(it.isEmpty()) null else LibraryEntry(it[0],it[1],it[2],it[3].toLong(),it[4].toLong(),it[5].toBoolean(),it[6].toInt(),it[7].toInt(),it.getOrNull(8).toBoolean(),
+        it.getOrNull(9).orEmpty(),it.getOrNull(10).orEmpty(),it.getOrNull(11).orEmpty(),it.getOrNull(12)?.toIntOrNull() ?: 0,it.getOrNull(13)?.toIntOrNull() ?: 0) })
 
 @Composable
 internal fun LibraryDeleteDialog(entry: LibraryEntry, onDismiss: ()->Unit, onRemoved: ()->Unit) {

@@ -17,7 +17,8 @@ internal fun saveRangeBarMaximum(duration: Double?): Long? = duration
     ?.takeIf { it.isFinite() && it > 0 && it <= 16_777_216 }
     ?.let { ceil(it).toLong() }
 
-internal fun saveRangeBarReferences(videos: List<Video>) = videos.filter { it.selected && saveRangeBarMaximum(it.duration) != null }
+internal fun saveRangeBarCandidates(videos: List<Video>)=videos.filter { it.selected }.ifEmpty { videos }
+internal fun saveRangeBarReferences(videos: List<Video>) = saveRangeBarCandidates(videos).filter { saveRangeBarMaximum(it.duration) != null }
 
 internal data class SaveRangeBarSelection(val start: Long, val end: Long) {
     fun values()=start.toFloat()..end.toFloat()

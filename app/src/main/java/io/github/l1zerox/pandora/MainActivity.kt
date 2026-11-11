@@ -261,7 +261,10 @@ fun PandoraScreen(artworkRequested: Boolean = false, onArtworkClosed: ()->Unit =
                 Store.preferences(Store.state.value.preferences.copy(saveRange=selected))
                 rangeDialog=false; onRangeClosed()
             }
-        },onDismiss={rangeDialog=false; onRangeClosed()},videos=s.videos)
+        },onDismiss={rangeDialog=false; onRangeClosed()},videos=s.videos,resolving=s.busy && s.operation == "REFRESH",onResolve={video ->
+            if(!Store.state.value.busy) ContextCompat.startForegroundService(context,Intent(context,DownloadService::class.java)
+                .setAction("REFRESH").putExtra("urls",video.url))
+        })
         UpdatePrompt(allowed=!settings && !backgroundSettings && !logs && !artworkRequested && !rangeDialog && !rangeRequested && preview == null && error.isEmpty() && pending == null)
         preview?.let { selected ->
             val video=s.videos.firstOrNull { it.key == selected.key } ?: selected

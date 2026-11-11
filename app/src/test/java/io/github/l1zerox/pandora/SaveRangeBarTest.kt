@@ -14,6 +14,14 @@ class SaveRangeBarTest {
         val v=Video("one","https://example.com/1","One",duration=60.0)
         assertEquals(listOf(v),saveRangeBarReferences(listOf(v,v.copy(key="two",selected=false),v.copy(key="three",duration=null))))
     }
+    @Test fun deselectedQueueStillProvidesAReferenceWithoutChangingSelection() {
+        val known=Video("one","https://example.com/1","One",duration=90.0,selected=false)
+        val unknown=known.copy(key="two",duration=null)
+        assertEquals(listOf(known),saveRangeBarReferences(listOf(unknown,known)))
+        assertFalse(known.selected)
+        assertEquals(listOf(unknown.copy(selected=true)),saveRangeBarCandidates(listOf(known,unknown.copy(selected=true))))
+        assertTrue(saveRangeBarReferences(listOf(known,unknown.copy(selected=true))).isEmpty())
+    }
     @Test fun timeFieldsMapToTheSameWholeSecondPositions() {
         assertEquals(SaveRangeBarSelection(30,90),saveRangeBarSelection("0:30","1:30",180))
         assertEquals(SaveRangeBarSelection(0,180),saveRangeBarSelection("","",180))

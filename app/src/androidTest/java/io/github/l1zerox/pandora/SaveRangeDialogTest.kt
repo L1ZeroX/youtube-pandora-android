@@ -1,6 +1,7 @@
 package io.github.l1zerox.pandora
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.*
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -10,6 +11,28 @@ import org.junit.Test
 
 class SaveRangeDialogTest {
     @get:Rule val screen=createComposeRule()
+    @Test fun rangeBarRemainsVisibleWhenTimeRangeIsOff() {
+        val video=Video("one","https://example.com/1","One",duration=180.0)
+        screen.setContent { MaterialTheme { SaveRangeDialog(SaveRange(),true,{},{},listOf(video)) } }
+        screen.onNodeWithTag("save-range-slider").assertExists()
+        val handles=screen.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsActions.SetProgress),useUnmergedTree=true)
+        handles[0].assertIsNotEnabled()
+        screen.onNodeWithContentDescription("保存範囲を指定").performClick()
+        handles[0].assertIsEnabled()
+    }
+    @Test fun metadataArrivalRestoresTheBarWithoutClosingOrLosingTypedTimes() {
+        var videos by mutableStateOf(listOf(Video("one","https://example.com/1","One")))
+        var requests=0
+        screen.setContent { MaterialTheme { SaveRangeDialog(SaveRange(true,30,90),true,{},{},videos,onResolve={requests++}) } }
+        screen.runOnIdle { assertEquals(1,requests) }
+        screen.onNodeWithTag("save-range-slider").assertExists()
+        screen.onNodeWithText("動画の長さを取得").performScrollTo().performClick()
+        screen.runOnIdle { assertEquals(2,requests); videos=listOf(videos.single().copy(duration=180.0)) }
+        screen.onNodeWithTag("save-range-slider").performScrollTo()
+        screen.onNodeWithText("開始 0:30").assertIsDisplayed()
+        screen.onNodeWithText("終了 1:30").assertIsDisplayed()
+        screen.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsActions.SetProgress),useUnmergedTree=true)[0].assertIsEnabled()
+    }
     @Test fun barAndTimeFieldsStayInSyncBeforeApply() {
         var saved: SaveRange?=null
         val video=Video("one","https://example.com/1","One",duration=180.0)
@@ -43,7 +66,8 @@ class SaveRangeDialogTest {
         var saved: SaveRange?=null
         val unknown=Video("unknown","https://example.com/1","Unknown")
         screen.setContent { MaterialTheme { SaveRangeDialog(SaveRange(true,30,90),true,{saved=it},{},listOf(unknown)) } }
-        screen.onNodeWithTag("save-range-slider").assertDoesNotExist()
+        screen.onNodeWithTag("save-range-slider").assertExists()
+        screen.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsActions.SetProgress),useUnmergedTree=true)[0].assertIsNotEnabled()
         screen.onNodeWithText("開始時刻").performScrollTo().performTextReplacement("40")
         screen.onNodeWithText("適用").performClick()
         screen.runOnIdle { assertEquals(SaveRange(true,40,90),saved) }

@@ -13,6 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.CancellationException
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -49,30 +50,38 @@ internal object LibraryRepository {
 
     private fun readImports(context: Context): List<LibraryEntry> = runCatching {
         val array=JSONArray(preferences(context).getString("items","[]"))
-        (0 until array.length()).map { index ->
+        (0 until array.length()).mapNotNull { index -> runCatching {
             val item=array.getJSONObject(index)
             LibraryEntry(item.getString("uri"),item.getString("title"),item.getString("mime"),
                 item.optLong("duration"),item.optLong("added"),true)
-        }
+        }.getOrNull() }
     }.getOrDefault(emptyList())
 
-    suspend fun addFiles(context: Context, uris: List<Uri>): Int = withContext(Dispatchers.IO) {
+    suspend fun addFiles(context: Context, uris: List<Uri>, section: LibrarySection? = null): Int = withContext(Dispatchers.IO) {
         val entries=mutableMapOf<String,LibraryEntry>()
+        val existing=readImports(context).map { it.uri }.toSet()
         var failed=0
-        for(uri in uris) {
+        for(uri in uris.distinct()) {
+            currentCoroutineContext().ensureActive()
             try {
                 require(uri.scheme == "content")
                 val resolver=context.contentResolver
+                if(uri.toString() in existing) {
+                    resolver.takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    continue
+                }
                 val name=resolver.query(uri,arrayOf(OpenableColumns.DISPLAY_NAME),null,null,null)?.use {
                     if(it.moveToFirst()) it.getString(0) else null
                 } ?: "メディア"
                 val mime=libraryMime(resolver.getType(uri),name) ?: error("非対応のファイル")
+                require(section == null || mime.startsWith(if(section == LibrarySection.VIDEO) "video/" else "audio/"))
                 resolver.takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 // Providers may grant only read access; importing must still work in that case.
                 runCatching { resolver.takePersistableUriPermission(uri,Intent.FLAG_GRANT_WRITE_URI_PERMISSION) }
                 entries[uri.toString()]=LibraryEntry(uri.toString(),name.substringBeforeLast('.'),mime,
                     added=System.currentTimeMillis()/1000,imported=true)
-            } catch(e: Exception) { failed++; AppLog.info("ライブラリー","ファイルを追加できません: ${e.javaClass.simpleName}") }
+            } catch(e: CancellationException) { throw e }
+            catch(e: Exception) { failed++; AppLog.info("ライブラリー","ファイルを追加できません: ${e.javaClass.simpleName}") }
         }
         synchronized(importLock) {
             val merged=readImports(context).associateBy { it.uri }.toMutableMap()

@@ -72,6 +72,7 @@ private fun LibraryCardArtwork(entry: LibraryEntry, artwork: Bitmap?, palette: L
 @Composable
 private fun LibraryCardInfo(entry: LibraryEntry, palette: LibraryPalette, stacked: Boolean) {
     val duration=if(entry.durationMs > 0) durationText(entry.durationMs/1000.0) else ""
+    if(!entry.video && entry.artist.isNotBlank()) Text(entry.artist,fontSize=12.sp,color=palette.detail,maxLines=1,overflow=TextOverflow.Ellipsis)
     FlowRow(horizontalArrangement=Arrangement.spacedBy(6.dp),verticalArrangement=Arrangement.spacedBy(2.dp)) {
         Text(entry.category+if(duration.isEmpty()) "" else if(stacked) "\n$duration" else " · $duration",
             fontSize=if(stacked) 11.sp else 12.sp,color=palette.detail)

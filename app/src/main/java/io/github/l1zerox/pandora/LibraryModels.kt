@@ -2,7 +2,8 @@ package io.github.l1zerox.pandora
 
 internal data class LibraryEntry(val uri: String, val title: String, val mime: String,
     val durationMs: Long = 0, val added: Long = 0, val imported: Boolean = false,
-    val width: Int = 0, val height: Int = 0, val autoDubbed: Boolean = false) {
+    val width: Int = 0, val height: Int = 0, val autoDubbed: Boolean = false,
+    val artist: String = "", val album: String = "", val albumArtist: String = "", val track: Int = 0, val disc: Int = 0) {
     val video: Boolean get() = mime.startsWith("video/")
     val short: Boolean get() = video && width > 0 && height > width
     val category: String get() = if(!video) "音楽" else if(short) "ショート" else "動画"
@@ -19,6 +20,12 @@ internal fun libraryMime(mime: String?, name: String): String? = when {
     mime?.startsWith("video/") == true || mime?.startsWith("audio/") == true -> mime
     name.endsWith(".mp4",true) -> "video/mp4"
     name.endsWith(".mp3",true) -> "audio/mpeg"
+    name.endsWith(".m4a",true) -> "audio/mp4"
+    name.endsWith(".flac",true) -> "audio/flac"
+    name.endsWith(".wav",true) -> "audio/wav"
+    name.endsWith(".ogg",true) -> "audio/ogg"
+    name.endsWith(".opus",true) -> "audio/opus"
+    name.endsWith(".aac",true) -> "audio/aac"
     else -> null
 }
 
@@ -26,7 +33,8 @@ internal fun libraryMime(mime: String?, name: String): String? = when {
 internal fun libraryEntries(downloads: List<LibraryEntry>, imports: List<LibraryEntry>, filter: String = "すべて", search: String = ""): List<LibraryEntry> =
     (downloads+imports).distinctBy { it.uri }.filter {
         (filter == "すべて" || filter == it.category) &&
-            it.title.contains(search.trim(),ignoreCase=true)
+            (it.title.contains(search.trim(),ignoreCase=true) || !it.video &&
+                (it.artist.contains(search.trim(),ignoreCase=true) || it.albumArtist.contains(search.trim(),ignoreCase=true) || it.album.contains(search.trim(),ignoreCase=true)))
     }.sortedWith(compareByDescending<LibraryEntry> { it.added }.thenBy { it.title }.thenBy { it.uri })
 
 internal fun pipAspect(width: Int, height: Int, pixelRatio: Float = 1f): Float =

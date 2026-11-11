@@ -4,8 +4,13 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 internal data class UserPlaylist(val id: String, val name: String, val uris: List<String> = emptyList())
-internal data class LibraryCollections(val favorites: Set<String> = emptySet(), val playlists: List<UserPlaylist> = emptyList(), val folders: List<UserPlaylist> = emptyList()) {
-    fun without(uri: String)=copy(favorites=favorites-uri,playlists=playlists.map { it.copy(uris=it.uris-uri) },folders=folders.map { it.copy(uris=it.uris-uri) })
+internal data class LibraryCollections(val favorites: Set<String> = emptySet(), val playlists: List<UserPlaylist> = emptyList(), val folders: List<UserPlaylist> = emptyList(), val albums: List<UserPlaylist> = emptyList()) {
+    fun without(uri: String)=copy(favorites=favorites-uri,playlists=playlists.map { it.copy(uris=it.uris-uri) },folders=folders.map { it.copy(uris=it.uris-uri) },albums=albums.map { it.copy(uris=it.uris-uri) })
+    fun withAlbum(album: UserPlaylist): LibraryCollections {
+        require(album.name.isNotBlank())
+        val members=album.uris.toSet()
+        return copy(albums=albums.filterNot { it.id == album.id }.map { it.copy(uris=it.uris.filterNot { uri -> uri in members }) }+album.copy(uris=album.uris.distinct()))
+    }
     fun addTo(id: String, uris: List<String>)=copy(playlists=playlists.map {
         if(it.id == id) it.copy(uris=(it.uris+uris).distinct()) else it
     })
@@ -19,6 +24,8 @@ internal data class LibraryCollections(val favorites: Set<String> = emptySet(), 
         playlists.forEach { array.put(JSONObject().put("id",it.id).put("name",it.name).put("uris",JSONArray(it.uris))) }
     }).put("folders",JSONArray().also { array ->
         folders.forEach { array.put(JSONObject().put("id",it.id).put("name",it.name).put("uris",JSONArray(it.uris))) }
+    }).put("albums",JSONArray().also { array ->
+        albums.forEach { array.put(JSONObject().put("id",it.id).put("name",it.name).put("uris",JSONArray(it.uris))) }
     }).toString()
     companion object {
         fun parse(text: String): LibraryCollections=runCatching {
@@ -34,7 +41,9 @@ internal data class LibraryCollections(val favorites: Set<String> = emptySet(), 
             }
             val assigned=mutableSetOf<String>()
             val folders=lists("folders").map { it.copy(uris=it.uris.filter { uri -> assigned.add(uri) }) }
-            LibraryCollections(strings(json.optJSONArray("favorites")).toSet(),lists("playlists"),folders)
+            val albumAssigned=mutableSetOf<String>()
+            LibraryCollections(strings(json.optJSONArray("favorites")).toSet(),lists("playlists"),folders,
+                lists("albums").map { it.copy(uris=it.uris.filter { uri -> albumAssigned.add(uri) }) })
         }.getOrDefault(LibraryCollections())
     }
 }
@@ -50,6 +59,8 @@ internal fun libraryFolderRows(entries: List<LibraryEntry>, data: LibraryCollect
 }
 internal fun organizedLibrary(entries: List<LibraryEntry>, data: LibraryCollections, collection: String, sort: LibrarySort,
     dubbedOnly: Boolean): List<LibraryEntry> {
+    if(isAlbumCollection(collection)) return if(collection == MUSIC_ALBUM_ROOT) emptyList()
+        else libraryAlbums(entries,data).firstOrNull { it.id == collection }?.tracks.orEmpty()
     val playlist=data.playlists.firstOrNull { it.id == collection }
     val folder=data.folders.firstOrNull { it.id == collection }
     val members=when { collection == "unfiled" || collection == LIBRARY_FOLDER_ROOT -> entries.map { it.uri }.toSet()-data.folders.flatMap { it.uris }.toSet()

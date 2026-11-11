@@ -297,5 +297,6 @@ class PlayerActivity : ComponentActivity() {
 }
 
 internal fun LibraryEntry.mediaItem(): MediaItem = MediaItem.Builder().setMediaId(uri).setUri(uri).setMimeType(mime)
-    .setMediaMetadata(MediaMetadata.Builder().setTitle(title)
+    .setMediaMetadata(MediaMetadata.Builder().setTitle(title).setArtist(artist.ifBlank { null }).setAlbumTitle(album.ifBlank { null })
+        .setAlbumArtist(albumArtist.ifBlank { null }).setTrackNumber(track.takeIf { it > 0 }).setDiscNumber(disc.takeIf { it > 0 })
         .setExtras(Bundle().apply { putBoolean("video",video); putString("category",category); putLong("durationMs",durationMs) }).build()).build()

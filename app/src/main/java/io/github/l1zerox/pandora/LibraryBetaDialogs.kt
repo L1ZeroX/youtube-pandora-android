@@ -14,7 +14,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @Composable
 internal fun LibraryOrganizeDialog(collection: String, sort: LibrarySort, dubbed: Boolean,
-    onCollection: (String)->Unit, onSort: (LibrarySort)->Unit, onDubbed: (Boolean)->Unit, onDismiss: ()->Unit) {
+    onCollection: (String)->Unit, onSort: (LibrarySort)->Unit, onDubbed: (Boolean)->Unit, onDismiss: ()->Unit, allowDubbed: Boolean = true) {
     val data by LibraryExtras.state.collectAsStateWithLifecycle()
     var newList by rememberSaveable { mutableStateOf(false) }
     var rename by rememberSaveable { mutableStateOf("") }
@@ -48,7 +48,7 @@ internal fun LibraryOrganizeDialog(collection: String, sort: LibrarySort, dubbed
                     Text(if(data.playlists.any { it.id == collection } && option == LibrarySort.NEWEST) "リストの登録順" else option.label)
                 }
             }
-            Row(Modifier.fillMaxWidth().clickable { onDubbed(!dubbed) },verticalAlignment=Alignment.CenterVertically) {
+            if(allowDubbed) Row(Modifier.fillMaxWidth().clickable { onDubbed(!dubbed) },verticalAlignment=Alignment.CenterVertically) {
                 Checkbox(checked=dubbed,onCheckedChange=onDubbed)
                 Text("オートダビング版のみ")
             }

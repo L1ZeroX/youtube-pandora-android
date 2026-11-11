@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.sp
 
 @Composable
 internal fun SaveRangeDialog(initial: SaveRange, editable: Boolean, onApply: (SaveRange)->Unit, onDismiss: ()->Unit,
-    videos: List<Video> = emptyList()) {
+    videos: List<Video> = emptyList(), resolving: Boolean = false, onResolve: ((Video)->Unit)? = null) {
     var enabled by rememberSaveable { mutableStateOf(initial.enabled) }
     var start by rememberSaveable { mutableStateOf(saveTimeText(initial.startSeconds)) }
     var end by rememberSaveable { mutableStateOf(initial.endSeconds?.let(::saveTimeText).orEmpty()) }
@@ -28,6 +28,17 @@ internal fun SaveRangeDialog(initial: SaveRange, editable: Boolean, onApply: (Sa
     val references=saveRangeBarReferences(videos)
     val reference=references.firstOrNull { it.key == referenceKey } ?: references.firstOrNull()
     val maximum=saveRangeBarMaximum(reference?.duration)
+    val unresolved=saveRangeBarCandidates(videos).firstOrNull { saveRangeBarMaximum(it.duration) == null }
+    var requested by rememberSaveable { mutableStateOf(false) }
+    fun resolve() {
+        if(unresolved != null && onResolve != null) {
+            requested=true; error=""
+            runCatching { onResolve(unresolved) }.onFailure { error="動画の長さを取得できませんでした。再試行してください。" }
+        }
+    }
+    LaunchedEffect(maximum,editable,unresolved?.key) {
+        if(maximum == null && editable && !requested) resolve()
+    }
     AlertDialog(onDismissRequest=onDismiss,title={Text("保存範囲")},text={
         Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment=Alignment.CenterVertically) {
@@ -39,7 +50,6 @@ internal fun SaveRangeDialog(initial: SaveRange, editable: Boolean, onApply: (Sa
                 },enabled=editable,
                     modifier=Modifier.semantics { contentDescription="保存範囲を指定" })
             }
-            if(enabled) {
                 if(reference != null && maximum != null) {
                     Text("バーで範囲を選択",fontSize=14.sp)
                     if(references.size > 1) Box {
@@ -58,14 +68,22 @@ internal fun SaveRangeDialog(initial: SaveRange, editable: Boolean, onApply: (Sa
                         Text(if(end.isBlank()) "終了 最後まで" else "終了 ${saveTimeText(selection.end)}",fontSize=12.sp)
                     }
                     key(reference.key,maximum) {
-                        SaveRangeSlider(selection,maximum,editable) { changed ->
+                        SaveRangeSlider(selection,maximum,editable && enabled) { changed ->
                             start=saveTimeText(changed.start)
                             end=changed.endText(selection,end)
                             error=""
                         }
                     }
                     Text("左右のつまみで1秒単位に指定。バーは基準動画の長さまで表示します。",fontSize=12.sp)
-                } else Text("長さが分かる動画をキューで選択すると、バーでも指定できます。時刻の入力はそのまま使えます。",fontSize=12.sp)
+                } else {
+                    Text("バーで範囲を選択",fontSize=14.sp)
+                    SaveRangeSlider(SaveRangeBarSelection(0,1),1,false) {}
+                    Text(if(resolving) "動画の長さを取得しています…" else if(videos.isEmpty()) "リンクを追加するとバーで指定できます。"
+                        else "長さの取得後にバーを操作できます。時刻の手入力も使えます。",fontSize=12.sp)
+                    if(resolving) LinearProgressIndicator(Modifier.fillMaxWidth())
+                    if(onResolve != null && unresolved != null) TextButton(onClick={resolve()},enabled=editable) { Text("動画の長さを取得") }
+                }
+            if(enabled) {
                 OutlinedTextField(value=start,onValueChange={start=it.take(24); error=""},label={Text("開始時刻")},
                     placeholder={Text("0:30")},singleLine=true,enabled=editable,modifier=Modifier.fillMaxWidth(),
                     keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Ascii))
@@ -76,7 +94,7 @@ internal fun SaveRangeDialog(initial: SaveRange, editable: Boolean, onApply: (Sa
                 Text("選択した動画・音楽に同じ範囲を適用します。取得後に切り出すため、ダウンロード量は減りません。",fontSize=12.sp)
             } else Text("動画・音楽を全体で保存します。")
             if(error.isNotEmpty()) Text(error,color=MaterialTheme.colorScheme.error,fontSize=13.sp)
-            if(!editable) Text("ダウンロード・一時停止中は変更できません。",fontSize=12.sp)
+            if(!editable && !resolving) Text("ダウンロード・一時停止中は変更できません。",fontSize=12.sp)
         }
     },confirmButton={TextButton(enabled=editable,onClick={
         runCatching {

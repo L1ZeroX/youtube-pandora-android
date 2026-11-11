@@ -6,7 +6,7 @@ Windows版と別プロジェクトのAndroid用アプリです。Android 10以�
 
 **[正式版APK v0.4.24](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.4.24/YoutubePandora-Android-v0.4.24.apk)**（ライブラリーのベータ版機能を統合済み）
 
-**[ベータ版APK v0.4.25-beta.6](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.4.25-beta.6/YoutubePandora-Android-v0.4.25-beta.6.apk)**：ライブラリーのフォルダー表示を階層式に変更。上にフォルダー一覧、下に未分類の動画・音楽を表示し、フォルダー内では現在の階層を表示します。音楽の全画面再生バーにも既存のエフェクト設定を適用し、yt-dlpの新版をポップアップで案内・更新できます。[更新内容と検証範囲](BETA_RELEASE_NOTES.md)。beta.5からの差分更新に対応します。
+**[ベータ版APK v0.4.25-beta.7](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.4.25-beta.7/YoutubePandora-Android-v0.4.25-beta.7.apk)**：ライブラリーを動画・音楽に分離。音楽のタグ読み込み、アルバム自動整理／手動追加、曲名先頭のトラック番号の整理に対応しました。保存範囲のバーを常時表示し、動画の長さをその場で取得できます。[更新内容と検証範囲](BETA_RELEASE_NOTES.md)。beta.6からの差分更新に対応します。
 
 v0.4.24では、お気に入り・プレイリスト、続きから再生、スリープタイマー、再生キュー編集、保存済みチェック、複数選択を正式版でも使えます。オートダビング判定とラベル反映の修正、サムネイル付き再生パネル・波のエフェクト・操作欄の折りたたみも統合しました。バブルはタップでDL管理パネルを開き、再タップで閉じます。
 
@@ -146,7 +146,7 @@ python scripts/build.py assembleDebug testDebugUnitTest lintDebug
 
 配布用APKを作るには `python scripts/release.py` を実行します。初回に `.signing` 内へ署名鍵を生成します。このフォルダーは公開せずにバックアップしてください。同じ署名鍵を使わないと既存アプリを上書き更新できません。
 
-ベータ版v0.4.25では、通知センター風の再生バー・差分更新・保存範囲を追加しています。`python scripts/release.py --beta --delta-from release/YoutubePandora-Android-v0.4.25-beta.5.apk` で通常APKに加えて差分を生成できます。差分名は `YoutubePandora-Android-v<更新先>-from-v<更新元>.pdelta.gz`。配信時は通常APKと差分の両方が同じリリースに必要で、GitHub APIの両ファイルのSHA-256と、端末の更新元APKのSHA-256を検証します。一致しない場合や差分がない場合は通常APKを取得します。旧版を飛ばす更新には、その更新元に対応する差分を用意してください。このスクリプトはGitHubへ公開しません。[試験内容](BETA_RELEASE_NOTES.md)・[検証範囲](VALIDATION.md)。
+ベータ版v0.4.25では、通知センター風の再生バー・差分更新・保存範囲を追加しています。`python scripts/release.py --beta --delta-from release/YoutubePandora-Android-v0.4.25-beta.6.apk` で通常APKに加えて差分を生成できます。差分名は `YoutubePandora-Android-v<更新先>-from-v<更新元>.pdelta.gz`。配信時は通常APKと差分の両方が同じリリースに必要で、GitHub APIの両ファイルのSHA-256と、端末の更新元APKのSHA-256を検証します。一致しない場合や差分がない場合は通常APKを取得します。旧版を飛ばす更新には、その更新元に対応する差分を用意してください。このスクリプトはGitHubへ公開しません。[試験内容](BETA_RELEASE_NOTES.md)・[検証範囲](VALIDATION.md)。
 
 端末または起動済みエミュレーターを接続した場合は `python scripts/build.py connectedDebugAndroidTest` で、合成動画の情報取得・MP4保存・24fps変換・MP3保存と画面操作を検証できます。テストが作った保存結果は終了時に削除します。
 

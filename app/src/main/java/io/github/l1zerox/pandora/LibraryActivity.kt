@@ -106,6 +106,11 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
     var importing by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
     var filter by rememberSaveable { mutableStateOf("すべて") }
+    var sectionName by rememberSaveable { mutableStateOf(LibrarySection.VIDEO.name) }
+    val section=LibrarySection.valueOf(sectionName)
+    var pickerSection by rememberSaveable { mutableStateOf(sectionName) }
+    var albumEditor by rememberSaveable { mutableStateOf(false) }
+    var editingAlbum by rememberSaveable { mutableStateOf("") }
     var search by rememberSaveable { mutableStateOf("") }
     var searchExpanded by rememberSaveable { mutableStateOf(false) }
     var controlsExpanded by rememberSaveable { mutableStateOf(false) }
@@ -123,6 +128,8 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
     var collection by rememberSaveable { mutableStateOf("") }
     val folderBrowsing=isFolderCollection(collection)
     val folderRoot=collection == LIBRARY_FOLDER_ROOT
+    val albumBrowsing=isAlbumCollection(collection)
+    val albumRoot=collection == MUSIC_ALBUM_ROOT
     var sortName by rememberSaveable { mutableStateOf(LibrarySort.NEWEST.name) }
     val sort=LibrarySort.valueOf(sortName)
     var dubbedOnly by rememberSaveable { mutableStateOf(false) }
@@ -134,13 +141,14 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
     var resumeEntry by rememberSaveable(stateSaver=LibraryEntrySaver) { mutableStateOf<LibraryEntry?>(null) }
     fun navigateCollection(id: String) {
         collection=id; selected=arrayListOf(); selecting=false
-        if(isFolderCollection(id)) controlsExpanded=false
+        if(isFolderCollection(id) || isAlbumCollection(id)) controlsExpanded=false
         focusManager.clearFocus(); keyboard?.hide()
     }
     fun navigateBack() {
-        if(folderBrowsing) navigateCollection(folderParent(collection)) else onBack()
+        if(folderBrowsing) navigateCollection(folderParent(collection))
+        else if(albumBrowsing) navigateCollection(if(albumRoot) "" else MUSIC_ALBUM_ROOT) else onBack()
     }
-    BackHandler(enabled=folderBrowsing && !folderDialog && moveToFolder.isEmpty() && !organize && !appearance && deletion == null && !confirmBatch && resumeEntry == null && addToList.isEmpty()) { navigateBack() }
+    BackHandler(enabled=(folderBrowsing || albumBrowsing) && !albumEditor && !folderDialog && moveToFolder.isEmpty() && !organize && !appearance && deletion == null && !confirmBatch && resumeEntry == null && addToList.isEmpty()) { navigateBack() }
     LaunchedEffect(collection) { gridState.scrollToItem(0) }
     LaunchedEffect(collection,collections.folders) {
         if(collection.startsWith("folder:") && collections.folders.none { it.id == collection }) navigateCollection(LIBRARY_FOLDER_ROOT)
@@ -174,7 +182,7 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
         if(uris.isNotEmpty()) scope.launch {
             importing=true
             try {
-                val failed=LibraryRepository.addFiles(context,uris)
+                val failed=LibraryRepository.addFiles(context,uris,LibrarySection.valueOf(pickerSection))
                 error=if(failed > 0) "${failed}件を追加できませんでした。端末に保存した動画・音楽を選んでください。" else ""
                 refresh++
             } finally { importing=false }
@@ -197,11 +205,20 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
         catch(e: Exception) { error="一覧を読み込めませんでした。「更新」で再試行してください。"; AppLog.error("ライブラリー",e) }
         finally { loading=false }
     }
-    val filteredEntries=remember(entries,filter,search) { libraryEntries(entries,emptyList(),filter,search) }
+    val sectionItems=remember(entries,section) { sectionEntries(entries,section) }
+    val albums=remember(entries,collections) { libraryAlbums(entries,collections) }
+    val currentAlbum=albums.firstOrNull { it.id == collection }
+    val filteredEntries=remember(sectionItems,filter,search) { libraryEntries(sectionItems,emptyList(),filter,search) }
     val visible=remember(filteredEntries,collections,collection,sort,dubbedOnly) {
         organizedLibrary(filteredEntries,collections,collection,sort,dubbedOnly)
     }
-    val folderRows=remember(filteredEntries,collections,dubbedOnly) { libraryFolderRows(filteredEntries,collections,dubbedOnly) }
+    val folderRows=remember(filteredEntries,collections,dubbedOnly,sectionItems,entries) {
+        val known=entries.map { it.uri }.toSet(); val own=sectionItems.map { it.uri }.toSet()
+        libraryFolderRows(filteredEntries,collections,dubbedOnly).filter { row ->
+            val members=collections.folders.first { it.id == row.id }.uris
+            members.none { it in known } || members.any { it in own }
+        }
+    }
     val playingEntry=entries.firstOrNull { it.uri == playback.uri }
     val playingArtwork by produceState<Bitmap?>(null,playingEntry?.uri) {
         value=null
@@ -225,10 +242,19 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
                 onSurfaceVariant=Color.White,outline=Color.White.copy(alpha=.7f)) else colors) {
             Column(Modifier.padding(12.dp)) {
             LibraryHeader(headerAccent,loading,::navigateBack,onRefresh={error=""; refresh++})
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                LibrarySection.entries.forEach { tab -> FilterChip(selected=section == tab,modifier=Modifier.weight(1f),
+                    onClick={sectionName=tab.name; filter="すべて"; search=""; dubbedOnly=false; navigateCollection("")},label={Text(tab.label)}) }
+            }
+            if(section == LibrarySection.MUSIC) Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp),verticalAlignment=Alignment.CenterVertically) {
+                FilterChip(selected=!albumBrowsing,onClick={navigateCollection("")},label={Text("曲")})
+                FilterChip(selected=albumBrowsing,onClick={navigateCollection(MUSIC_ALBUM_ROOT); controlsExpanded=false},label={Text("アルバム")})
+                TextButton(onClick={editingAlbum=""; albumEditor=true},enabled=!importing) { Text("＋ アルバムを追加") }
+            }
             val controlsSummary=listOfNotNull(
                 filter.takeUnless { it == "すべて" },
                 "検索中".takeIf { search.isNotBlank() },
-                if(folderRoot) "フォルダー一覧" else if(collection == "favorites") "お気に入り" else (collections.playlists+collections.folders).firstOrNull { it.id == collection }?.name ?: "未分類".takeIf { collection == "unfiled" },
+                if(albumBrowsing) currentAlbum?.name ?: "アルバム" else if(folderRoot) "フォルダー一覧" else if(collection == "favorites") "お気に入り" else (collections.playlists+collections.folders).firstOrNull { it.id == collection }?.name ?: "未分類".takeIf { collection == "unfiled" },
                 "オートダビング版".takeIf { dubbedOnly },
                 "${selected.size}件選択".takeIf { selecting }
             ).joinToString(" · ")
@@ -237,9 +263,9 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
                 if(!it) { focusManager.clearFocus(); keyboard?.hide() }
             }) {
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically) {
-                Text("保存した動画と音楽",fontSize=13.sp)
-                OutlinedButton(onClick={picker.launch(arrayOf("video/*","audio/*"))},enabled=!importing) {
-                    Text(if(importing) "追加中…" else "ファイルを追加")
+                Text(if(section == LibrarySection.MUSIC) "音楽ライブラリー" else "動画ライブラリー",fontSize=13.sp)
+                OutlinedButton(onClick={pickerSection=sectionName; picker.launch(arrayOf(section.mime))},enabled=!importing) {
+                    Text(if(importing) "取り込み中…" else if(section == LibrarySection.MUSIC) "曲を取り込む" else "動画を取り込む")
                 }
             }
             OutlinedButton(onClick={navigateCollection(LIBRARY_FOLDER_ROOT)}) { Text("📁 フォルダー") }
@@ -249,8 +275,8 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
                     keyboardActions=KeyboardActions(onSearch={focusManager.clearFocus(); keyboard?.hide()}))
                 LaunchedEffect(Unit) { if(!appearance) { searchFocus.requestFocus(); keyboard?.show() } }
             }
-            FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
-                listOf("すべて","動画","音楽","ショート").forEach { option -> FilterChip(selected=filter == option,onClick={filter=option},label={Text(option)}) }
+            if(section == LibrarySection.VIDEO) FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+                listOf("すべて","動画","ショート").forEach { option -> FilterChip(selected=filter == option,onClick={filter=option},label={Text(option)}) }
             }
             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                 FlowRow(Modifier.weight(1f),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
@@ -269,7 +295,7 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
                     Text(name+(if(dubbedOnly) " · オートダビング版" else ""),maxLines=1,overflow=TextOverflow.Ellipsis)
                 }
                 TextButton(onClick={selecting=!selecting; selected=arrayListOf()}) { Text(if(selecting) "選択を終了" else "選択") }
-                if(playback.uri.isNotBlank()) PlaybackBetaMenu(transport.controller)
+                if(playback.uri.isNotBlank() && playingEntry?.video == (section == LibrarySection.VIDEO)) PlaybackBetaMenu(transport.controller)
             }
             if(selecting) FlowRow(horizontalArrangement=Arrangement.spacedBy(4.dp),verticalArrangement=Arrangement.Center) {
                 Text("${selected.size}件選択",Modifier.padding(vertical=12.dp))
@@ -282,7 +308,12 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
             if(folderBrowsing) LibraryFolderPath(
                 name=if(folderRoot) null else if(collection == "unfiled") "未分類" else collections.folders.firstOrNull { it.id == collection }?.name,
                 onRoot={navigateCollection(LIBRARY_FOLDER_ROOT)},onAll={navigateCollection("")},onManage={folderDialog=true})
-            if(preferences.libraryPlayerVisible && playback.uri.isNotBlank()) {
+            if(albumBrowsing && !albumRoot) Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                TextButton(onClick={navigateCollection(MUSIC_ALBUM_ROOT)}) { Text("アルバム ›") }
+                Text(currentAlbum?.name ?: "アルバムが見つかりません",Modifier.weight(1f),maxLines=1,overflow=TextOverflow.Ellipsis)
+                if(currentAlbum?.manual == true) TextButton(onClick={editingAlbum=collection; albumEditor=true}) { Text("編集") }
+            }
+            if(preferences.libraryPlayerVisible && playback.uri.isNotBlank() && playingEntry?.video == (section == LibrarySection.VIDEO)) {
                 val panel=if(transport.panel.uri == playback.uri) transport.panel.copy(title=playback.title,advancing=transport.panel.advancing && !appearance)
                     else LibraryPlayerState(uri=playback.uri,title=playback.title)
                 LibraryPlayerPanel(panel,playingArtwork,playingColor,preferences.libraryPlayerScale,
@@ -293,13 +324,22 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
             if(transport.error.isNotBlank()) Text(transport.error,fontSize=13.sp)
             if(error.isNotBlank()) Text(error,color=if(hasWallpaper) Color.White else MaterialTheme.colorScheme.error,fontSize=13.sp)
             if(loading) LinearProgressIndicator(Modifier.fillMaxWidth())
-            if(visible.isEmpty() && !loading && !folderRoot) Text(if(entries.isEmpty()) "保存した動画・音楽がここに表示されます。" else "該当するファイルはありません。",Modifier.padding(vertical=24.dp))
+            if(visible.isEmpty() && !loading && !folderRoot && !albumRoot) Text(if(sectionItems.isEmpty()) "保存した${section.label}がここに表示されます。" else "該当するファイルはありません。",Modifier.padding(vertical=24.dp))
             }
             }
             }
             val controlsPull=rememberLibraryControlsPull(controlsExpanded,atTop={!gridState.canScrollBackward},onExpand={controlsExpanded=true})
             LazyVerticalGrid(columns=GridCells.Fixed(layout.columns),state=gridState,modifier=Modifier.weight(1f).nestedScroll(controlsPull),
                 horizontalArrangement=Arrangement.spacedBy(10.dp),verticalArrangement=Arrangement.spacedBy(10.dp),contentPadding=PaddingValues(vertical=8.dp)) {
+                if(albumRoot) {
+                    val shown=albums.filter { it.name.contains(search,true) || it.artist.contains(search,true) || it.tracks.any { track -> track.title.contains(search,true) || track.artist.contains(search,true) } }
+                    items(shown,key={"album-row:${it.id}"},span={GridItemSpan(maxLineSpan)}) { album ->
+                        LibraryAlbumTile(album,dark,backdrop,onOpen={navigateCollection(album.id)})
+                    }
+                    if(shown.isEmpty()) item(key="albums-empty",span={GridItemSpan(maxLineSpan)}) {
+                        LibraryFolderCaption("アルバム情報のある曲を取り込むか、「アルバムを追加」で曲をまとめられます。",dark,backdrop)
+                    }
+                }
                 if(folderRoot) {
                     items(folderRows,key={"folder-row:${it.id}"},span={GridItemSpan(maxLineSpan)}) { folder ->
                         LibraryFolderTile(folder,headerAccent,dark,backdrop,onOpen={navigateCollection(folder.id)})
@@ -335,12 +375,14 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
     }
     if(appearance) LibraryAppearanceDialog(wallpaper,preferences,playingEntry ?: visible.firstOrNull(),headerAccent,colors,
         onChange=Store::preferences,onDismiss={appearance=false},previewEntries=visible.take(6))
-    UpdatePrompt(allowed=!appearance && deletion == null && !importing && error.isBlank() && !organize && addToList.isEmpty() && !confirmBatch && resumeEntry == null && batch == null && !folderDialog && moveToFolder.isEmpty())
+    UpdatePrompt(allowed=!albumEditor && !appearance && deletion == null && !importing && error.isBlank() && !organize && addToList.isEmpty() && !confirmBatch && resumeEntry == null && batch == null && !folderDialog && moveToFolder.isEmpty())
+    if(albumEditor) LibraryAlbumEditor(entries,collections.albums.firstOrNull { it.id == editingAlbum },
+        onSaved={id -> albumEditor=false; navigateCollection(id)},onDismiss={albumEditor=false})
     if(folderDialog) LibraryFolderDialog(collection,onSelect=::navigateCollection,onDismiss={folderDialog=false})
     if(moveToFolder.isNotEmpty()) LibraryFolderDialog(collection,onSelect={},onDismiss={moveToFolder=arrayListOf()},
         moving=moveToFolder,onMoved={moveToFolder=arrayListOf(); selected=arrayListOf(); selecting=false})
     if(organize) LibraryOrganizeDialog(collection,sort,dubbedOnly,onCollection=::navigateCollection,onSort={sortName=it.name},
-        onDubbed={dubbedOnly=it},onDismiss={organize=false})
+        onDubbed={dubbedOnly=it},onDismiss={organize=false},allowDubbed=section == LibrarySection.VIDEO)
     if(addToList.isNotEmpty()) AddToPlaylistDialog(addToList,onDismiss={addToList=arrayListOf()},onAdded={addToList=arrayListOf(); selected=arrayListOf(); selecting=false})
     resumeEntry?.let { entry -> ResumePlaybackDialog(entry,LibraryExtras.position(entry.uri,entry.durationMs),
         onStart={position -> resumeEntry=null; launchPlayer(entry.uri,position)},onDismiss={resumeEntry=null}) }

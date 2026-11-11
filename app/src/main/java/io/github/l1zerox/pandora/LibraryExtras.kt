@@ -46,6 +46,12 @@ internal object LibraryExtras {
     }
     fun deleteFolder(id: String)=change { it.copy(folders=it.folders.filterNot { f -> f.id == id }) }
     fun moveToFolder(id: String, uris: List<String>)=change { it.moveToFolder(id,uris) }
+    fun saveAlbum(id: String?, name: String, uris: List<String>): String {
+        val key=id ?: "album:"+UUID.randomUUID().toString()
+        val cleaned=name.trim().take(60); require(cleaned.isNotEmpty())
+        change { it.withAlbum(UserPlaylist(key,cleaned,uris)) }; return key
+    }
+    fun deleteAlbum(id: String)=change { it.copy(albums=it.albums.filterNot { album -> album.id == id }) }
     fun forget(uri: String) {
         change { it.without(uri) }; bookmarks.edit().remove(uri).apply()
     }
