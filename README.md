@@ -6,7 +6,7 @@ Windows版と別プロジェクトのAndroid用アプリです。Android 10以�
 
 **[正式版APK v0.4.24](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.4.24/YoutubePandora-Android-v0.4.24.apk)**（ライブラリーのベータ版機能を統合済み）
 
-**[ベータ版APK v0.4.25-beta.7](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.4.25-beta.7/YoutubePandora-Android-v0.4.25-beta.7.apk)**：ライブラリーを動画・音楽に分離。音楽のタグ読み込み、アルバム自動整理／手動追加、曲名先頭のトラック番号の整理に対応しました。保存範囲のバーを常時表示し、動画の長さをその場で取得できます。[更新内容と検証範囲](BETA_RELEASE_NOTES.md)。beta.6からの差分更新に対応します。
+**[ベータ版APK v0.4.25-beta.8](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.4.25-beta.8/YoutubePandora-Android-v0.4.25-beta.8.apk)**：ライブラリーを動画・音楽に分離。音楽のタグ読み込み、アルバム自動整理／手動追加、曲名先頭のトラック番号の整理に対応しました。保存範囲のバーを常時表示し、動画の長さをその場で取得できます。[更新内容と検証範囲](BETA_RELEASE_NOTES.md)。beta.6／beta.7からの差分更新に対応します。
 
 v0.4.24では、お気に入り・プレイリスト、続きから再生、スリープタイマー、再生キュー編集、保存済みチェック、複数選択を正式版でも使えます。オートダビング判定とラベル反映の修正、サムネイル付き再生パネル・波のエフェクト・操作欄の折りたたみも統合しました。バブルはタップでDL管理パネルを開き、再タップで閉じます。
 

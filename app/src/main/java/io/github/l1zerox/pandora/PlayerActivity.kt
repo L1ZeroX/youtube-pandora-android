@@ -165,7 +165,9 @@ class PlayerActivity : ComponentActivity() {
             if(player.mediaItemCount == 0) { title="再生するファイルを選んでください"; error="ライブラリーに戻って動画・音楽を選んでください。" }
             return
         }
-        if(player.currentMediaItem?.mediaId == uri) {
+        val albumPosition=albumQueueResumePosition(player.currentMediaItem?.mediaId,uri,intent.getStringExtra("collection").orEmpty(),restoring,
+            if(player.playbackState == Player.STATE_ENDED) 0 else player.currentPosition)
+        if(player.currentMediaItem?.mediaId == uri && albumPosition == null) {
             if(!restoring) {
                 if(intent.hasExtra("startPosition")) player.seekTo(intent.getLongExtra("startPosition",0).coerceAtLeast(0))
                 else if(player.playbackState == Player.STATE_ENDED) player.seekTo(0)
@@ -184,7 +186,7 @@ class PlayerActivity : ComponentActivity() {
                 val order=runCatching { LibrarySort.valueOf(intent.getStringExtra("librarySort").orEmpty()) }.getOrDefault(LibrarySort.NEWEST)
                 val available=organizedLibrary(entries,LibraryExtras.state.value,collection,order,intent.getBooleanExtra("dubbedOnly",false))
                 val playlist=available.filter { it.category == selected.category }.let { if(selected in it) it else listOf(selected)+it }
-                val position=if(restoring) restorePosition else intent.getLongExtra("startPosition",0)
+                val position=if(restoring) restorePosition else intent.getLongExtra("startPosition",albumPosition ?: 0)
                 player.setMediaItems(playlist.map { it.mediaItem() },playlist.indexOf(selected),position.coerceIn(0,selected.durationMs.coerceAtLeast(0)))
                 player.prepare()
                 if(lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) player.play()

@@ -69,4 +69,15 @@ class LibraryMusicTest {
         for(extension in listOf("mp3","m4a","flac","wav","ogg","opus","aac")) assertTrue(libraryMime("application/octet-stream","01 song.$extension")!!.startsWith("audio/"))
         assertNull(libraryMime(null,"song.flac.exe"))
     }
+    @Test fun reopeningCurrentSongFromAlbumRebuildsItsQueueAtTheCurrentPosition() {
+        val entries=listOf(one,two)
+        val data=LibraryCollections().withAlbum(UserPlaylist("album:single","Single",listOf("one")))
+        assertEquals(42_000L,albumQueueResumePosition("one","one","album:single",false,42_000))
+        assertEquals(listOf(one),organizedLibrary(entries,data,"album:single",LibrarySort.NEWEST,false))
+        assertEquals(0L,albumQueueResumePosition("one","one","album:single",false,0))
+        // Activity recreation and the now-playing panel keep an explicitly edited queue.
+        assertNull(albumQueueResumePosition("one","one","album:single",true,42_000))
+        assertNull(albumQueueResumePosition("one","one","",false,42_000))
+        assertNull(albumQueueResumePosition("two","one","album:single",false,42_000))
+    }
 }

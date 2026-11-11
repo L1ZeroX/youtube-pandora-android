@@ -40,3 +40,7 @@ internal fun libraryAlbums(entries: List<LibraryEntry>, data: LibraryCollections
         if(untagged.isEmpty()) emptyList() else listOf(MusicAlbum("album-unknown","アルバム情報なし","",albumTracks(untagged)))
 }
 internal fun isAlbumCollection(id: String)=id == MUSIC_ALBUM_ROOT || id.startsWith("album:") || id.startsWith("album-tag:") || id == "album-unknown"
+
+/** Opening the current song from an album must replace an older queue without restarting the song. */
+internal fun albumQueueResumePosition(currentUri: String?, requestedUri: String, collection: String, restoring: Boolean, position: Long): Long? =
+    if(!restoring && currentUri == requestedUri && collection != MUSIC_ALBUM_ROOT && isAlbumCollection(collection)) position.coerceAtLeast(0) else null
