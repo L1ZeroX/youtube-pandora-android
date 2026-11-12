@@ -29,29 +29,43 @@ import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-/** List scrolling opens the tools only after pulling beyond the top, never during a fling. */
+/** Pull at the top to expand; reaching the bottom through user scrolling collapses the tools. */
 @Composable
-internal fun rememberLibraryControlsPull(expanded: Boolean, atTop: ()->Boolean, onExpand: ()->Unit): NestedScrollConnection {
+internal fun rememberLibraryControlsPull(expanded: Boolean, atTop: ()->Boolean, onExpand: ()->Unit,
+    atBottom: ()->Boolean = { false }, onCollapse: ()->Unit = {}): NestedScrollConnection {
     val open by rememberUpdatedState(expanded)
     val isAtTop by rememberUpdatedState(atTop)
     val expand by rememberUpdatedState(onExpand)
+    val isAtBottom by rememberUpdatedState(atBottom)
+    val collapse by rememberUpdatedState(onCollapse)
     val threshold=with(LocalDensity.current) { 64.dp.toPx() }
     return remember(threshold) {
         object: NestedScrollConnection {
-            var distance=0f
-            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                if(open || available.y < 0 || !isAtTop()) distance=0f
-                return Offset.Zero
-            }
+            val gesture=LibraryControlsScroll(threshold)
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
-                if(!open && isAtTop() && source == NestedScrollSource.UserInput && available.y > 0) {
-                    distance+=available.y
-                    if(distance >= threshold) { distance=0f; expand() }
-                    return Offset(0f,available.y)
+                val pulling=!open && isAtTop() && source == NestedScrollSource.UserInput && available.y > 0
+                when(gesture.scroll(open,isAtTop(),isAtBottom(),consumed.y,available.y,source == NestedScrollSource.UserInput)) {
+                    true -> expand(); false -> collapse(); null -> Unit
                 }
+                if(pulling) return Offset(0f,available.y)
                 return Offset.Zero
             }
-            override suspend fun onPreFling(available: Velocity): Velocity { distance=0f; return Velocity.Zero }
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+                if(gesture.endFling(open,isAtBottom()) == false) collapse()
+                return Velocity.Zero
+            }
+        }
+    }
+}
+
+@Composable
+internal fun LibraryBrowseButtons(searchExpanded: Boolean, onFolder: ()->Unit, onSearch: ()->Unit) {
+    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(onClick=onFolder,modifier=Modifier.weight(1f).testTag("library-folder-button"),contentPadding=PaddingValues(horizontal=8.dp)) {
+            Text("📁 フォルダー",maxLines=1,overflow=TextOverflow.Ellipsis)
+        }
+        OutlinedButton(onClick=onSearch,modifier=Modifier.weight(1f).testTag("library-search-button"),contentPadding=PaddingValues(horizontal=8.dp)) {
+            Text(if(searchExpanded) "検索を閉じる" else "検索 🔎",maxLines=1,overflow=TextOverflow.Ellipsis)
         }
     }
 }

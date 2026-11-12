@@ -9,6 +9,8 @@ import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.MediaStore
 import android.provider.OpenableColumns
+import android.provider.DocumentsContract
+import androidx.core.net.toUri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.currentCoroutineContext
@@ -59,14 +61,14 @@ internal object LibraryRepository {
 
     suspend fun addFiles(context: Context, uris: List<Uri>, section: LibrarySection? = null): Int = withContext(Dispatchers.IO) {
         val entries=mutableMapOf<String,LibraryEntry>()
-        val existing=readImports(context).map { it.uri }.toSet()
+        val existing=readImports(context).map { importIdentity(it.uri.toUri()) }.toMutableSet()
         var failed=0
         for(uri in uris.distinct()) {
             currentCoroutineContext().ensureActive()
             try {
                 require(uri.scheme == "content")
                 val resolver=context.contentResolver
-                if(uri.toString() in existing) {
+                if(importIdentity(uri) in existing) {
                     resolver.takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     continue
                 }
@@ -80,6 +82,7 @@ internal object LibraryRepository {
                 runCatching { resolver.takePersistableUriPermission(uri,Intent.FLAG_GRANT_WRITE_URI_PERMISSION) }
                 entries[uri.toString()]=LibraryEntry(uri.toString(),name.substringBeforeLast('.'),mime,
                     added=System.currentTimeMillis()/1000,imported=true)
+                existing.add(importIdentity(uri))
             } catch(e: CancellationException) { throw e }
             catch(e: Exception) { failed++; AppLog.info("ライブラリー","ファイルを追加できません: ${e.javaClass.simpleName}") }
         }
@@ -91,11 +94,52 @@ internal object LibraryRepository {
         failed
     }
 
-    private fun writeImports(context: Context, entries: List<LibraryEntry>) {
+    private fun importIdentity(uri: Uri)=runCatching { "${uri.authority}:${DocumentsContract.getDocumentId(uri)}" }.getOrDefault(uri.toString())
+
+    suspend fun addAudioFolder(context: Context, tree: Uri, onProgress: (Int)->Unit = {}): AudioFolderResult = withContext(Dispatchers.IO) {
+        require(tree.scheme == "content" && DocumentsContract.isTreeUri(tree)) { "フォルダーを選択してください。" }
+        val resolver=context.contentResolver
+        resolver.takePersistableUriPermission(tree,Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        runCatching { resolver.takePersistableUriPermission(tree,Intent.FLAG_GRANT_WRITE_URI_PERMISSION) }
+        val known=readImports(context).map { importIdentity(it.uri.toUri()) }.toMutableSet()
+        val additions=mutableListOf<LibraryEntry>()
+        val added=System.currentTimeMillis()/1000
+        val result=scanAudioFolder(DocumentsContract.getTreeDocumentId(tree),children={ id ->
+            val uri=DocumentsContract.buildChildDocumentsUriUsingTree(tree,id)
+            val columns=arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID,DocumentsContract.Document.COLUMN_DISPLAY_NAME,DocumentsContract.Document.COLUMN_MIME_TYPE)
+            val rows=mutableListOf<FolderDocument>()
+            val cursor=resolver.query(uri,columns,null,null,null) ?: error("フォルダーを読み込めません。")
+            cursor.use {
+                while(it.moveToNext()) {
+                    currentCoroutineContext().ensureActive()
+                    val mime=it.getString(2)
+                    rows+=FolderDocument(it.getString(0),it.getString(1).orEmpty(),mime,mime == DocumentsContract.Document.MIME_TYPE_DIR)
+                }
+            }
+            rows
+        },add={ document,mime ->
+            val uri=DocumentsContract.buildDocumentUriUsingTree(tree,document.id)
+            if(!known.add(importIdentity(uri))) false else {
+                additions+=LibraryEntry(uri.toString(),document.name.substringBeforeLast('.'),mime,added=added,imported=true)
+                true
+            }
+        },progress={ count -> withContext(Dispatchers.Main) { onProgress(count) } })
+        currentCoroutineContext().ensureActive()
+        if(additions.isNotEmpty()) synchronized(importLock) {
+            val merged=readImports(context).toMutableList()
+            val identities=merged.map { importIdentity(it.uri.toUri()) }.toMutableSet()
+            merged+=additions.filter { identities.add(importIdentity(it.uri.toUri())) }
+            writeImports(context,merged,durable=true)
+        }
+        result
+    }
+
+    private fun writeImports(context: Context, entries: List<LibraryEntry>, durable: Boolean = false) {
         val array=JSONArray()
         entries.forEach { item -> array.put(JSONObject().put("uri",item.uri).put("title",item.title)
             .put("mime",item.mime).put("duration",item.durationMs).put("added",item.added)) }
-        preferences(context).edit().putString("items",array.toString()).apply()
+        val edit=preferences(context).edit().putString("items",array.toString())
+        if(durable) check(edit.commit()) { "取り込み情報を保存できませんでした。" } else edit.apply()
     }
 
     internal fun forgetImport(context: Context, uri: String) {
@@ -106,7 +150,7 @@ internal object LibraryRepository {
     suspend fun artwork(context: Context, entry: LibraryEntry): Bitmap? = withContext(Dispatchers.IO) {
         runCatching {
             MediaMetadataRetriever().use { retriever ->
-                retriever.setDataSource(context,Uri.parse(entry.uri))
+                retriever.setDataSource(context,entry.uri.toUri())
                 if(entry.video) retriever.getScaledFrameAtTime(0,MediaMetadataRetriever.OPTION_CLOSEST_SYNC,480,270)
                 else retriever.embeddedPicture?.let { bytes ->
                     val bounds=BitmapFactory.Options().apply { inJustDecodeBounds=true }

@@ -2,6 +2,7 @@ package io.github.l1zerox.pandora
 
 import java.security.MessageDigest
 import java.util.Locale
+import java.text.Normalizer
 
 internal enum class LibrarySection(val label: String, val mime: String) { VIDEO("動画","video/*"), MUSIC("音楽","audio/*") }
 internal fun sectionEntries(entries: List<LibraryEntry>, section: LibrarySection)=entries.filter { it.video == (section == LibrarySection.VIDEO) }
@@ -20,7 +21,14 @@ internal fun LibraryEntry.musicMetadata(titleTag: String?, artistTag: String?, a
     return copy(title=musicTitle(titleTag?.trim()?.takeIf { it.isNotEmpty() } ?: title,number),
         artist=artistTag.orEmpty().trim(),album=albumTag.orEmpty().trim(),albumArtist=albumArtistTag.orEmpty().trim(),track=number,disc=musicNumber(discTag))
 }
-internal data class MusicAlbum(val id: String, val name: String, val artist: String, val tracks: List<LibraryEntry>, val manual: Boolean = false)
+internal data class MusicAlbum(val id: String, val name: String, val artist: String, val tracks: List<LibraryEntry>, val manual: Boolean = false,
+    val legacyIds: Set<String> = emptySet()) {
+    fun matches(key: String)=id == key || key in legacyIds
+}
+internal fun albumNameKey(name: String)=Normalizer.normalize(name,Normalizer.Form.NFKC)
+    .filterNot { Character.getType(it) == Character.FORMAT.toInt() }.replace('’','\'')
+    .replace(Regex("(?U)\\s+")," ").trim().lowercase(Locale.ROOT)
+private fun albumId(key: String)="album-tag:"+MessageDigest.getInstance("SHA-256").digest(key.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
 internal const val MUSIC_ALBUM_ROOT="albums"
 internal fun albumTracks(entries: List<LibraryEntry>)=entries.filterNot { it.video }.sortedWith(
     compareBy<LibraryEntry> { it.disc.takeIf { n -> n > 0 } ?: 1 }.thenBy { it.track.takeIf { n -> n > 0 } ?: Int.MAX_VALUE }.thenBy { it.title }.thenBy { it.uri })
@@ -28,14 +36,14 @@ internal fun libraryAlbums(entries: List<LibraryEntry>, data: LibraryCollections
     val audio=entries.filterNot { it.video }.distinctBy { it.uri }
     val assigned=data.albums.flatMap { it.uris }.toSet()
     val manual=data.albums.map { list -> MusicAlbum(list.id,list.name,"",albumTracks(audio.filter { it.uri in list.uris }),true) }
-    val tagged=audio.filter { it.uri !in assigned && it.album.isNotBlank() }.groupBy {
-        it.album.trim().lowercase(Locale.ROOT) to it.albumArtist.ifBlank { it.artist }.trim().lowercase(Locale.ROOT)
+    val tagged=audio.filter { it.uri !in assigned && albumNameKey(it.album).isNotBlank() }.groupBy {
+        albumNameKey(it.album)
     }.map { (key,tracks) ->
-        val bytes=(key.first+"\u0000"+key.second).toByteArray(Charsets.UTF_8)
-        val id="album-tag:"+MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
-        MusicAlbum(id,tracks.first().album,tracks.first().albumArtist.ifBlank { tracks.first().artist },albumTracks(tracks))
+        val artists=tracks.map { it.albumArtist.ifBlank { it.artist } }.filter { it.isNotBlank() }.distinctBy(::albumNameKey)
+        val legacy=tracks.map { albumId(it.album.trim().lowercase(Locale.ROOT)+"\u0000"+it.albumArtist.ifBlank { it.artist }.trim().lowercase(Locale.ROOT)) }.toSet()
+        MusicAlbum(albumId(key),tracks.first().album.trim(),if(artists.size == 1) artists.single() else if(artists.isEmpty()) "" else "複数のアーティスト",albumTracks(tracks),legacyIds=legacy)
     }
-    val untagged=audio.filter { it.uri !in assigned && it.album.isBlank() }
+    val untagged=audio.filter { it.uri !in assigned && albumNameKey(it.album).isBlank() }
     return (manual+tagged).sortedBy { it.name.lowercase(Locale.ROOT) }+
         if(untagged.isEmpty()) emptyList() else listOf(MusicAlbum("album-unknown","アルバム情報なし","",albumTracks(untagged)))
 }

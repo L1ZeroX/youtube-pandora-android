@@ -31,16 +31,27 @@ class LibraryMusicTest {
         assertEquals(listOf(tagged),libraryEntries(listOf(tagged),emptyList(),search="Disc"))
         assertEquals(listOf(tagged),libraryEntries(listOf(tagged),emptyList(),search="Artist"))
     }
-    @Test fun albumsUseAlbumArtistAndDiscTrackOrderWithoutMixingSameNamedAlbums() {
+    @Test fun albumsKeepDiscTrackOrderAndSeparateDifferentAlbumNames() {
         val common=one.copy(albumArtist="Compilation")
         val duet=two.copy(artist="Guest",albumArtist="Compilation")
         val disc2=common.copy(uri="third",disc=2)
-        val other=one.copy(uri="other",albumArtist="Different")
+        val other=one.copy(uri="other",album="Other Album",albumArtist="Different")
         val albums=libraryAlbums(listOf(duet,disc2,other,common,video),LibraryCollections())
         assertEquals(2,albums.size)
         val joined=albums.first { it.artist == "Compilation" }
         assertEquals(listOf("one","two","third"),joined.tracks.map { it.uri })
         assertEquals(joined.id,libraryAlbums(listOf(common.copy(album="ALBUM")),LibraryCollections()).single().id)
+    }
+    @Test fun compilationAlbumDoesNotSplitByTrackOrAlbumArtistAndAcceptsLegacyIds() {
+        val group=one.copy(album="μ's Best Album Best Live! Collection II",artist="μ's")
+        val solo=two.copy(album=" μ’s  Best Album Best Live! Collection II ",artist="高坂穂乃果",albumArtist="高坂穂乃果")
+        val albums=libraryAlbums(listOf(group,solo),LibraryCollections())
+        assertEquals(1,albums.size); assertEquals(2,albums.single().tracks.size)
+        assertEquals("複数のアーティスト",albums.single().artist)
+        for(oldId in albums.single().legacyIds) assertEquals(listOf(group,solo),organizedLibrary(listOf(group,solo),LibraryCollections(),oldId,LibrarySort.NEWEST,false))
+        assertEquals(albums.single().id,libraryAlbums(listOf(group.copy(artist="Other",albumArtist="Other")),LibraryCollections()).single().id)
+        val manual=LibraryCollections().withAlbum(UserPlaylist("album:custom","Separate",listOf(solo.uri)))
+        assertEquals(2,libraryAlbums(listOf(group,solo),manual).size)
     }
     @Test fun manualAlbumsPersistOverrideAutomaticGroupingAndLeaveFilesWhenRemoved() {
         val initial=LibraryCollections(favorites=setOf("one"),folders=listOf(UserPlaylist("folder:a","F",listOf("one"))))

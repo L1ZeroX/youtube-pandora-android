@@ -60,7 +60,7 @@ internal fun libraryFolderRows(entries: List<LibraryEntry>, data: LibraryCollect
 internal fun organizedLibrary(entries: List<LibraryEntry>, data: LibraryCollections, collection: String, sort: LibrarySort,
     dubbedOnly: Boolean): List<LibraryEntry> {
     if(isAlbumCollection(collection)) return if(collection == MUSIC_ALBUM_ROOT) emptyList()
-        else libraryAlbums(entries,data).firstOrNull { it.id == collection }?.tracks.orEmpty()
+        else libraryAlbums(entries,data).firstOrNull { it.matches(collection) }?.tracks.orEmpty()
     val playlist=data.playlists.firstOrNull { it.id == collection }
     val folder=data.folders.firstOrNull { it.id == collection }
     val members=when { collection == "unfiled" || collection == LIBRARY_FOLDER_ROOT -> entries.map { it.uri }.toSet()-data.folders.flatMap { it.uris }.toSet()
