@@ -4,6 +4,14 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class LibraryMusicTest {
+    @Test fun albumKeysNormalizeUnicodeWhitespaceWithoutRuntimeSpecificRegex() {
+        for(space in listOf(" ","\t","\n","\r\n","\u0085","\u00a0","\u2003","\u202f","\u3000")) {
+            assertEquals("μ's best album",albumNameKey("${space}μ’s${space}${space}ＢＥＳＴ${space}Album$space"))
+            assertEquals("",albumNameKey(space+"\u200b"+space))
+        }
+        assertEquals("album",albumNameKey("\u200bAl\ufeffbum\u200b"))
+        assertEquals("",albumNameKey(""))
+    }
     private val one=LibraryEntry("one","01 Song","audio/mpeg",1000,album="Album",artist="Singer",track=1)
     private val two=one.copy(uri="two",title="Second",track=2)
     private val video=one.copy(uri="video",mime="video/mp4",width=1080,height=1920)

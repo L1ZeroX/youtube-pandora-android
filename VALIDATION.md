@@ -1,5 +1,15 @@
 # 検証状況
 
+## v0.4.25-beta.10（2026-11-12）
+
+USB接続端末SCG32（Android 16）のクラッシュログで、beta.9のLibraryMusic.kt:30から `PatternSyntaxException: (?U)\s+` が発生し、LibraryScreen内のlibraryAlbumsで停止することを確認。PC/JDK上の単体テストでは通過するが、AndroidのICU正規表現では `(?U)` が使えない。[Android公式Patternの仕様](https://developer.android.com/reference/java/util/regex/Pattern.html)。
+
+アルバム名の正規化からこの正規表現を除去し、文字を走査して空白をまとめる方式へ変更。Unicode空白、NBSP、全角空白、NEL、不可視書式文字、曲ごとのアーティスト違いの統合を維持。単体テストにUnicode空白の回帰テストを追加し、Android instrumentationには既存ライブラリーの読み込み・音楽／アルバム画面への遷移テストを追加。
+
+Debug/Release単体テスト各280件成功（失敗・エラー・スキップ0）。Lintエラー0・警告67件。配布用の署名付きAPKをAndroid 16 / SCG32へ上書き更新し、同じ署名のinstrumentationでライブラリー起動・既存データの読み込み・音楽→アルバムへの画面遷移とUnicode空白の回帰テストを実行、1件成功。端末にインストールされたAPKのSHA-256が配布APKと一致することを確認。
+
+署名付きAPKは140,523,174 bytes、beta.9からの差分は3,713,942 bytes（97.4%削減）。アプリと同じKotlin処理で差分復元したAPKのSHA-256が完全一致、旧版と同じ署名証明書・v3署名・16KB ZIP alignmentを確認。APKのSHA-256は `acb360530e171447079c597c8ca706403c2cc1df8a6c9ceb1f0a362ed68112b0`。フォルダー取り込み全体・アプリ内更新操作の実機再検証は今回の修正範囲外。
+
 ## v0.4.25-beta.9（2026-11-12）
 
 フォルダーと検索を等幅のRowへまとめ、検索を閉じる表示でも同じ行を維持する。整理・選択・表示調整・レイアウトを次の行へ配置する。端末用テストに横幅280dpで両ボタンの縦位置・非重複・検索の開閉時の配置・クリックを確認するケースを追加した。端末では未実行。

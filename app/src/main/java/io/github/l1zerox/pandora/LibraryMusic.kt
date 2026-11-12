@@ -25,9 +25,20 @@ internal data class MusicAlbum(val id: String, val name: String, val artist: Str
     val legacyIds: Set<String> = emptySet()) {
     fun matches(key: String)=id == key || key in legacyIds
 }
-internal fun albumNameKey(name: String)=Normalizer.normalize(name,Normalizer.Form.NFKC)
-    .filterNot { Character.getType(it) == Character.FORMAT.toInt() }.replace('’','\'')
-    .replace(Regex("(?U)\\s+")," ").trim().lowercase(Locale.ROOT)
+/** Android's ICU regex engine rejects Java's (?U) flag; normalize whitespace directly. */
+internal fun albumNameKey(name: String): String = buildString {
+    var space=false
+    for(char in Normalizer.normalize(name,Normalizer.Form.NFKC)) {
+        if(Character.getType(char) == Character.FORMAT.toInt()) continue
+        if(char.isWhitespace() || char == '\u0085') {
+            space=isNotEmpty()
+        } else {
+            if(space) append(' ')
+            append(if(char == '’') '\'' else char)
+            space=false
+        }
+    }
+}.lowercase(Locale.ROOT)
 private fun albumId(key: String)="album-tag:"+MessageDigest.getInstance("SHA-256").digest(key.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
 internal const val MUSIC_ALBUM_ROOT="albums"
 internal fun albumTracks(entries: List<LibraryEntry>)=entries.filterNot { it.video }.sortedWith(
