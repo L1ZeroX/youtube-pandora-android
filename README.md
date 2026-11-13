@@ -4,13 +4,13 @@ Windows版と別プロジェクトのAndroid用アプリです。Android 10以�
 
 ## インストール
 
-**[正式版APK v0.4.24](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.4.24/YoutubePandora-Android-v0.4.24.apk)**（ライブラリーのベータ版機能を統合済み）
+**[正式版APK v0.4.25](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.4.25/YoutubePandora-Android-v0.4.25.apk)**（beta.11までの機能・修正を統合済み）
 
-**[ベータ版APK v0.4.25-beta.11](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.4.25-beta.11/YoutubePandora-Android-v0.4.25-beta.11.apk)**：「バブル」を終了後も、アプリの環境設定の左に再開ボタンを表示。タップでバブルを再開できます。[更新内容と検証範囲](BETA_RELEASE_NOTES.md)。beta.10からの差分更新に対応します。
+v0.4.25では、バブル終了後の再開ボタン、動画と音楽を分けたライブラリー、アルバムの自動整理・手動追加、フォルダー管理・一括取り込み、保存範囲バー、再生エフェクト、yt-dlpの更新通知、差分更新を正式版へ統合しました。同じアルバムが分離する問題と、ライブラリーを開くと停止する不具合も修正済みです。
 
-v0.4.24では、お気に入り・プレイリスト、続きから再生、スリープタイマー、再生キュー編集、保存済みチェック、複数選択を正式版でも使えます。オートダビング判定とラベル反映の修正、サムネイル付き再生パネル・波のエフェクト・操作欄の折りたたみも統合しました。バブルはタップでDL管理パネルを開き、再タップで閉じます。
+正式版v0.4.24・v0.4.25-beta.11から、同じアプリID・署名、versionCode 64で上書き更新できます。設定・背景・保存ファイル・取り込み済みの曲・アルバム等を引き継ぎます。ベータ版を利用中なら環境設定の「リリース版に戻す」、正式版なら「新しいバージョンを確認」から取得できます。[更新内容](RELEASE_NOTES.md)・[検証状況](VALIDATION.md)。
 
-同じアプリID・署名、versionCode 52で正式版v0.4.23／v0.4.24ベータ版から上書き更新できます。設定・背景・保存ファイル・お気に入り等を引き継ぎます。ベータ版を利用中なら環境設定の「リリース版に戻す」、正式版なら「新しいバージョンを確認」から取得できます。[更新内容](RELEASE_NOTES.md)・[検証状況](VALIDATION.md)。
+旧ベータ版v0.4.25-beta.11の内容は正式版に統合されています。[ベータ版の履歴](BETA_RELEASE_NOTES.md)。
 
 v0.4.23ではライブラリーの細い再生バーと音楽画面の丸いつまみを「│」形に変更しました。つまみをバーの中央に揃え、バーの描画と操作位置を同じSliderStateに統一しています。曲が変わると古いドラッグを終了し、表示時刻とシーク先の計算も揃えました。色はサムネイルに同期します。
 
@@ -146,7 +146,7 @@ python scripts/build.py assembleDebug testDebugUnitTest lintDebug
 
 配布用APKを作るには `python scripts/release.py` を実行します。初回に `.signing` 内へ署名鍵を生成します。このフォルダーは公開せずにバックアップしてください。同じ署名鍵を使わないと既存アプリを上書き更新できません。
 
-ベータ版v0.4.25では、通知センター風の再生バー・差分更新・保存範囲を追加しています。`python scripts/release.py --beta --delta-from release/YoutubePandora-Android-v0.4.25-beta.10.apk` で通常APKに加えて差分を生成できます。差分名は `YoutubePandora-Android-v<更新先>-from-v<更新元>.pdelta.gz`。配信時は通常APKと差分の両方が同じリリースに必要で、GitHub APIの両ファイルのSHA-256と、端末の更新元APKのSHA-256を検証します。一致しない場合や差分がない場合は通常APKを取得します。旧版を飛ばす更新には、その更新元に対応する差分を用意してください。このスクリプトはGitHubへ公開しません。[試験内容](BETA_RELEASE_NOTES.md)・[検証範囲](VALIDATION.md)。
+v0.4.25では、通知センター風の再生バー・差分更新・保存範囲を利用できます。`python scripts/release.py --delta-from release/YoutubePandora-Android-v0.4.24.apk` で正式版APKに加えて差分を生成できます。差分名は `YoutubePandora-Android-v<更新先>-from-v<更新元>.pdelta.gz`。配信時は通常APKと差分の両方が同じリリースに必要で、GitHub APIの両ファイルのSHA-256と、端末の更新元APKのSHA-256を検証します。一致しない場合や差分がない場合は通常APKを取得します。旧版を飛ばす更新には、その更新元に対応する差分を用意してください。このスクリプトはGitHubへ公開しません。[更新内容](RELEASE_NOTES.md)・[検証範囲](VALIDATION.md)。
 
 端末または起動済みエミュレーターを接続した場合は `python scripts/build.py connectedDebugAndroidTest` で、合成動画の情報取得・MP4保存・24fps変換・MP3保存と画面操作を検証できます。テストが作った保存結果は終了時に削除します。
 

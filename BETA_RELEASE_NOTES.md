@@ -1,5 +1,7 @@
 # v0.4.25-beta.11 — バブル終了後の再開ボタン
 
+このベータ版の内容は[正式版v0.4.25](https://github.com/L1ZeroX/youtube-pandora-android/releases/tag/v0.4.25)へ統合済みです。環境設定の「リリース版に戻す」から更新できます。
+
 [ベータ版APKをダウンロード](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.4.25-beta.11/YoutubePandora-Android-v0.4.25-beta.11.apk)
 
 - バブルを終了しても、ダウンロード画面の「環境設定」の左に「バブル」ボタンを表示します。
