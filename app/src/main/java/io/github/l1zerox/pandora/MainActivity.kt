@@ -172,11 +172,13 @@ fun PandoraScreen(artworkRequested: Boolean = false, onArtworkClosed: ()->Unit =
                         Column(Modifier.padding(top=16.dp,bottom=10.dp)) {
                             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                                 Text(if(BuildConfig.BETA) "ベータ版" else "Android版",fontSize=12.sp,modifier=Modifier.weight(1f))
-                                if(p.bubble) {
-                                    if(bubblePermission) Button(contentPadding=PaddingValues(horizontal=12.dp,vertical=8.dp),
-                                        onClick={ (context as? android.app.Activity)?.moveTaskToBack(true) }) { Text("バブル") }
-                                    else Button(onClick={settings=true},contentPadding=PaddingValues(horizontal=12.dp,vertical=8.dp)) { Text("バブルの表示許可") }
-                                }
+                                Button(contentPadding=PaddingValues(horizontal=12.dp,vertical=8.dp),onClick={
+                                    BubbleRuntime.error.value=""
+                                    Store.preferences(Store.state.value.preferences.copy(bubble=true))
+                                    if(bubblePermission && BubbleRuntime.sync(context))
+                                        (context as? android.app.Activity)?.moveTaskToBack(true)
+                                    else settings=true
+                                }) { Text("バブル") }
                                 Button(onClick={settings=true},contentPadding=PaddingValues(horizontal=12.dp,vertical=8.dp)) { Text("環境設定") }
                             }
                             TitleLogo(Modifier.align(Alignment.CenterHorizontally))

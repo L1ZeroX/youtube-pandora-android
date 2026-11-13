@@ -1,5 +1,13 @@
 # 検証状況
 
+## v0.4.25-beta.11（2026-11-13）
+
+バブルの通知・DL管理パネルから終了するとpreferences.bubble=falseになる一方、MainActivityのヘッダーも同じフラグを表示条件としていたため再開ボタンが消えていた。「環境設定」の左へ「バブル」ボタンを常時表示。明示タップ時に最新の設定へbubble=trueを保存し、表示権限とBubbleRuntime.syncの開始結果が成功の場合だけ最小化する。未許可・開始失敗は既存の環境設定へ進み、権限案内・エラーを表示する。アプリ起動時だけでオンへ戻す処理は追加しない。
+
+USB接続端末なし。バブル終了→アプリ再表示→ボタンで再開・最小化、未許可端末の設定案内の実機操作は今回未確認。
+
+Debug/Release単体テスト各280件成功（失敗・エラー・スキップ0）。compileDebugAndroidTestKotlin成功。Lintエラー0・警告67件。署名付きAPKは140,519,078 bytes、beta.10からの差分は3,713,853 bytes（97.4%削減）。アプリと同じKotlin処理で差分復元したAPKのSHA-256が完全一致、旧版と同じ署名証明書・v3署名・16KB ZIP alignmentを確認。APKのSHA-256は `74361c278999acfabc384877ab8346dbdaf2559264298309fc348b4c30832265`。
+
 ## v0.4.25-beta.10（2026-11-12）
 
 USB接続端末SCG32（Android 16）のクラッシュログで、beta.9のLibraryMusic.kt:30から `PatternSyntaxException: (?U)\s+` が発生し、LibraryScreen内のlibraryAlbumsで停止することを確認。PC/JDK上の単体テストでは通過するが、AndroidのICU正規表現では `(?U)` が使えない。[Android公式Patternの仕様](https://developer.android.com/reference/java/util/regex/Pattern.html)。
