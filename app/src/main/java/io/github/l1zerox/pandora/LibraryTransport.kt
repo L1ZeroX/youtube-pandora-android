@@ -1,8 +1,11 @@
 package io.github.l1zerox.pandora
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
@@ -47,11 +50,18 @@ internal fun LibrarySeekBar(uri: String, playback: LibraryPlayback, palette: Lib
 }
 
 @Composable
-internal fun LibraryPlayButton(uri: String, playback: LibraryPlayback, palette: LibraryPalette, onPlay: ()->Unit) {
+internal fun LibraryPlayButton(uri: String, playback: LibraryPlayback, palette: LibraryPalette, onPlay: ()->Unit, outlined: Boolean = false) {
     val active=uri == playback.uri
     val playing=active && playback.playing
     IconButton(onClick={if(active) playback.toggle(uri) else onPlay()},enabled=!active || playback.controller != null,
         modifier=Modifier.semantics { contentDescription=if(playing) "一時停止" else "再生" }) {
-        Text(if(playing) "Ⅱ" else "▶",fontSize=22.sp,color=palette.content)
+        LibraryPlayGlyph(playing,palette.content,outlined)
     }
+}
+
+@Composable
+internal fun LibraryPlayGlyph(playing: Boolean, color: Color, outlined: Boolean) {
+    if(outlined) Box(Modifier.size(32.dp).border(1.5.dp,color,CircleShape),contentAlignment=Alignment.Center) {
+        Text(if(playing) "Ⅱ" else "▶",fontSize=16.sp,color=color)
+    } else Text(if(playing) "Ⅱ" else "▶",fontSize=22.sp,color=color)
 }

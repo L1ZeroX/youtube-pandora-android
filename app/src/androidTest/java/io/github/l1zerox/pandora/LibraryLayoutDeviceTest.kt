@@ -23,6 +23,20 @@ import org.junit.Test
 class LibraryLayoutDeviceTest {
     @get:Rule val screen=createComposeRule()
 
+    @Test fun detailedAlbumRowSeparatesOpeningFromAlbumPlayback() {
+        val track=LibraryEntry("content://layout-test/missing","曲","audio/mpeg")
+        val album=MusicAlbum("album:detail","テストアルバム","Artist",listOf(track))
+        var opened=0; var played=0
+        screen.setContent { MaterialTheme { Box(Modifier.width(280.dp)) {
+            LibraryAlbumTile(album,true,LibraryBackdrop(null,Rect.Zero,0f,Color.Black),LibraryLayout.DETAILS,
+                onPlay={played++},onOpen={opened++})
+        } } }
+        screen.onNodeWithText("トータル 1 曲").assertIsDisplayed()
+        screen.onNodeWithText(album.name).performClick()
+        screen.onNodeWithContentDescription("${album.name}を再生").performClick()
+        screen.runOnIdle { assertEquals(1,opened); assertEquals(1,played) }
+    }
+
     @Test fun layoutsPersistAndOldOrUnknownPreferencesFallBackToStandard() {
         val context=InstrumentationRegistry.getInstrumentation().targetContext
         val original=Store.state.value

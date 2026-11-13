@@ -156,11 +156,11 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
     LaunchedEffect(collection,collections.folders) {
         if(collection.startsWith("folder:") && collections.folders.none { it.id == collection }) navigateCollection(LIBRARY_FOLDER_ROOT)
     }
-    fun launchPlayer(uri: String? = null, position: Long? = null) {
+    fun launchPlayer(uri: String? = null, position: Long? = null, playlist: String = collection) {
         transport.handOffToPlayer()
         context.startActivity(Intent(context,PlayerActivity::class.java).apply {
             if(uri != null) putExtra("uri",uri)
-            putExtra("collection",collection)
+            putExtra("collection",playlist)
             putExtra("librarySort",sortName); putExtra("dubbedOnly",dubbedOnly)
             if(position != null) putExtra("startPosition",position)
         })
@@ -357,13 +357,15 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
             }
             }
             val controlsPull=rememberLibraryControlsPull(controlsExpanded,atTop={!gridState.canScrollBackward},onExpand={controlsExpanded=true},
-                atBottom={!gridState.canScrollForward},onCollapse={controlsExpanded=false; focusManager.clearFocus(); keyboard?.hide()})
+                onCollapse={controlsExpanded=false; focusManager.clearFocus(); keyboard?.hide()})
             LazyVerticalGrid(columns=GridCells.Fixed(layout.columns),state=gridState,modifier=Modifier.weight(1f).nestedScroll(controlsPull),
                 horizontalArrangement=Arrangement.spacedBy(10.dp),verticalArrangement=Arrangement.spacedBy(10.dp),contentPadding=PaddingValues(vertical=8.dp)) {
                 if(albumRoot) {
                     val shown=albums.filter { it.name.contains(search,true) || it.artist.contains(search,true) || it.tracks.any { track -> track.title.contains(search,true) || track.artist.contains(search,true) } }
                     items(shown,key={"album-row:${it.id}"},span={GridItemSpan(maxLineSpan)}) { album ->
-                        LibraryAlbumTile(album,dark,backdrop,onOpen={navigateCollection(album.id)})
+                        LibraryAlbumTile(album,dark,backdrop,layout,onPlay={
+                            album.tracks.firstOrNull()?.let { launchPlayer(it.uri,playlist=album.id) }
+                        },onOpen={navigateCollection(album.id)})
                     }
                     if(shown.isEmpty()) item(key="albums-empty",span={GridItemSpan(maxLineSpan)}) {
                         LibraryFolderCaption("アルバム情報のある曲を取り込むか、「アルバムを追加」で曲をまとめられます。",dark,backdrop)
@@ -441,11 +443,11 @@ internal fun LibraryCard(entry: LibraryEntry, dark: Boolean, backdrop: LibraryBa
     val palette=remember(source,dark) { libraryPalette(source,dark) }
     var menu by remember { mutableStateOf(false) }
     Surface(shape=RoundedCornerShape(16.dp),color=Color.Transparent,contentColor=palette.content,
-        border=BorderStroke(if(selected) 3.dp else 1.dp,palette.content.copy(alpha=if(selected) 1f else .25f)),
+        border=if(layout == LibraryLayout.DETAILS && !selected) null else BorderStroke(if(selected) 3.dp else 1.dp,palette.content.copy(alpha=if(selected) 1f else .25f)),
         modifier=Modifier.fillMaxWidth().libraryCardGlass(palette,backdrop)
             .combinedClickable(onClick=onClick,onLongClick=onLongClick)) {
         LibraryCardBody(entry,bitmap,palette,layout,
-            play={if(selectionMode) Checkbox(checked=selected,onCheckedChange={onClick()}) else LibraryPlayButton(entry.uri,playback,palette,onClick)},menu={
+            play={if(selectionMode) Checkbox(checked=selected,onCheckedChange={onClick()}) else LibraryPlayButton(entry.uri,playback,palette,onClick,outlined=layout == LibraryLayout.DETAILS)},menu={
                 Box {
                     IconButton(onClick={menu=true},modifier=Modifier.semantics { contentDescription="${entry.title}のメニュー" }) {
                         Text(if(favorite) "♥⋮" else "⋮",fontSize=22.sp,color=palette.content)

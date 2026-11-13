@@ -29,14 +29,13 @@ import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-/** Pull at the top to expand; reaching the bottom through user scrolling collapses the tools. */
+/** Pull at the top to expand; scrolling down the list immediately collapses the tools. */
 @Composable
 internal fun rememberLibraryControlsPull(expanded: Boolean, atTop: ()->Boolean, onExpand: ()->Unit,
-    atBottom: ()->Boolean = { false }, onCollapse: ()->Unit = {}): NestedScrollConnection {
+    onCollapse: ()->Unit = {}): NestedScrollConnection {
     val open by rememberUpdatedState(expanded)
     val isAtTop by rememberUpdatedState(atTop)
     val expand by rememberUpdatedState(onExpand)
-    val isAtBottom by rememberUpdatedState(atBottom)
     val collapse by rememberUpdatedState(onCollapse)
     val threshold=with(LocalDensity.current) { 64.dp.toPx() }
     return remember(threshold) {
@@ -44,14 +43,14 @@ internal fun rememberLibraryControlsPull(expanded: Boolean, atTop: ()->Boolean, 
             val gesture=LibraryControlsScroll(threshold)
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
                 val pulling=!open && isAtTop() && source == NestedScrollSource.UserInput && available.y > 0
-                when(gesture.scroll(open,isAtTop(),isAtBottom(),consumed.y,available.y,source == NestedScrollSource.UserInput)) {
+                when(gesture.scroll(open,isAtTop(),consumed.y,available.y,source == NestedScrollSource.UserInput)) {
                     true -> expand(); false -> collapse(); null -> Unit
                 }
                 if(pulling) return Offset(0f,available.y)
                 return Offset.Zero
             }
             override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
-                if(gesture.endFling(open,isAtBottom()) == false) collapse()
+                gesture.endGesture()
                 return Velocity.Zero
             }
         }

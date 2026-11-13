@@ -18,6 +18,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -32,28 +33,35 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.R as MediaUiR
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 internal data class MusicPalette(val top: Color, val bottom: Color, val accent: Color, val onAccent: Color, val secondary: Color)
-internal fun musicPalette(source: Color?): MusicPalette {
+internal const val MUSIC_ARTWORK_DIM=.66f
+internal fun musicPalette(source: Color?, artworkBackground: Boolean = false): MusicPalette {
     val original=(source ?: Color(0xFF4388FF)).copy(alpha=1f)
     val top=(0..20).asSequence().map { lerp(original,Color.Black,.45f+it*.0275f) }
         .first { libraryContrast(Color.White,it) >= 4.5f }
     val bottom=lerp(top,Color.Black,.88f)
+    // The brightest possible artwork pixel after dimming bounds every backdrop color.
+    val backgrounds=listOfNotNull(top,bottom,
+        if(artworkBackground) Color.Black.copy(alpha=MUSIC_ARTWORK_DIM).compositeOver(Color.White) else null)
     val accent=(0..20).asSequence().map { lerp(original,Color.White,it/20f) }
-        .first { libraryContrast(it,top) >= 3f && libraryContrast(it,bottom) >= 3f }
+        .first { color -> backgrounds.all { libraryContrast(color,it) >= 3f } }
     return MusicPalette(top,bottom,accent,libraryTextColor(accent),
-        if(libraryContrast(Color.LightGray,top) >= 4.5f) Color.LightGray else Color.White)
+        if(backgrounds.all { libraryContrast(Color.LightGray,it) >= 4.5f }) Color.LightGray else Color.White)
 }
 
 @Composable
 internal fun MusicPlayerScreen(player: Player?, title: String, artwork: Bitmap?, source: Color?, error: String,
     onBack: ()->Unit, onStop: ()->Unit) {
     val transport=rememberMusicPlayback(player)
-    val palette=remember(source) { musicPalette(source) }
+    val palette=remember(source,artwork != null) { musicPalette(source,artworkBackground=artwork != null) }
     var menu by remember { mutableStateOf(false) }
     var queue by rememberSaveable { mutableStateOf(false) }
     var timer by rememberSaveable { mutableStateOf(false) }
     Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(palette.top,lerp(palette.top,palette.bottom,.55f),palette.bottom)))) {
+        if(artwork != null) key(artwork) { MusicArtworkBackdrop(artwork) }
         BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
             val wide=maxWidth > maxHeight
             val artSize=if(wide) minOf((maxHeight-104.dp).coerceAtLeast(128.dp),maxWidth*.42f)
@@ -102,6 +110,18 @@ internal fun MusicPlayerScreen(player: Player?, title: String, artwork: Bitmap?,
     if(timer) SleepTimerDialog { timer=false }
     if(queue) PlaybackQueueDialog(player) { queue=false }
 
+}
+
+@Composable
+private fun MusicArtworkBackdrop(artwork: Bitmap) {
+    val blurred by produceState<Bitmap?>(null,artwork) {
+        value=withContext(Dispatchers.Default) { blurThumbnail(artwork,maxEdge=96,passes=12) }
+    }
+    blurred?.let { image ->
+        Image(image.asImageBitmap(),null,Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(
+            Color.Black.copy(alpha=MUSIC_ARTWORK_DIM),Color.Black.copy(alpha=.72f),Color.Black.copy(alpha=.84f)))))
+    }
 }
 
 @Composable

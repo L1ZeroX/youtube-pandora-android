@@ -70,6 +70,14 @@ internal fun LibraryLayoutChoices(layout: LibraryLayout, onSelect: (LibraryLayou
 private fun LibraryLayoutIcon(layout: LibraryLayout) {
     val color=LocalContentColor.current
     Canvas(Modifier.size(22.dp)) {
+        if(layout == LibraryLayout.DETAILS) {
+            repeat(3) { row ->
+                val y=row*8.dp.toPx()
+                drawRoundRect(color,Offset(0f,y),Size(5.dp.toPx(),5.dp.toPx()),CornerRadius(1.dp.toPx()))
+                drawLine(color,Offset(8.dp.toPx(),y+2.5.dp.toPx()),Offset(size.width,y+2.5.dp.toPx()),1.5.dp.toPx(),StrokeCap.Round)
+            }
+            return@Canvas
+        }
         val columns=layout.columns
         val rows=when(layout) { LibraryLayout.COMPACT -> 4; LibraryLayout.LARGE -> 1; else -> 2 }
         val gap=3.dp.toPx()

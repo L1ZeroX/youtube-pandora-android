@@ -131,10 +131,10 @@ private fun LibraryAppearanceSample(wallpaper: Bitmap?, artwork: Map<String,Bitm
                             val source=remember(image) { image?.let { libraryThumbnailColor(it) } }
                             val palette=remember(source,p.dark) { libraryPalette(source,p.dark) }
                             Surface(shape=RoundedCornerShape(16.dp),color=Color.Transparent,contentColor=palette.content,
-                                border=BorderStroke(1.dp,palette.content.copy(alpha=.25f)),
+                                border=if(layout == LibraryLayout.DETAILS) null else BorderStroke(1.dp,palette.content.copy(alpha=.25f)),
                                 modifier=Modifier.weight(1f).libraryCardGlass(palette,backdrop)) {
                                 LibraryCardBody(entry,image,palette,layout,
-                                    play={Box(Modifier.size(48.dp),contentAlignment=Alignment.Center) { Text("▶",fontSize=22.sp) }},
+                                    play={Box(Modifier.size(48.dp),contentAlignment=Alignment.Center) { LibraryPlayGlyph(false,palette.content,layout == LibraryLayout.DETAILS) }},
                                     menu={Box(Modifier.size(48.dp),contentAlignment=Alignment.Center) { Text("⋮",fontSize=22.sp) }})
                             }
                         }

@@ -21,18 +21,19 @@ import androidx.compose.ui.unit.sp
 internal fun LibraryCardBody(entry: LibraryEntry, artwork: Bitmap?, palette: LibraryPalette, layout: LibraryLayout,
     play: @Composable ()->Unit, menu: @Composable ()->Unit, footer: @Composable ()->Unit = {}) {
     val compact=layout == LibraryLayout.COMPACT
+    val details=layout == LibraryLayout.DETAILS
     val three=layout == LibraryLayout.GRID_THREE
-    val padding=when { three -> 6.dp; compact -> 8.dp; layout == LibraryLayout.GRID_TWO -> 10.dp; else -> 12.dp }
+    val padding=when { three -> 6.dp; compact || details -> 8.dp; layout == LibraryLayout.GRID_TWO -> 10.dp; else -> 12.dp }
     Column(Modifier.padding(padding)) {
-        if(layout == LibraryLayout.STANDARD || compact) {
+        if(layout == LibraryLayout.STANDARD || compact || details) {
             Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(if(compact) 8.dp else 12.dp)) {
-                LibraryCardArtwork(entry,artwork,palette,Modifier.size(if(compact) 48.dp else 80.dp))
+                LibraryCardArtwork(entry,artwork,palette,Modifier.size(if(details) 56.dp else if(compact) 48.dp else 80.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(entry.title,maxLines=if(compact) 1 else 2,overflow=TextOverflow.Ellipsis,fontWeight=FontWeight.SemiBold,
+                    Text(entry.title,maxLines=if(compact || details) 1 else 2,overflow=TextOverflow.Ellipsis,fontWeight=if(details) FontWeight.Normal else FontWeight.SemiBold,
                         color=palette.content,fontSize=if(compact) 14.sp else 16.sp)
                     LibraryCardInfo(entry,palette,false)
                 }
-                if(compact) Row(verticalAlignment=Alignment.CenterVertically) { play(); menu() }
+                if(compact || details) Row(verticalAlignment=Alignment.CenterVertically) { play(); menu() }
                 else Column(horizontalAlignment=Alignment.CenterHorizontally) { play(); menu() }
             }
         } else {

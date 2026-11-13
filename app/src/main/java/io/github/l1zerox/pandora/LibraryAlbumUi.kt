@@ -17,27 +17,34 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
 @Composable
-internal fun LibraryAlbumTile(album: MusicAlbum, dark: Boolean, backdrop: LibraryBackdrop, onOpen: ()->Unit) {
+internal fun LibraryAlbumTile(album: MusicAlbum, dark: Boolean, backdrop: LibraryBackdrop,
+    layout: LibraryLayout = LibraryLayout.STANDARD, onPlay: ()->Unit = {}, onOpen: ()->Unit) {
+    val details=layout == LibraryLayout.DETAILS
     val context=LocalContext.current
     val cover=album.tracks.firstOrNull()
     val bitmap by produceState<Bitmap?>(null,cover?.uri) { value=null; if(cover != null) value=LibraryRepository.artwork(context,cover) }
     val palette=remember(bitmap,dark) { libraryPalette(bitmap?.let(::libraryThumbnailColor),dark) }
     Surface(onClick=onOpen,color=Color.Transparent,contentColor=palette.content,shape=RoundedCornerShape(16.dp),
         modifier=Modifier.fillMaxWidth().libraryCardGlass(palette,backdrop)) {
-        Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-            Box(Modifier.size(72.dp).clip(RoundedCornerShape(10.dp)),contentAlignment=Alignment.Center) {
+        Row(Modifier.padding(if(details) 8.dp else 12.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+            Box(Modifier.size(if(details) 56.dp else 72.dp).clip(RoundedCornerShape(10.dp)),contentAlignment=Alignment.Center) {
                 bitmap?.let { Image(it.asImageBitmap(),contentDescription=null,modifier=Modifier.fillMaxSize(),contentScale=ContentScale.Crop) } ?: Text("♫")
             }
             Column(Modifier.weight(1f)) {
-                Text(album.name,style=MaterialTheme.typography.titleMedium,maxLines=2,overflow=TextOverflow.Ellipsis)
-                if(album.artist.isNotBlank()) Text(album.artist,maxLines=1,overflow=TextOverflow.Ellipsis,style=MaterialTheme.typography.bodySmall)
-                Text("${album.tracks.size}曲",style=MaterialTheme.typography.bodySmall)
+                Text(album.name,style=MaterialTheme.typography.titleMedium,maxLines=if(details) 1 else 2,overflow=TextOverflow.Ellipsis)
+                if(!details && album.artist.isNotBlank()) Text(album.artist,maxLines=1,overflow=TextOverflow.Ellipsis,style=MaterialTheme.typography.bodySmall)
+                Text(if(details) "トータル ${album.tracks.size} 曲" else "${album.tracks.size}曲",style=MaterialTheme.typography.bodySmall)
             }
-            Text("›")
+            if(details) IconButton(onClick=onPlay,enabled=album.tracks.isNotEmpty(),
+                modifier=Modifier.semantics { contentDescription="${album.name}を再生" }) {
+                LibraryPlayGlyph(false,palette.content,true)
+            } else Text("›")
         }
     }
 }
