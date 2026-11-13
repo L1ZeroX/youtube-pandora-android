@@ -113,6 +113,14 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
     val section=LibrarySection.valueOf(sectionName)
     var pickerSection by rememberSaveable { mutableStateOf(sectionName) }
     var albumEditor by rememberSaveable { mutableStateOf(false) }
+    var artworkTarget by rememberSaveable { mutableStateOf("") }
+    var artworkTitle by rememberSaveable { mutableStateOf("") }
+    var artworkAlbum by rememberSaveable { mutableStateOf<String?>(null) }
+    var artworkTrack by rememberSaveable { mutableStateOf<String?>(null) }
+    fun editArtwork(entry: LibraryEntry?, album: MusicAlbum? = null) {
+        artworkTarget=album?.let { albumArtworkKey(it.id) } ?: entry?.let { trackArtworkKey(it.uri) }.orEmpty()
+        artworkTitle=album?.name ?: entry?.title.orEmpty(); artworkAlbum=album?.id; artworkTrack=entry?.uri
+    }
     var editingAlbum by rememberSaveable { mutableStateOf("") }
     var search by rememberSaveable { mutableStateOf("") }
     var searchExpanded by rememberSaveable { mutableStateOf(false) }
@@ -134,6 +142,7 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
     val albumBrowsing=isAlbumCollection(collection)
     val albumRoot=collection == MUSIC_ALBUM_ROOT
     var sortName by rememberSaveable { mutableStateOf(LibrarySort.NEWEST.name) }
+    var indexLabel by remember { mutableStateOf<String?>(null) }
     val sort=LibrarySort.valueOf(sortName)
     var dubbedOnly by rememberSaveable { mutableStateOf(false) }
     var organize by rememberSaveable { mutableStateOf(false) }
@@ -151,7 +160,7 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
         if(folderBrowsing) navigateCollection(folderParent(collection))
         else if(albumBrowsing) navigateCollection(if(albumRoot) "" else MUSIC_ALBUM_ROOT) else onBack()
     }
-    BackHandler(enabled=(folderBrowsing || albumBrowsing) && !importMenu && !albumEditor && !folderDialog && moveToFolder.isEmpty() && !organize && !appearance && deletion == null && !confirmBatch && resumeEntry == null && addToList.isEmpty()) { navigateBack() }
+    BackHandler(enabled=(folderBrowsing || albumBrowsing) && artworkTarget.isBlank() && !importMenu && !albumEditor && !folderDialog && moveToFolder.isEmpty() && !organize && !appearance && deletion == null && !confirmBatch && resumeEntry == null && addToList.isEmpty()) { navigateBack() }
     LaunchedEffect(collection) { gridState.scrollToItem(0) }
     LaunchedEffect(collection,collections.folders) {
         if(collection.startsWith("folder:") && collections.folders.none { it.id == collection }) navigateCollection(LIBRARY_FOLDER_ROOT)
@@ -226,6 +235,10 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
     }
     val sectionItems=remember(entries,section) { sectionEntries(entries,section) }
     val albums=remember(entries,collections) { libraryAlbums(entries,collections) }
+    val shownAlbums=remember(albums,search) {
+        albums.filter { it.name.contains(search,true) || it.artist.contains(search,true) || it.tracks.any { track -> track.title.contains(search,true) || track.artist.contains(search,true) } }
+            .sortedBy { libraryTitleKey(it.name) }
+    }
     val currentAlbum=albums.firstOrNull { it.matches(collection) }
     LaunchedEffect(collection,currentAlbum?.id) {
         if(currentAlbum != null && collection != currentAlbum.id) collection=currentAlbum.id
@@ -234,18 +247,25 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
     val visible=remember(filteredEntries,collections,collection,sort,dubbedOnly) {
         organizedLibrary(filteredEntries,collections,collection,sort,dubbedOnly)
     }
-    val folderRows=remember(filteredEntries,collections,dubbedOnly,sectionItems,entries) {
+    val folderRows=remember(filteredEntries,collections,dubbedOnly,sectionItems,entries,sort) {
         val known=entries.map { it.uri }.toSet(); val own=sectionItems.map { it.uri }.toSet()
         libraryFolderRows(filteredEntries,collections,dubbedOnly).filter { row ->
             val members=collections.folders.first { it.id == row.id }.uris
             members.none { it in known } || members.any { it in own }
+        }.let { if(sort == LibrarySort.TITLE) it.sortedBy { row -> libraryTitleKey(row.name) } else it }
+    }
+    val indexRows=remember(albumRoot,folderRoot,shownAlbums,folderRows,visible) {
+        when {
+            albumRoot -> shownAlbums.map { LibraryIndexRow("album-row:${it.id}",it.name) }
+            folderRoot -> (if(folderRows.isEmpty()) listOf(LibraryIndexRow("no-folders","")) else folderRows.map { LibraryIndexRow("folder-row:${it.id}",it.name) })+
+                LibraryIndexRow("unfiled-heading","")+visible.map { LibraryIndexRow(it.uri,it.title) }
+            else -> visible.map { LibraryIndexRow(it.uri,it.title) }
         }
     }
+    val indexTargets=remember(indexRows) { libraryIndexTargets(indexRows) }
+    LaunchedEffect(indexLabel,indexRows) { indexLabel?.let { label -> libraryIndexTargets(indexRows)[label]?.let { gridState.scrollToItem(it) } } }
     val playingEntry=entries.firstOrNull { it.uri == playback.uri }
-    val playingArtwork by produceState<Bitmap?>(null,playingEntry?.uri) {
-        value=null
-        if(playingEntry != null) value=LibraryRepository.artwork(context,playingEntry)
-    }
+    val playingArtwork by rememberLibraryArtwork(playingEntry)
     val playingColor=remember(playingArtwork) { playingArtwork?.let { libraryThumbnailColor(it) } }
     val colors=remember(playingColor,dark) { libraryColorScheme(playingColor,dark,appBackgroundColor(dark)) }
     MaterialTheme(colorScheme=colors) {
@@ -337,6 +357,7 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
             if(albumBrowsing && !albumRoot) Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                 TextButton(onClick={navigateCollection(MUSIC_ALBUM_ROOT)}) { Text("アルバム ›") }
                 Text(currentAlbum?.name ?: "アルバムが見つかりません",Modifier.weight(1f),maxLines=1,overflow=TextOverflow.Ellipsis)
+                currentAlbum?.let { album -> TextButton(onClick={editArtwork(album.tracks.firstOrNull(),album)}) { Text("画像") } }
                 if(currentAlbum?.manual == true) TextButton(onClick={editingAlbum=collection; albumEditor=true}) { Text("編集") }
             }
             if(preferences.libraryPlayerVisible && playback.uri.isNotBlank() && playingEntry?.video == (section == LibrarySection.VIDEO)) {
@@ -358,16 +379,16 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
             }
             val controlsPull=rememberLibraryControlsPull(controlsExpanded,atTop={!gridState.canScrollBackward},onExpand={controlsExpanded=true},
                 onCollapse={controlsExpanded=false; focusManager.clearFocus(); keyboard?.hide()})
-            LazyVerticalGrid(columns=GridCells.Fixed(layout.columns),state=gridState,modifier=Modifier.weight(1f).nestedScroll(controlsPull),
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+            LazyVerticalGrid(columns=GridCells.Fixed(layout.columns),state=gridState,modifier=Modifier.fillMaxSize().padding(end=24.dp).nestedScroll(controlsPull),
                 horizontalArrangement=Arrangement.spacedBy(10.dp),verticalArrangement=Arrangement.spacedBy(10.dp),contentPadding=PaddingValues(vertical=8.dp)) {
                 if(albumRoot) {
-                    val shown=albums.filter { it.name.contains(search,true) || it.artist.contains(search,true) || it.tracks.any { track -> track.title.contains(search,true) || track.artist.contains(search,true) } }
-                    items(shown,key={"album-row:${it.id}"},span={GridItemSpan(maxLineSpan)}) { album ->
+                    items(shownAlbums,key={"album-row:${it.id}"},span={GridItemSpan(maxLineSpan)}) { album ->
                         LibraryAlbumTile(album,dark,backdrop,layout,onPlay={
                             album.tracks.firstOrNull()?.let { launchPlayer(it.uri,playlist=album.id) }
                         },onOpen={navigateCollection(album.id)})
                     }
-                    if(shown.isEmpty()) item(key="albums-empty",span={GridItemSpan(maxLineSpan)}) {
+                    if(shownAlbums.isEmpty()) item(key="albums-empty",span={GridItemSpan(maxLineSpan)}) {
                         LibraryFolderCaption("アルバム情報のある曲を取り込むか、「アルバムを追加」で曲をまとめられます。",dark,backdrop)
                     }
                 }
@@ -387,6 +408,7 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
                 }
                 items(visible,key={it.uri}) { item ->
                     LibraryCard(item,dark,backdrop,transport,layout,onDelete={if(!importing) deletion=item},
+                        onArtwork={editArtwork(item)},
                         favorite=item.uri in collections.favorites,selected=item.uri in selected,
                         selectionMode=selecting,onLongClick={toggleSelection(item.uri)},
                         onFavorite={runCatching { LibraryExtras.favorite(item.uri) }.onFailure { error="お気に入りを保存できませんでした。" }},
@@ -401,12 +423,17 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
                     }
                 }
             }
+            LibraryIndexRail(indexTargets,onStart={sortName=LibrarySort.TITLE.name; controlsExpanded=false; focusManager.clearFocus(); keyboard?.hide()},onJump={indexLabel=it})
+            }
         }
     }
     }
     if(appearance) LibraryAppearanceDialog(wallpaper,preferences,playingEntry ?: visible.firstOrNull(),headerAccent,colors,
         onChange=Store::preferences,onDismiss={appearance=false},previewEntries=visible.take(6))
-    UpdatePrompt(allowed=!importMenu && !albumEditor && !appearance && deletion == null && !importing && error.isBlank() && !organize && addToList.isEmpty() && !confirmBatch && resumeEntry == null && batch == null && !folderDialog && moveToFolder.isEmpty())
+    if(artworkTarget.isNotBlank()) key(artworkTarget) {
+        LibraryArtworkEditor(artworkTarget,artworkTitle,entries.firstOrNull { it.uri == artworkTrack },artworkAlbum,onDismiss={artworkTarget=""})
+    }
+    UpdatePrompt(allowed=artworkTarget.isBlank() && !importMenu && !albumEditor && !appearance && deletion == null && !importing && error.isBlank() && !organize && addToList.isEmpty() && !confirmBatch && resumeEntry == null && batch == null && !folderDialog && moveToFolder.isEmpty())
     if(albumEditor) LibraryAlbumEditor(entries,collections.albums.firstOrNull { it.id == editingAlbum },
         onSaved={id -> albumEditor=false; navigateCollection(id)},onDismiss={albumEditor=false})
     if(folderDialog) LibraryFolderDialog(collection,onSelect=::navigateCollection,onDismiss={folderDialog=false})
@@ -436,9 +463,9 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
 internal fun LibraryCard(entry: LibraryEntry, dark: Boolean, backdrop: LibraryBackdrop, playback: LibraryPlayback,
     layout: LibraryLayout = LibraryLayout.STANDARD, onDelete: ()->Unit, favorite: Boolean = false, selected: Boolean = false,
     selectionMode: Boolean = false, onLongClick: ()->Unit = {}, onFavorite: ()->Unit = {}, onPlaylist: ()->Unit = {},
-    onNext: ()->Unit = {}, onFolder: ()->Unit = {}, onRemoveFromList: (()->Unit)? = null, onClick: ()->Unit) {
+    onNext: ()->Unit = {}, onFolder: ()->Unit = {}, onArtwork: ()->Unit = {}, onRemoveFromList: (()->Unit)? = null, onClick: ()->Unit) {
     val context=LocalContext.current
-    val bitmap by produceState<Bitmap?>(null,entry.uri) { value=null; value=LibraryRepository.artwork(context,entry) }
+    val bitmap by rememberLibraryArtwork(entry)
     val source=remember(bitmap) { bitmap?.let { libraryThumbnailColor(it) } }
     val palette=remember(source,dark) { libraryPalette(source,dark) }
     var menu by remember { mutableStateOf(false) }
@@ -453,6 +480,7 @@ internal fun LibraryCard(entry: LibraryEntry, dark: Boolean, backdrop: LibraryBa
                         Text(if(favorite) "♥⋮" else "⋮",fontSize=22.sp,color=palette.content)
                     }
                     DropdownMenu(expanded=menu,onDismissRequest={menu=false}) {
+                        if(!entry.video) DropdownMenuItem(text={Text("アートワークを変更")},onClick={menu=false; onArtwork()})
                         DropdownMenuItem(text={Text(if(favorite) "お気に入りを解除" else "お気に入りに追加")},onClick={menu=false; onFavorite()})
                         DropdownMenuItem(text={Text("フォルダーへ移動")},onClick={menu=false; onFolder()})
                         DropdownMenuItem(text={Text("プレイリストに追加")},onClick={menu=false; onPlaylist()})

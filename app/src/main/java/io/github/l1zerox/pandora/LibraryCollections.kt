@@ -59,8 +59,10 @@ internal fun libraryFolderRows(entries: List<LibraryEntry>, data: LibraryCollect
 }
 internal fun organizedLibrary(entries: List<LibraryEntry>, data: LibraryCollections, collection: String, sort: LibrarySort,
     dubbedOnly: Boolean): List<LibraryEntry> {
-    if(isAlbumCollection(collection)) return if(collection == MUSIC_ALBUM_ROOT) emptyList()
-        else libraryAlbums(entries,data).firstOrNull { it.matches(collection) }?.tracks.orEmpty()
+    if(isAlbumCollection(collection)) {
+        val tracks=if(collection == MUSIC_ALBUM_ROOT) emptyList() else libraryAlbums(entries,data).firstOrNull { it.matches(collection) }?.tracks.orEmpty()
+        return if(sort == LibrarySort.TITLE) tracks.sortedBy { libraryTitleKey(it.title) } else tracks
+    }
     val playlist=data.playlists.firstOrNull { it.id == collection }
     val folder=data.folders.firstOrNull { it.id == collection }
     val members=when { collection == "unfiled" || collection == LIBRARY_FOLDER_ROOT -> entries.map { it.uri }.toSet()-data.folders.flatMap { it.uris }.toSet()
@@ -71,7 +73,7 @@ internal fun organizedLibrary(entries: List<LibraryEntry>, data: LibraryCollecti
     val order=when(sort) {
         LibrarySort.NEWEST -> compareByDescending<LibraryEntry> { it.added }
         LibrarySort.OLDEST -> compareBy<LibraryEntry> { it.added }
-        LibrarySort.TITLE -> compareBy<LibraryEntry> { it.title.lowercase() }
+        LibrarySort.TITLE -> compareBy<LibraryEntry> { libraryTitleKey(it.title) }
         LibrarySort.LONGEST -> compareByDescending<LibraryEntry> { it.durationMs }
         LibrarySort.SHORTEST -> compareBy<LibraryEntry> { if(it.durationMs > 0) it.durationMs else Long.MAX_VALUE }
     }

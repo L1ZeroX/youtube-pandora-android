@@ -34,7 +34,8 @@ internal fun LibraryAppearanceDialog(wallpaper: Bitmap?, preferences: Preference
     onChange: (Preferences)->Unit, onDismiss: ()->Unit, previewEntries: List<LibraryEntry> = emptyList()) {
     val context=LocalContext.current
     val samples=remember(entry,previewEntries) { (listOfNotNull(entry)+previewEntries).distinctBy { it.uri }.take(6) }
-    val artwork by produceState<Map<String,Bitmap>>(emptyMap(),samples.map { it.uri }) {
+    val covers by LibraryArtwork.state.collectAsState()
+    val artwork by produceState<Map<String,Bitmap>>(emptyMap(),samples,covers) {
         value=emptyMap()
         value=buildMap { for(item in samples) LibraryRepository.artwork(context,item)?.let { put(item.uri,it) } }
     }

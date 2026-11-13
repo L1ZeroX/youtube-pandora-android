@@ -26,9 +26,8 @@ import androidx.compose.ui.unit.dp
 internal fun LibraryAlbumTile(album: MusicAlbum, dark: Boolean, backdrop: LibraryBackdrop,
     layout: LibraryLayout = LibraryLayout.STANDARD, onPlay: ()->Unit = {}, onOpen: ()->Unit) {
     val details=layout == LibraryLayout.DETAILS
-    val context=LocalContext.current
     val cover=album.tracks.firstOrNull()
-    val bitmap by produceState<Bitmap?>(null,cover?.uri) { value=null; if(cover != null) value=LibraryRepository.artwork(context,cover) }
+    val bitmap by rememberLibraryArtwork(cover,album.id)
     val palette=remember(bitmap,dark) { libraryPalette(bitmap?.let(::libraryThumbnailColor),dark) }
     Surface(onClick=onOpen,color=Color.Transparent,contentColor=palette.content,shape=RoundedCornerShape(16.dp),
         modifier=Modifier.fillMaxWidth().libraryCardGlass(palette,backdrop)) {

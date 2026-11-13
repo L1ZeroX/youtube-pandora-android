@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Rect
 import android.graphics.Bitmap
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.Rational
@@ -136,6 +137,7 @@ class PlayerActivity : ComponentActivity() {
                 }
             }
         }
+        lifecycleScope.launch { LibraryArtwork.state.collect { artworkUri=""; updatePlayer() } }
         val connecting=MediaController.Builder(this,SessionToken(this,ComponentName(this,PlaybackService::class.java))).buildAsync()
         future=connecting
         connecting.addListener({
@@ -209,8 +211,9 @@ class PlayerActivity : ComponentActivity() {
             artworkColor=null; artwork=null
             playerView?.let { stylePlaybackControls(it,null) }
             val isVideo=video
+            val mediaAlbum=player.mediaMetadata.albumTitle?.toString().orEmpty()
             if(uri.isNotBlank()) artJob=lifecycleScope.launch {
-                val art=LibraryRepository.artwork(this@PlayerActivity,LibraryEntry(uri,title,if(isVideo) "video/mp4" else "audio/mpeg"))
+                val art=LibraryRepository.artwork(this@PlayerActivity,LibraryEntry(uri,title,if(isVideo) "video/mp4" else "audio/mpeg",album=mediaAlbum))
                 val color=withContext(Dispatchers.Default) { art?.let { libraryThumbnailColor(it) } }
                 if(artworkUri == uri) {
                     artworkColor=color
@@ -300,5 +303,6 @@ class PlayerActivity : ComponentActivity() {
 
 internal fun LibraryEntry.mediaItem(): MediaItem = MediaItem.Builder().setMediaId(uri).setUri(uri).setMimeType(mime)
     .setMediaMetadata(MediaMetadata.Builder().setTitle(title).setArtist(artist.ifBlank { null }).setAlbumTitle(album.ifBlank { null })
+        .setArtworkUri(LibraryArtwork.file(this)?.let(Uri::fromFile))
         .setAlbumArtist(albumArtist.ifBlank { null }).setTrackNumber(track.takeIf { it > 0 }).setDiscNumber(disc.takeIf { it > 0 })
         .setExtras(Bundle().apply { putBoolean("video",video); putString("category",category); putLong("durationMs",durationMs) }).build()).build()

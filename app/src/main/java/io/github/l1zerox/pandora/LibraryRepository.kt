@@ -147,7 +147,13 @@ internal object LibraryRepository {
         LibraryMetadata.remove(context,uri)
     }
 
-    suspend fun artwork(context: Context, entry: LibraryEntry): Bitmap? = withContext(Dispatchers.IO) {
+    suspend fun artwork(context: Context, entry: LibraryEntry, album: String? = null): Bitmap? = withContext(Dispatchers.IO) {
+        if(!entry.video) {
+            val direct=album?.let { LibraryArtwork.file(albumArtworkKey(it)) } ?: LibraryArtwork.file(trackArtworkKey(entry.uri))
+            val metadata=if(direct == null && entry.album.isBlank() && LibraryArtwork.state.value.isNotEmpty()) LibraryMetadata.enrich(context,entry) else entry
+            val image=direct ?: LibraryArtwork.file(metadata)
+            if(image != null) runCatching { loadArtworkBitmap(context,Uri.fromFile(image),768) }.getOrNull()?.let { return@withContext it }
+        }
         runCatching {
             MediaMetadataRetriever().use { retriever ->
                 retriever.setDataSource(context,entry.uri.toUri())

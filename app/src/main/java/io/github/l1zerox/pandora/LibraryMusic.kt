@@ -39,7 +39,7 @@ internal fun albumNameKey(name: String): String = buildString {
         }
     }
 }.lowercase(Locale.ROOT)
-private fun albumId(key: String)="album-tag:"+MessageDigest.getInstance("SHA-256").digest(key.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+internal fun albumId(key: String)="album-tag:"+MessageDigest.getInstance("SHA-256").digest(key.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
 internal const val MUSIC_ALBUM_ROOT="albums"
 internal fun albumTracks(entries: List<LibraryEntry>)=entries.filterNot { it.video }.sortedWith(
     compareBy<LibraryEntry> { it.disc.takeIf { n -> n > 0 } ?: 1 }.thenBy { it.track.takeIf { n -> n > 0 } ?: Int.MAX_VALUE }.thenBy { it.title }.thenBy { it.uri })
@@ -55,7 +55,7 @@ internal fun libraryAlbums(entries: List<LibraryEntry>, data: LibraryCollections
         MusicAlbum(albumId(key),tracks.first().album.trim(),if(artists.size == 1) artists.single() else if(artists.isEmpty()) "" else "複数のアーティスト",albumTracks(tracks),legacyIds=legacy)
     }
     val untagged=audio.filter { it.uri !in assigned && albumNameKey(it.album).isBlank() }
-    return (manual+tagged).sortedBy { it.name.lowercase(Locale.ROOT) }+
+    return (manual+tagged).sortedBy { libraryTitleKey(it.name) }+
         if(untagged.isEmpty()) emptyList() else listOf(MusicAlbum("album-unknown","アルバム情報なし","",albumTracks(untagged)))
 }
 internal fun isAlbumCollection(id: String)=id == MUSIC_ALBUM_ROOT || id.startsWith("album:") || id.startsWith("album-tag:") || id == "album-unknown"
