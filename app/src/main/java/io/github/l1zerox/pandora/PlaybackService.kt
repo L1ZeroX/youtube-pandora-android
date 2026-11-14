@@ -11,6 +11,9 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 
 internal data class PlaybackStatus(val uri: String = "", val title: String = "", val playing: Boolean = false)
 internal object PlaybackRuntime {
@@ -31,14 +34,22 @@ internal fun removeLibraryMedia(player: Player, uri: String) {
 class PlaybackService : MediaSessionService() {
     private var session: MediaSession? = null
     private var betaTools: PlaybackBetaTools? = null
+    private val scope=CoroutineScope(SupervisorJob()+Dispatchers.Main.immediate)
     override fun onCreate() {
         super.onCreate()
-        val player=ExoPlayer.Builder(this)
+        fun bassEnabled()=Store.state.value.preferences.let { it.libraryPlayerWave && PlaybackEffect.fromId(it.libraryPlayerEffect) == PlaybackEffect.BASS }
+        BassRuntime.enabled=bassEnabled()
+        scope.launch {
+            Store.state.map { it.preferences.libraryPlayerWave && PlaybackEffect.fromId(it.preferences.libraryPlayerEffect) == PlaybackEffect.BASS }
+                .distinctUntilChanged().collect { BassRuntime.enabled=it; BassRuntime.level.value=0f }
+        }
+        val player=ExoPlayer.Builder(this,BassRenderersFactory(this))
             .setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(),true)
             .setHandleAudioBecomingNoisy(true).setWakeMode(C.WAKE_MODE_LOCAL).build()
         player.addListener(object: Player.Listener {
             override fun onPlayerError(error: PlaybackException) { AppLog.error("ライブラリー再生",error) }
             override fun onEvents(player: Player, events: Player.Events) {
+                if(!player.isPlaying) BassRuntime.level.value=0f
                 PlaybackRuntime.state.value=PlaybackStatus(player.currentMediaItem?.mediaId.orEmpty(),
                     player.mediaMetadata.title?.toString().orEmpty(),player.isPlaying)
             }
@@ -50,6 +61,7 @@ class PlaybackService : MediaSessionService() {
     }
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
     override fun onDestroy() {
+        scope.cancel(); BassRuntime.enabled=false; BassRuntime.level.value=0f
         betaTools?.close(); betaTools=null
         PlaybackRuntime.removeLibraryItem=null
         session?.run { player.release(); release() }; session=null

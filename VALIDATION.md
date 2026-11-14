@@ -1,5 +1,19 @@
 # 検証状況
 
+## v0.4.28（2026-11-14）
+
+PlaybackEffectにbass_100hz（100Hz低音連動）を追加。既存のwave・notificationと既定値は維持。ライブラリー再生パネル・音楽全画面・再生中カードの再生位置バーで選べ、パネル表示フラグに依存せず全画面用の設定を変更できる。描画は同じSliderStateから再生済み幅を求め、マーカーの位置を変えない。波は9dp以内、テンポは0〜1の低音レベルに応じて4000〜400ms/周期。90msで振幅を平滑化し、位相を保ってテンポ変更する。停止・無音では振幅0。既存のComposeアニメーション基盤を使い、システムのアニメーション倍率に従う。
+
+BassRenderersFactoryは標準DefaultRenderersFactoryが作るAudioSinkをForwardingAudioSinkで包む。configure(AudioSinkConfig)でPCM形式を記録し、handleBufferは元バッファのread-only viewだけを解析。元バッファの位置・内容・タイムスタンプ・アクセス単位数は変更せず、そのまま標準sinkへ渡し、戻り値も保持する。同じバッファの部分書き込み再試行は解析を重複させない。標準の浮動小数点・パススルー・オフロード等の設定は変更しない。PCMが得られない場合はレベル0。[Media3 AudioSinkの契約](https://developer.android.com/reference/androidx/media3/exoplayer/audio/AudioSink)・[1.11.1の実装](https://github.com/androidx/media/blob/1.11.1/libraries/exoplayer/src/main/java/androidx/media3/exoplayer/audio/DefaultAudioSink.java)。
+
+解析は100Hz中心、Q=2のバンドパス2段と40ms単位のRMS。左右を足さず、チャンネルごとにエネルギーを求めて平均し、逆位相の低音の消失を避ける。PCM 8/16/24/32bit、float/double、LE/BEの読み取りを用意。解析結果はPTS付きで最大256点を保持し、標準AudioSinkの再生時計へ到達した窓だけを公開する。先読み中の将来の値は表示せず、200ms以上古い値・後方シーク・flush・不連続・disableではリセットする。Bass選択かつエフェクトオンの時だけ解析し、サービス終了時に停止。マイク・音声キャプチャの権限・依存ライブラリーの追加はない。
+
+単体テストを10件追加。8/44.1/48/96kHzでの100Hzと20Hz・1kHzの区別、無音・DC・非有限値、逆位相ステレオ、音量の強弱、チャンク境界・時刻・入力データ不変、全PCM形式、先読み・大きいPTS・古い値・後方移動・点数制限、テンポ上限と端点固定を確認。AudioSinkはプロキシで部分書き込み再試行・元バイト列／position／PTS／アクセス単位・pause／disable／flush／再開・非PCMの透過を確認する。Androidには音量0の合成WAV（1kHz→100Hz→無音）を標準AudioTrackで再生し、選択的反応・一時停止・シーク・速度1倍を確認するテストを追加。新しい選択肢とパネル非表示時の設定もAndroidテストへ追加した（いずれもコンパイルのみ）。
+
+今回USB接続端末なし。実音・Bluetooth等の出力遅延を含めた同期、長時間の負荷・電池消費、実際のコーデック・出力経路での動作は実機未確認。PCM解析を通らないパススルー・オフロードは反応しない場合がある。音声出力そのものは従来方式を維持する。
+
+正式版設定でDebug/Release単体テスト各296件成功（失敗・エラー・スキップ0）。compileDebugAndroidTestKotlin成功。Lintエラー0・警告68件。署名付きAPKは140,617,382 bytes、v0.4.27からの差分は3,748,352 bytes（97.3%削減）。アプリと同じKotlin処理で差分復元したAPKのSHA-256が完全一致、旧版と同じ署名証明書・v3署名・16KB ZIP alignmentを確認。APKのSHA-256は `fee372a4d69d4952f96c8240a1c26300364ee98e965713dce17ee0d9fe632960`。Manifestの権限変更がないことも確認。
+
 ## v0.4.27（2026-11-14）
 
 LibraryArtworkがアルバムID・曲URIに対する画像の上書き設定を専用SharedPreferencesへcommitし、アプリ所有のcover-*.jpgだけを扱う。既存の画像選択・ArtworkCropDialog・saveCroppedArtworkで最大1024pxの正方形JPEGを作成。曲の上書き→手動アルバム→自動アルバム（情報なしを含む）→元画像の優先順で解決する。元の音声とタグは書き換えない。保存失敗・キャンセル時は未採用の画像を削除し、変更解除・差し替え時は参照がない旧画像だけを削除する。LibraryRepository.artworkの共通経路、一覧・アルバム・再生パネル・表示プレビューを更新し、PlayerActivityは同じ曲の画像変更にも反応する。MediaItemにも指定画像のURIを渡す。

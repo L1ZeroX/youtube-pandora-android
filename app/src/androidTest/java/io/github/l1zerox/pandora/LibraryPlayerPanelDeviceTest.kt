@@ -83,6 +83,9 @@ class LibraryPlayerPanelDeviceTest {
         screen.onNodeWithContentDescription("再生パネルを表示").performClick()
         screen.onNodeWithTag("library-player-panel").assertDoesNotExist()
         screen.onNodeWithContentDescription("再生パネルの大きさ").assertIsNotEnabled()
+        screen.onNodeWithContentDescription("再生バーのエフェクト").assertIsEnabled()
+        screen.onNodeWithContentDescription("100Hz低音連動").performClick()
+        screen.runOnIdle { assertEquals("bass_100hz",preferences.libraryPlayerEffect) }
         screen.onNodeWithContentDescription("再生パネルを表示").performClick()
         screen.onNodeWithTag("library-player-panel").assertIsDisplayed()
         screen.runOnIdle { assertEquals(.85f,preferences.libraryPlayerScale,0f); assertEquals(0,playbackActions) }

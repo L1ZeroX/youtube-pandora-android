@@ -6,7 +6,7 @@ import kotlin.math.pow
 import kotlin.math.sin
 
 internal enum class PlaybackEffect(val id: String, val label: String) {
-    WAVE("wave","従来の波"), NOTIFICATION("notification","通知センター風");
+    WAVE("wave","従来の波"), NOTIFICATION("notification","通知センター風"), BASS("bass_100hz","100Hz低音連動");
     companion object { fun fromId(id: String)=entries.firstOrNull { it.id == id } ?: WAVE }
 }
 

@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlin.math.PI
 import kotlin.math.ceil
 import kotlin.math.min
@@ -51,20 +52,26 @@ internal fun WavyPlaybackTrack(state: SliderState, enabled: Boolean, playing: Bo
         onDispose { lifecycle.removeObserver(observer) }
     }
     val moving=enabled && playing && visible && state.value > state.valueRange.start && state.value < state.valueRange.endInclusive
+    val bass=if(effect == PlaybackEffect.BASS) BassRuntime.level.collectAsStateWithLifecycle().value else 0f
+    val bassStrength=animateFloatAsState(if(moving) bass else 0f,tween(90),label="bass-wave-strength")
     val phase=remember { Animatable(0f) }
     val strength=animateFloatAsState(if(moving) 1f else 0f,tween(220),label="playback-wave-strength")
-    LaunchedEffect(moving,effect) {
+    LaunchedEffect(moving,effect,if(effect == PlaybackEffect.BASS) bass else 0f) {
         if(moving) {
-            phase.snapTo(0f)
+            phase.snapTo(if(effect == PlaybackEffect.BASS) phase.value%1f else 0f)
             // Compose's animation clock respects the system animator duration scale.
-            phase.animateTo(if(effect == PlaybackEffect.NOTIFICATION) 5f else 1f,
-                infiniteRepeatable(tween(if(effect == PlaybackEffect.NOTIFICATION) 18_000 else 1400,easing=LinearEasing),RepeatMode.Restart))
+            phase.animateTo(if(effect == PlaybackEffect.BASS) phase.value+1f else if(effect == PlaybackEffect.NOTIFICATION) 5f else 1f,
+                infiniteRepeatable(tween(when(effect) {
+                    PlaybackEffect.BASS -> bassCycleMillis(bass)
+                    PlaybackEffect.NOTIFICATION -> 18_000
+                    PlaybackEffect.WAVE -> 1400
+                },easing=LinearEasing),RepeatMode.Restart))
         }
     }
     val rtl=LocalLayoutDirection.current == LayoutDirection.Rtl
     val path=remember { Path() }
     val active=if(enabled) color else color.copy(alpha=.38f)
-    Canvas(Modifier.fillMaxWidth().height(if(effect == PlaybackEffect.NOTIFICATION) 26.dp else 12.dp).testTag("playback-position-track")) {
+    Canvas(Modifier.fillMaxWidth().height(if(effect != PlaybackEffect.WAVE) 26.dp else 12.dp).testTag("playback-position-track")) {
         val range=state.valueRange.endInclusive-state.valueRange.start
         val fraction=if(range > 0) ((state.value-state.valueRange.start)/range).coerceIn(0f,1f) else 0f
         val played=size.width*fraction
@@ -90,14 +97,15 @@ internal fun WavyPlaybackTrack(state: SliderState, enabled: Boolean, playing: Bo
                     }
                     return@scale
                 }
-                val amplitude=4.dp.toPx()*strength.value
+                val amplitude=(if(effect == PlaybackEffect.BASS) 9.dp.toPx()*bassStrength.value else 4.dp.toPx())*strength.value
                 if(amplitude < .01f) drawLine(active,Offset(0f,baseline),Offset(played,baseline),stroke,StrokeCap.Round)
                 else {
                     path.reset(); path.moveTo(0f,baseline)
                     val samples=ceil(played/2.dp.toPx()).toInt().coerceAtLeast(1)
                     for(index in 1..samples) {
                         val x=played*index/samples
-                        path.lineTo(x,baseline+playbackWaveOffset(x,played,28.dp.toPx(),amplitude,phase.value))
+                        path.lineTo(x,baseline+playbackWaveOffset(x,played,
+                            (if(effect == PlaybackEffect.BASS) 48 else 28).dp.toPx(),amplitude,phase.value))
                     }
                     drawPath(path,active,style=Stroke(stroke,cap=StrokeCap.Round))
                 }

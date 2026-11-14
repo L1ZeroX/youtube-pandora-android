@@ -26,7 +26,7 @@ internal fun LibraryPlayerAppearanceControls(preferences: Preferences, onChange:
             modifier=Modifier.fillMaxWidth().semantics { contentDescription="再生パネルの大きさ" })
         Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
             Text("再生バーのエフェクト",Modifier.weight(1f))
-            Switch(checked=preferences.libraryPlayerWave,enabled=preferences.libraryPlayerVisible,
+            Switch(checked=preferences.libraryPlayerWave,
                 onCheckedChange={onChange(preferences.copy(libraryPlayerWave=it))},
                 modifier=Modifier.semantics { contentDescription="再生バーのエフェクト" })
         }
@@ -34,13 +34,15 @@ internal fun LibraryPlayerAppearanceControls(preferences: Preferences, onChange:
             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                 RadioButton(selected=PlaybackEffect.fromId(preferences.libraryPlayerEffect) == effect,
                     onClick={onChange(preferences.copy(libraryPlayerEffect=effect.id))},
-                    enabled=preferences.libraryPlayerVisible && preferences.libraryPlayerWave,
+                    enabled=preferences.libraryPlayerWave,
                     modifier=Modifier.semantics { contentDescription=effect.label })
                 TextButton(onClick={onChange(preferences.copy(libraryPlayerEffect=effect.id))},
-                    enabled=preferences.libraryPlayerVisible && preferences.libraryPlayerWave,
+                    enabled=preferences.libraryPlayerWave,
                     colors=ButtonDefaults.textButtonColors(contentColor=LocalContentColor.current)) { Text(effect.label) }
             }
         }
+        if(PlaybackEffect.fromId(preferences.libraryPlayerEffect) == PlaybackEffect.BASS)
+            Text("100Hz付近の低音で、波の大きさ・流れる速さが変わります。",fontSize=11.sp)
         Text("非表示にしても再生は続きます。",fontSize=11.sp)
         TextButton(onClick={onChange(preferences.copy(libraryPlayerVisible=true,libraryPlayerScale=DEFAULT_LIBRARY_PLAYER_SCALE,libraryPlayerWave=true,libraryPlayerEffect="wave"))}) {
             Text("再生パネルを初期設定に戻す")

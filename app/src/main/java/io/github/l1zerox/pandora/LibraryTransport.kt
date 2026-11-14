@@ -14,6 +14,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -23,6 +24,8 @@ internal fun LibrarySeekBar(uri: String, playback: LibraryPlayback, palette: Lib
     val duration=playback.duration
     val fraction=drag ?: playbackFraction(playback.position,duration)
     val enabled=playback.controller != null && playback.seekable
+    val settings by Store.state.collectAsStateWithLifecycle()
+    val bass=settings.preferences.libraryPlayerWave && PlaybackEffect.fromId(settings.preferences.libraryPlayerEffect) == PlaybackEffect.BASS
     LaunchedEffect(enabled) { if(!enabled) drag=null }
     val accent=remember(source,palette,backdrop) {
         val tint=libraryGlassTint(palette,backdrop.contrastColors,backdrop.transparency)
@@ -30,10 +33,11 @@ internal fun LibrarySeekBar(uri: String, playback: LibraryPlayback, palette: Lib
             .first { color -> backdrop.contrastColors.all { libraryContrast(color,tint.compositeOver(it)) >= 3f } }
     }
     Column {
-        if(compact) {
+        if(compact || bass) {
             PlaybackPositionSlider(mediaKey=uri,value=fraction,onValueChange={drag=it},
                 onValueChangeFinished={drag?.let { playback.seek(uri,it) }; drag=null},enabled=enabled,
-                color=accent,description="再生位置",modifier=Modifier.fillMaxWidth(),compact=true)
+                color=accent,description="再生位置",modifier=Modifier.fillMaxWidth(),compact=true,
+                waveform=bass,playing=playback.panel.advancing && drag == null,effect=if(bass) PlaybackEffect.BASS else PlaybackEffect.WAVE)
         } else key(uri) {
             Slider(value=fraction.coerceIn(0f,1f),onValueChange={drag=it},
                 onValueChangeFinished={drag?.let { playback.seek(uri,it) }; drag=null},
