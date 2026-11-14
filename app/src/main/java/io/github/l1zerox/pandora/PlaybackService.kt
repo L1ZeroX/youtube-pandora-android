@@ -38,9 +38,13 @@ class PlaybackService : MediaSessionService() {
     override fun onCreate() {
         super.onCreate()
         BassRuntime.enabled=playbackBassEnabled(Store.state.value.preferences)
+        BassRuntime.bars=PlaybackEffect.fromId(Store.state.value.preferences.libraryPlayerEffect) == PlaybackEffect.BARS
         scope.launch {
-            Store.state.map { playbackBassEnabled(it.preferences) }
-                .distinctUntilChanged().collect { BassRuntime.enabled=it; BassRuntime.level.value=0f }
+            Store.state.map { playbackBassEnabled(it.preferences) to (PlaybackEffect.fromId(it.preferences.libraryPlayerEffect) == PlaybackEffect.BARS) }
+                .distinctUntilChanged().collect { (enabled,bars) ->
+                    BassRuntime.bars=bars; BassRuntime.enabled=enabled
+                    BassRuntime.level.value=0f; BassRuntime.spectrum.value=emptyList()
+                }
         }
         val player=ExoPlayer.Builder(this,BassRenderersFactory(this))
             .setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(),true)
@@ -48,7 +52,7 @@ class PlaybackService : MediaSessionService() {
         player.addListener(object: Player.Listener {
             override fun onPlayerError(error: PlaybackException) { AppLog.error("ライブラリー再生",error) }
             override fun onEvents(player: Player, events: Player.Events) {
-                if(!player.isPlaying) BassRuntime.level.value=0f
+                if(!player.isPlaying) { BassRuntime.level.value=0f; BassRuntime.spectrum.value=emptyList() }
                 PlaybackRuntime.state.value=PlaybackStatus(player.currentMediaItem?.mediaId.orEmpty(),
                     player.mediaMetadata.title?.toString().orEmpty(),player.isPlaying)
             }
@@ -60,7 +64,7 @@ class PlaybackService : MediaSessionService() {
     }
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
     override fun onDestroy() {
-        scope.cancel(); BassRuntime.enabled=false; BassRuntime.level.value=0f
+        scope.cancel(); BassRuntime.enabled=false; BassRuntime.bars=false; BassRuntime.level.value=0f; BassRuntime.spectrum.value=emptyList()
         betaTools?.close(); betaTools=null
         PlaybackRuntime.removeLibraryItem=null
         session?.run { player.release(); release() }; session=null

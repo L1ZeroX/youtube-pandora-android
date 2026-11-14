@@ -9,6 +9,25 @@ import org.junit.Test
 import java.util.UUID
 
 class LibraryArtworkRuntimeTest {
+    @Test fun aCustomAlbumCoverStaysWithItsAlbumAcrossTrackAndAlbumChanges() = runBlocking {
+        val context=InstrumentationRegistry.getInstrumentation().targetContext
+        val name="Test-${UUID.randomUUID()}"
+        val a=LibraryEntry("content://artwork-test/$name/a","A","audio/mpeg",album="$name A")
+        val a2=a.copy(uri="content://artwork-test/$name/a2",title="A2")
+        val b=a.copy(uri="content://artwork-test/$name/b",title="B",album="$name B")
+        val aKey=libraryArtworkKeys(a,LibraryCollections()).last()
+        val bKey=libraryArtworkKeys(b,LibraryCollections()).last()
+        val bitmap=Bitmap.createBitmap(40,40,Bitmap.Config.ARGB_8888)
+        try {
+            bitmap.eraseColor(Color.RED); LibraryArtwork.set(aKey,saveCroppedArtwork(context,bitmap,ArtworkCrop()))
+            bitmap.eraseColor(Color.BLUE); LibraryArtwork.set(bKey,saveCroppedArtwork(context,bitmap,ArtworkCrop()))
+            for(song in listOf(a,b,a2,b,a)) {
+                val pixel=LibraryRepository.artwork(context,song)!!.getPixel(0,0)
+                if(song.album == a.album) assertTrue(Color.red(pixel) > 200 && Color.blue(pixel) < 30)
+                else assertTrue(Color.blue(pixel) > 200 && Color.red(pixel) < 30)
+            }
+        } finally { LibraryArtwork.set(aKey,null); LibraryArtwork.set(bKey,null); bitmap.recycle() }
+    }
     @Test fun croppedOverridesPersistAndResetToAlbumWithoutRewritingTheSource() = runBlocking {
         val context=InstrumentationRegistry.getInstrumentation().targetContext
         val name="Test-${UUID.randomUUID()}"

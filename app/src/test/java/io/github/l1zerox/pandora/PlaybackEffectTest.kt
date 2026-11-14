@@ -16,7 +16,7 @@ class PlaybackEffectTest {
         assertTrue(Preferences().libraryNotificationBass)
         for(style in PlaybackEffect.entries) for(wave in listOf(false,true)) for(link in listOf(false,true)) {
             val p=Preferences(libraryPlayerWave=wave,libraryPlayerEffect=style.id,libraryNotificationBass=link)
-            assertEquals(wave && (style == PlaybackEffect.BASS || style == PlaybackEffect.NOTIFICATION && link),playbackBassEnabled(p))
+            assertEquals(wave && (style == PlaybackEffect.BARS || style == PlaybackEffect.BASS || style == PlaybackEffect.NOTIFICATION && link),playbackBassEnabled(p))
         }
     }
     @Test fun filledCrestsNeverMoveThePlaybackEndpointOrGoBelowTheBaseline() {

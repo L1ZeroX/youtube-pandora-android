@@ -57,8 +57,13 @@ internal fun rememberLibraryArtwork(entry: LibraryEntry?, album: String? = null)
     val context=LocalContext.current
     val covers by LibraryArtwork.state.collectAsStateWithLifecycle()
     val collections by LibraryExtras.state.collectAsStateWithLifecycle()
-    return produceState<Bitmap?>(null,entry,album,covers,collections.albums) {
-        value=null
-        if(entry != null) value=LibraryRepository.artwork(context,entry,album)
+    return rememberArtworkResult(listOf(entry,album,covers,collections.albums)) {
+        entry?.let { LibraryRepository.artwork(context,it,album) }
     }
+}
+
+/** Replace the State as well as the loader, so a new item cannot expose the previous image for a frame. */
+@Composable
+internal fun rememberArtworkResult(request: Any?, load: suspend ()->Bitmap?): State<Bitmap?> = key(request) {
+    produceState<Bitmap?>(null) { value=load() }
 }

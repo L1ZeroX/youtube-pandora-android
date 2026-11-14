@@ -45,6 +45,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlin.math.roundToInt
 
 @androidx.annotation.OptIn(UnstableApi::class)
@@ -54,7 +57,7 @@ class PlayerActivity : ComponentActivity() {
     private var playerView: PlayerView? = null
     private var loadJob: Job? = null
     private var artJob: Job? = null
-    private var artworkUri=""
+    private val artworkRequest=ArtworkRequest()
     private var artworkColor by mutableStateOf<Color?>(null)
     private var artwork by mutableStateOf<Bitmap?>(null)
     private var title by mutableStateOf("読み込み中…")
@@ -137,7 +140,10 @@ class PlayerActivity : ComponentActivity() {
                 }
             }
         }
-        lifecycleScope.launch { LibraryArtwork.state.collect { artworkUri=""; updatePlayer() } }
+        lifecycleScope.launch {
+            combine(LibraryArtwork.state,LibraryExtras.state.map { it.albums }.distinctUntilChanged()) { covers,albums -> covers to albums }
+                .collect { artworkRequest.invalidate(); updatePlayer() }
+        }
         val connecting=MediaController.Builder(this,SessionToken(this,ComponentName(this,PlaybackService::class.java))).buildAsync()
         future=connecting
         connecting.addListener({
@@ -200,22 +206,22 @@ class PlayerActivity : ComponentActivity() {
 
     private fun updatePlayer() {
         val player=controller ?: return
-        title=player.mediaMetadata.title?.toString() ?: "プレーヤー"
-        video=player.currentMediaItem?.mediaMetadata?.extras?.getBoolean("video") == true
+        val item=player.currentMediaItem
+        val entry=item?.artworkEntry() ?: LibraryEntry("","","audio/mpeg")
+        title=entry.title.ifBlank { player.mediaMetadata.title?.toString() ?: "プレーヤー" }
+        video=entry.video
         updateWindowMode()
         error=player.playerError?.let { "再生できません。ファイルの場所・アクセス権、対応形式を確認してください。" }.orEmpty()
         playerView?.keepScreenOn=video && player.isPlaying
-        val uri=player.currentMediaItem?.mediaId.orEmpty()
-        if(uri != artworkUri) {
-            artworkUri=uri; artJob?.cancel(); playerView?.defaultArtwork=null
+        val ticket=artworkRequest.begin(entry)
+        if(ticket != null) {
+            artJob?.cancel(); playerView?.defaultArtwork=null
             artworkColor=null; artwork=null
             playerView?.let { stylePlaybackControls(it,null) }
-            val isVideo=video
-            val mediaAlbum=player.mediaMetadata.albumTitle?.toString().orEmpty()
-            if(uri.isNotBlank()) artJob=lifecycleScope.launch {
-                val art=LibraryRepository.artwork(this@PlayerActivity,LibraryEntry(uri,title,if(isVideo) "video/mp4" else "audio/mpeg",album=mediaAlbum))
+            if(entry.uri.isNotBlank()) artJob=lifecycleScope.launch {
+                val art=LibraryRepository.artwork(this@PlayerActivity,entry)
                 val color=withContext(Dispatchers.Default) { art?.let { libraryThumbnailColor(it) } }
-                if(artworkUri == uri) {
+                if(artworkRequest.accepts(ticket)) {
                     artworkColor=color
                     artwork=art
                     playerView?.let { stylePlaybackControls(it,artworkColor) }
@@ -294,11 +300,20 @@ class PlayerActivity : ComponentActivity() {
         super.onSaveInstanceState(outState)
     }
     override fun onDestroy() {
+        artworkRequest.invalidate()
         loadJob?.cancel(); artJob?.cancel(); playerView?.player=null
         controller?.removeListener(listener)
         future?.let { MediaController.releaseFuture(it) }
         controller=null; super.onDestroy()
     }
+}
+
+/** Item metadata belongs to this URI; merged player metadata may still contain the previous album. */
+internal fun MediaItem.artworkEntry(): LibraryEntry {
+    val metadata=mediaMetadata
+    val video=metadata.extras?.getBoolean("video") == true
+    return LibraryEntry(mediaId,metadata.title?.toString().orEmpty(),if(video) "video/mp4" else "audio/mpeg",
+        album=metadata.albumTitle?.toString().orEmpty(),artist=metadata.artist?.toString().orEmpty())
 }
 
 internal fun LibraryEntry.mediaItem(): MediaItem = MediaItem.Builder().setMediaId(uri).setUri(uri).setMimeType(mime)

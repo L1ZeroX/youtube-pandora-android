@@ -58,4 +58,18 @@ class BassAudioSinkTest {
         output.clock=100_000; sink.getCurrentPositionUs(false); assertEquals(0f,level,0f)
         assertEquals(1,output.calls); assertArrayEquals(byteArrayOf(1,2,3,4),data.array())
     }
+    @Test fun spectrumStyleCanBeSelectedDuringPlaybackWithoutChangingAudioOrPublishingOldBands() {
+        val output=Output(); var bars=false; var level=0f; var bands=emptyList<Float>()
+        val sink=BassAudioSink(output.sink,{true},{level=it},{bars},{bands=it})
+        sink.configure(config()); sink.play(); sink.handleBuffer(bassTone(),0,1)
+        output.clock=200_000; sink.getCurrentPositionUs(false); assertTrue(level > .8f); assertTrue(bands.isEmpty())
+        bars=true; sink.getCurrentPositionUs(false); assertEquals(0f,level,0f)
+        val data=bassTone(); val original=data.array().clone()
+        assertTrue(sink.handleBuffer(data,1_000_000,3)); assertArrayEquals(original,data.array())
+        output.clock=1_200_000; sink.getCurrentPositionUs(false); assertEquals(32,bands.size); assertTrue(bands.max() > .8f)
+        sink.pause(); assertTrue(bands.isEmpty()); sink.play()
+        sink.getCurrentPositionUs(false); assertEquals(32,bands.size)
+        bars=false; sink.getCurrentPositionUs(false); assertTrue(bands.isEmpty()); assertEquals(0f,level,0f)
+        assertEquals(2,output.calls); assertEquals(3,output.units); assertEquals(1_000_000L,output.timestamp)
+    }
 }

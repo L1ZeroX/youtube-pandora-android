@@ -26,7 +26,7 @@ internal fun LibrarySeekBar(uri: String, playback: LibraryPlayback, palette: Lib
     val enabled=playback.controller != null && playback.seekable
     val settings by Store.state.collectAsStateWithLifecycle()
     val effect=PlaybackEffect.fromId(settings.preferences.libraryPlayerEffect)
-    val animated=settings.preferences.libraryPlayerWave && (effect == PlaybackEffect.BASS || effect == PlaybackEffect.NOTIFICATION)
+    val animated=settings.preferences.libraryPlayerWave && effect != PlaybackEffect.WAVE
     LaunchedEffect(enabled) { if(!enabled) drag=null }
     val accent=remember(source,palette,backdrop) {
         val tint=libraryGlassTint(palette,backdrop.contrastColors,backdrop.transparency)

@@ -25,10 +25,15 @@ internal enum class BassPcm(val bytes: Int, val bigEndian: Boolean = false) {
     }.let { if(it.isFinite()) it.coerceIn(-1.0,1.0) else 0.0 }
 }
 
-internal data class BassPoint(val timeUs: Long, val level: Float)
+internal data class BassPoint(val timeUs: Long, val level: Float, val spectrum: List<Float> = emptyList())
+internal interface PcmLevelDetector {
+    val frameBytes: Int
+    fun reset()
+    fun read(source: ByteBuffer, timeUs: Long, emit: (BassPoint)->Unit)
+}
 
 /** Two cascaded 80 Hz band-pass filters. Average energy per channel avoids stereo cancellation. */
-internal class BassDetector(private val sampleRate: Int, private val channels: Int, private val encoding: BassPcm) {
+internal class BassDetector(private val sampleRate: Int, private val channels: Int, private val encoding: BassPcm): PcmLevelDetector {
     init { require(sampleRate in 1_000..384_000 && channels in 1..32) }
     private val alpha=sin(2*PI*80/sampleRate)/(2*2.0)
     private val b0=alpha/(1+alpha)
@@ -38,10 +43,10 @@ internal class BassDetector(private val sampleRate: Int, private val channels: I
     private val z3=DoubleArray(channels); private val z4=DoubleArray(channels)
     // Four cycles at 80 Hz keep a steady bass tone from pulsing at window boundaries.
     private val window=(sampleRate/20).coerceAtLeast(1)
-    val frameBytes=channels*encoding.bytes
+    override val frameBytes=channels*encoding.bytes
     private var count=0; private var energy=0.0
-    fun reset() { z1.fill(0.0); z2.fill(0.0); z3.fill(0.0); z4.fill(0.0); count=0; energy=0.0 }
-    fun read(source: ByteBuffer, timeUs: Long, emit: (BassPoint)->Unit) {
+    override fun reset() { z1.fill(0.0); z2.fill(0.0); z3.fill(0.0); z4.fill(0.0); count=0; energy=0.0 }
+    override fun read(source: ByteBuffer, timeUs: Long, emit: (BassPoint)->Unit) {
         val buffer=source.asReadOnlyBuffer().order(if(encoding.bigEndian) ByteOrder.BIG_ENDIAN else ByteOrder.LITTLE_ENDIAN)
         var frames=0L
         while(buffer.remaining() >= frameBytes) {
@@ -67,19 +72,21 @@ internal class BassDetector(private val sampleRate: Int, private val channels: I
 /** Samples can arrive ahead of the sound. Expose only the window reached by the audio clock. */
 internal class BassTimeline(private val limit: Int = 256) {
     private val points=ArrayDeque<BassPoint>()
-    private var current=BassPoint(Long.MIN_VALUE,0f)
+    private val empty=BassPoint(Long.MIN_VALUE,0f)
+    private var current=empty
     private var position=Long.MIN_VALUE
-    fun clear() { points.clear(); current=BassPoint(Long.MIN_VALUE,0f); position=Long.MIN_VALUE }
+    fun clear() { points.clear(); current=empty; position=Long.MIN_VALUE }
     fun add(point: BassPoint) {
         if(points.lastOrNull()?.let { it.timeUs > point.timeUs } == true) clear()
         points.addLast(point)
         while(points.size > limit) points.removeFirst()
     }
-    fun levelAt(timeUs: Long): Float {
-        if(position != Long.MIN_VALUE && timeUs < position-100_000) { clear(); return 0f }
+    fun levelAt(timeUs: Long)=pointAt(timeUs).level
+    fun pointAt(timeUs: Long): BassPoint {
+        if(position != Long.MIN_VALUE && timeUs < position-100_000) { clear(); return empty }
         position=timeUs
         while(points.isNotEmpty() && points.first().timeUs <= timeUs) current=points.removeFirst()
-        return if(current.timeUs == Long.MIN_VALUE || timeUs-current.timeUs > 200_000) 0f else current.level
+        return if(current.timeUs == Long.MIN_VALUE || timeUs-current.timeUs > 200_000) empty else current
     }
 }
 

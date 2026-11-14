@@ -48,7 +48,9 @@ internal fun LibraryPlayerAppearanceControls(preferences: Preferences, onChange:
                 onCheckedChange={onChange(preferences.copy(libraryNotificationBass=it))},
                 modifier=Modifier.semantics { contentDescription="通知センター風の80Hz低音連動" })
         }
-        if(selected.reactsToBass(preferences.libraryNotificationBass))
+        if(selected == PlaybackEffect.BARS)
+            Text("音域ごとに縦棒が動きます。低音40〜160Hzを1.7倍、立ち上がり20ms・戻り200ms。",fontSize=11.sp)
+        else if(selected.reactsToBass(preferences.libraryNotificationBass))
             Text("80Hz付近の低音で、波の大きさ・流れる速さが変わります。",fontSize=11.sp)
         Text("非表示にしても再生は続きます。",fontSize=11.sp)
         TextButton(onClick={onChange(preferences.copy(libraryPlayerVisible=true,libraryPlayerScale=DEFAULT_LIBRARY_PLAYER_SCALE,libraryPlayerWave=true,libraryPlayerEffect="wave",libraryNotificationBass=true))}) {

@@ -93,6 +93,8 @@ class LibraryPlayerPanelDeviceTest {
         screen.runOnIdle { assertFalse(preferences.libraryNotificationBass) }
         screen.onNodeWithContentDescription("80Hz低音連動").performClick()
         screen.runOnIdle { assertEquals("bass_80hz",preferences.libraryPlayerEffect) }
+        screen.onNodeWithContentDescription("縦棒スペクトラム").performClick()
+        screen.runOnIdle { assertEquals("spectrum_bars",preferences.libraryPlayerEffect) }
         screen.onNodeWithContentDescription("再生パネルを表示").performClick()
         screen.onNodeWithTag("library-player-panel").assertIsDisplayed()
         screen.runOnIdle { assertEquals(.85f,preferences.libraryPlayerScale,0f); assertEquals(0,playbackActions) }

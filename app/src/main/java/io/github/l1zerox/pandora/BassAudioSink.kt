@@ -12,7 +12,9 @@ import java.nio.ByteBuffer
 
 internal object BassRuntime {
     @Volatile var enabled=false
+    @Volatile var bars=false
     val level=MutableStateFlow(0f)
+    val spectrum=MutableStateFlow<List<Float>>(emptyList())
 }
 
 @androidx.annotation.OptIn(UnstableApi::class)
@@ -24,10 +26,14 @@ internal class BassRenderersFactory(context: Context): DefaultRenderersFactory(c
 /** Observes a read-only view. All original bytes, timestamps, return values and audio options pass through. */
 @androidx.annotation.OptIn(UnstableApi::class)
 internal class BassAudioSink(delegate: AudioSink, private val enabled: ()->Boolean = { BassRuntime.enabled },
-    private val publish: (Float)->Unit = { BassRuntime.level.value=it }): ForwardingAudioSink(delegate) {
-    private var detector: BassDetector?=null
+    private val publish: (Float)->Unit = { BassRuntime.level.value=it },
+    private val bars: ()->Boolean = { BassRuntime.bars },
+    private val publishSpectrum: (List<Float>)->Unit = { BassRuntime.spectrum.value=it }): ForwardingAudioSink(delegate) {
+    private var detector: PcmLevelDetector?=null
+    private var factory: ((Boolean)->PcmLevelDetector)?=null
     private val timeline=BassTimeline()
     private var active=false
+    private var activeBars=false
     private var playing=false
     private var failed=false
     private var buffer: ByteBuffer?=null
@@ -43,13 +49,18 @@ internal class BassAudioSink(delegate: AudioSink, private val enabled: ()->Boole
             C.ENCODING_PCM_32BIT_BIG_ENDIAN -> BassPcm.S32_BE; C.ENCODING_PCM_FLOAT_BIG_ENDIAN -> BassPcm.F32_BE
             C.ENCODING_PCM_DOUBLE_BIG_ENDIAN -> BassPcm.F64_BE; else -> null
         }
-        detector=if(format.sampleMimeType == MimeTypes.AUDIO_RAW && encoding != null && format.sampleRate in 1_000..384_000 && format.channelCount in 1..32)
-            BassDetector(format.sampleRate,format.channelCount,encoding) else null
+        factory=if(format.sampleMimeType == MimeTypes.AUDIO_RAW && encoding != null && format.sampleRate in 1_000..384_000 && format.channelCount in 1..32)
+            { spectrum -> if(spectrum) SpectrumDetector(format.sampleRate,format.channelCount,encoding)
+                else BassDetector(format.sampleRate,format.channelCount,encoding) } else null
+        activeBars=bars(); detector=factory?.invoke(activeBars)
         clear()
     }
-    private fun clear() { detector?.reset(); timeline.clear(); buffer=null; bufferTime=Long.MIN_VALUE; failed=false; publish(0f) }
+    private fun publishEmpty() { publish(0f); publishSpectrum(emptyList()) }
+    private fun clear() { detector?.reset(); timeline.clear(); buffer=null; bufferTime=Long.MIN_VALUE; failed=false; publishEmpty() }
     private fun sync() {
         val next=enabled()
+        val spectrum=bars()
+        if(spectrum != activeBars) { activeBars=spectrum; detector=factory?.invoke(spectrum); clear() }
         if(next != active) { active=next; clear() }
     }
     override fun handleBuffer(input: ByteBuffer, presentationTimeUs: Long, encodedAccessUnitCount: Int): Boolean {
@@ -58,18 +69,20 @@ internal class BassAudioSink(delegate: AudioSink, private val enabled: ()->Boole
         if(active && !failed && reader != null && presentationTimeUs != C.TIME_UNSET &&
             (buffer !== input || bufferTime != presentationTimeUs)) {
             buffer=input; bufferTime=presentationTimeUs
-            runCatching { reader.read(input,presentationTimeUs,timeline::add) }.onFailure { failed=true; timeline.clear(); publish(0f) }
+            runCatching { reader.read(input,presentationTimeUs,timeline::add) }.onFailure { failed=true; timeline.clear(); publishEmpty() }
         }
         return super.handleBuffer(input,presentationTimeUs,encodedAccessUnitCount)
     }
     override fun getCurrentPositionUs(sourceEnded: Boolean): Long {
         val time=super.getCurrentPositionUs(sourceEnded)
         sync()
-        publish(if(active && playing && time != AudioSink.CURRENT_POSITION_NOT_SET) timeline.levelAt(time) else 0f)
+        if(active && playing && time != AudioSink.CURRENT_POSITION_NOT_SET) {
+            val point=timeline.pointAt(time); publish(point.level); publishSpectrum(point.spectrum)
+        } else publishEmpty()
         return time
     }
     override fun play() { playing=true; super.play() }
-    override fun pause() { playing=false; publish(0f); super.pause() }
+    override fun pause() { playing=false; publishEmpty(); super.pause() }
     override fun flush() { clear(); super.flush() }
     override fun handleDiscontinuity() { clear(); super.handleDiscontinuity() }
     override fun reset() { playing=false; clear(); super.reset() }

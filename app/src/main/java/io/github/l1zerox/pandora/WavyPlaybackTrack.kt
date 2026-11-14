@@ -55,11 +55,12 @@ internal fun WavyPlaybackTrack(state: SliderState, enabled: Boolean, playing: Bo
     val settings by Store.state.collectAsStateWithLifecycle()
     val reactive=effect.reactsToBass(settings.preferences.libraryNotificationBass)
     val bass=if(reactive) BassRuntime.level.collectAsStateWithLifecycle().value else 0f
+    val spectrum=if(effect == PlaybackEffect.BARS) BassRuntime.spectrum.collectAsStateWithLifecycle().value else emptyList()
     val bassStrength=animateFloatAsState(if(moving) bass else 0f,tween(90),label="bass-wave-strength")
     val phase=remember { Animatable(0f) }
     val strength=animateFloatAsState(if(moving) 1f else 0f,tween(220),label="playback-wave-strength")
     LaunchedEffect(moving,effect,reactive,if(reactive) bass else 0f) {
-        if(moving) {
+        if(moving && effect != PlaybackEffect.BARS) {
             val cycles=if(effect == PlaybackEffect.NOTIFICATION) 5f else 1f
             phase.snapTo(if(reactive) phase.value%cycles else 0f)
             // Compose's animation clock respects the system animator duration scale.
@@ -79,8 +80,21 @@ internal fun WavyPlaybackTrack(state: SliderState, enabled: Boolean, playing: Bo
         val stroke=(if(effect == PlaybackEffect.NOTIFICATION) 5 else 3).dp.toPx()
         scale(scaleX=if(rtl) -1f else 1f,scaleY=1f) {
             if(played < size.width) drawLine(active.copy(alpha=active.alpha*.22f),Offset(played,baseline),Offset(size.width,baseline),stroke,StrokeCap.Round)
+            if(effect == PlaybackEffect.BARS && moving && spectrum.isNotEmpty()) {
+                val cell=size.width/spectrum.size
+                val barWidth=(cell*.65f).coerceAtMost(6.dp.toPx())
+                for(index in spectrum.indices) {
+                    val height=spectrum[index].coerceIn(0f,1f)*10.dp.toPx()
+                    val x=cell*(index+.5f)
+                    if(height > .5f && barWidth > 0) drawLine(if(x <= played) active else active.copy(alpha=active.alpha*.3f),
+                        Offset(x,baseline),Offset(x,baseline-height),barWidth,StrokeCap.Round)
+                }
+            }
             if(played > 0) {
-                if(effect == PlaybackEffect.NOTIFICATION) {
+                if(effect == PlaybackEffect.BARS) {
+                    drawLine(active,Offset(0f,baseline),Offset(played,baseline),stroke,StrokeCap.Round)
+                    return@scale
+                } else if(effect == PlaybackEffect.NOTIFICATION) {
                     drawLine(active,Offset(0f,baseline),Offset(played,baseline),stroke,StrokeCap.Round)
                     for(layer in 0..1) {
                         path.reset(); path.moveTo(0f,baseline)
