@@ -37,6 +37,7 @@ class PlaybackService : MediaLibraryService() {
     private var session: MediaLibrarySession? = null
     private var library: CarLibraryCallback? = null
     private var betaTools: PlaybackBetaTools? = null
+    private var artworkSync: PlaybackArtworkSync? = null
     private val scope=CoroutineScope(SupervisorJob()+Dispatchers.Main.immediate)
     override fun onCreate() {
         super.onCreate()
@@ -67,6 +68,7 @@ class PlaybackService : MediaLibraryService() {
         val open=PendingIntent.getActivity(this,40,Intent(this,PlayerActivity::class.java),PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         library=CarLibraryCallback(this)
         session=MediaLibrarySession.Builder(this,player,library!!).setSessionActivity(open).build().also { library!!.attach(it) }
+        artworkSync=PlaybackArtworkSync(this,player)
         betaTools=PlaybackBetaTools(player)
         PlaybackRuntime.removeLibraryItem={ uri -> removeLibraryMedia(player,uri) }
     }
@@ -74,6 +76,7 @@ class PlaybackService : MediaLibraryService() {
     override fun onDestroy() {
         scope.cancel(); BassRuntime.enabled=false; BassRuntime.bars=false; BassRuntime.level.value=0f; BassRuntime.spectrum.value=emptyList()
         library?.close(); library=null
+        artworkSync?.close(); artworkSync=null
         betaTools?.close(); betaTools=null
         PlaybackRuntime.removeLibraryItem=null
         session?.run { player.release(); release() }; session=null

@@ -4,6 +4,23 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ArtworkRequestTest {
+    @Test fun changingTheImageOfTheSameSongRejectsThePreviousImageRequest() {
+        val requests=ArtworkRequest(); val song=LibraryEntry("content://song/a","A","audio/mpeg")
+        val old=requests.begin(song,"cover-old")!!
+        assertNull(requests.begin(song,"cover-old"))
+        val latest=requests.begin(song,"cover-new")!!
+        assertFalse(requests.accepts(old)); assertTrue(requests.accepts(latest))
+        assertNull(requests.begin(song,"cover-new"))
+    }
+    @Test fun publishedMetadataCanBeAcknowledgedWithoutRestartingTheImageLoad() {
+        val requests=ArtworkRequest(); val song=LibraryEntry("content://song/a","A","audio/mpeg")
+        val load=requests.begin(song,"private-file-reference")!!
+        assertTrue(requests.accepts(load))
+        val published=requests.begin(song,"published-content-and-inline-data")!!
+        assertNull(requests.begin(song,"published-content-and-inline-data"))
+        assertTrue(requests.accepts(published)); assertFalse(requests.accepts(load))
+        requests.invalidate(); assertFalse(requests.accepts(published))
+    }
     @Test fun switchingAtoBtoARejectsTheFirstImageEvenWhenTheUriMatchesAgain() {
         val requests=ArtworkRequest()
         val a=LibraryEntry("content://song/a","A","audio/mpeg",album="Album A")

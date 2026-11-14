@@ -10,16 +10,19 @@ import androidx.media3.session.MediaSession
 class CarBrowseFixtureService: MediaLibraryService() {
     private var session: MediaLibrarySession?=null
     private var callback: CarLibraryCallback?=null
+    private var artworkSync: PlaybackArtworkSync?=null
     override fun onCreate() {
         super.onCreate()
         val snapshot=entries.toList()
         val player=ExoPlayer.Builder(this).build().apply { volume=0f }
         callback=CarLibraryCallback(this,{snapshot},{LibraryCollections()})
         session=MediaLibrarySession.Builder(this,player,callback!!).setId("car-browse-fixture").build()
+        artworkSync=PlaybackArtworkSync(this,player)
     }
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo)=session
     override fun onDestroy() {
         callback?.close(); callback=null
+        artworkSync?.close(); artworkSync=null
         session?.run { player.release(); release() }; session=null
         super.onDestroy()
     }

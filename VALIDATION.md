@@ -1,5 +1,19 @@
 # 検証状況
 
+## v0.4.34（2026-11-14）
+
+手動変更したアートワークがAndroid Autoの通常画面では表示され、分割画面では表示されないとの報告あり。今回の再現画面・端末ログは未取得。コード上ではスマホから作る再生項目の画像がアプリ内部のfile URIで、画像変更後も再生キューのメタデータを更新していなかった。これを原因候補として修正した。
+
+PlaybackServiceに、現在の音楽項目だけのアートワーク同期を追加。アプリ内の優先順（曲→手動アルバム→自動アルバム）に従い、手動画像をIOスレッドで最大256px・64KiB以内のJPEGへ変換。content URIに加えて現在のMediaItemのartworkDataにも指定する。Media3 1.11.1のBitmapLoaderはartworkDataをURIより優先し、ExoPlayerはMediaItemのメタデータを抽出済みメタデータより優先する。legacy sessionはデコード済み画像をnative ALBUM_ART／DISPLAY_ICONへ渡すため、ダッシュボードも同じ手動画像を参照できる設計。
+
+曲・アルバム画像変更と手動アルバム所属変更を監視。古い非同期結果は世代・項目・設定スナップショットで拒否する。現在項目のメタデータだけをreplaceMediaItemで置換し、キュー・URL・再生位置・再生状態は設定し直さない。前の項目から自身のinline画像を外し、長いキューで全曲分の画像バイト列を保持し続けない。解除時は自身の画像データと印を外し、元の埋め込み画像とcontent URIへ戻す。動画は対象外、元ファイルとタグの書き換えなし、権限変更なし。
+
+単体テスト2件追加：同じ曲で画像リビジョンが変わった時の古い要求の破棄、自身が更新したメタデータを再読み込みし続けない要求管理。Android結合テストは生成した埋め込み画像付き無音MP3を使い、native MediaControllerから曲／アルバムの手動画像、再生中の変更、曲送り、元の埋め込み画像への復帰、キュー・再生位置の維持を検証するテストを追加した。Androidテストはコンパイル成功のみで実行していない。USB接続端末なし、実車・Desktop Head Unitでの修正後の表示は未確認。
+
+公式の[車載アートワーク](https://developer.android.com/training/cars/media/create-media-browser/media-artwork)、[Player.replaceMediaItem](https://developer.android.com/reference/androidx/media3/common/Player)、[バックグラウンド再生](https://developer.android.com/media/media3/session/background-playback)、使用中のMedia3 1.11.1ソース（BitmapLoader、ExoPlayerImpl、LegacyConversions、MediaSessionLegacyStub）を確認。
+
+正式版設定でDebug/Release単体テスト各333件成功（失敗・エラー・スキップ0）。compileDebugAndroidTestKotlin成功。Lintエラー0・警告69件。署名付きAPKは140,723,934 bytes、v0.4.33からの差分は3,788,627 bytes（97.3%削減）。アプリと同じKotlin処理で差分復元したAPKのSHA-256が完全一致、旧版と同じ署名証明書・v3署名・16KB ZIP alignmentを確認。APKのSHA-256は `6ee3633435a077818225ab37118830218624bef99ed6d511140b643fd4cdc38b`。権限変更なし。
+
 ## v0.4.33（2026-11-14）
 
 ユーザー提供の車載画面写真で、曲名・アーティスト・アートワーク・再生時刻と再生中の表示を確認。その後「戻るだけ」でアルバム／曲一覧が開けないと報告あり。音声出力や曲送りを写真だけで確認したとは扱わない。
