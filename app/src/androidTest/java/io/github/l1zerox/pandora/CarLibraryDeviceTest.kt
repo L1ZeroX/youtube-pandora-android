@@ -12,6 +12,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaSession
+import androidx.media3.session.MediaConstants
 import androidx.test.platform.app.InstrumentationRegistry
 import com.google.common.util.concurrent.ListenableFuture
 import org.junit.Assert.*
@@ -66,9 +67,15 @@ class CarLibraryDeviceTest {
             val root=result { callback.onGetLibraryRoot(session,external,null) }
             assertEquals(CAR_ROOT,root.value!!.mediaId); assertEquals(true,root.value!!.mediaMetadata.isBrowsable)
             assertTrue(root.params!!.extras.getBoolean("android.media.browse.SEARCH_SUPPORTED"))
-            assertEquals(4,result { callback.onGetChildren(session,external,CAR_ROOT,0,80,null) }.value!!.size)
+            val top=result { callback.onGetChildren(session,external,CAR_ROOT,0,80,null) }.value!!
+            assertEquals(4,top.size); assertEquals(CAR_ALBUMS,top.first().mediaId)
             assertEquals(2,result { callback.onGetSearchResult(session,external,"Album",0,80,null) }.value!!.size)
             val album=catalog.children(CAR_ALBUMS,0,80)!!.single()
+            val albumItem=result { callback.onGetItem(session,external,album.id) }.value!!
+            assertEquals(MediaConstants.EXTRAS_VALUE_CONTENT_STYLE_GRID_ITEM,albumItem.mediaMetadata.extras!!.getInt(MediaConstants.EXTRAS_KEY_CONTENT_STYLE_SINGLE_ITEM))
+            val rows=result { callback.onGetChildren(session,external,album.id,0,80,null) }.value!!
+            assertEquals(listOf("A","B"),rows.map { it.mediaMetadata.title.toString() })
+            assertEquals(MediaConstants.EXTRAS_VALUE_CONTENT_STYLE_LIST_ITEM,rows.first().mediaMetadata.extras!!.getInt(MediaConstants.EXTRAS_KEY_CONTENT_STYLE_SINGLE_ITEM))
             val selected=catalog.children(album.id,0,80)!![1]
             val request=MediaItem.Builder().setMediaId(selected.id).setUri("https://example.invalid/arbitrary.mp4").build()
             val queue=result { callback.onSetMediaItems(session,external,listOf(request),0,5000) }

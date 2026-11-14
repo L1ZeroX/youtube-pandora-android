@@ -1,5 +1,21 @@
 # 検証状況
 
+## v0.4.33（2026-11-14）
+
+ユーザー提供の車載画面写真で、曲名・アーティスト・アートワーク・再生時刻と再生中の表示を確認。その後「戻るだけ」でアルバム／曲一覧が開けないと報告あり。音声出力や曲送りを写真だけで確認したとは扱わない。
+
+原因候補として、v0.4.32のブラウズ接続許可が、Media3でtrustedにならないクライアントに対してGoogle Play servicesとの同一署名を要求していた点を修正。実機ログでこの拒否を確認したものではない。Google公式UAMPのcaller allowlistはAndroid AutoとGoogleアプリに別の正式証明書を登録している。パッケージ名／UIDの検証済みフラグと、各アプリ固有の正式署名証明書SHA-256を確認する方式へ変更した。SigningInfoの検証済みローテーション履歴を調べ、複数の同時署名は拒否。デバッグ証明書や不明なパッケージは許可しない。自アプリUIDとMedia3が信頼するコントローラーの扱いは維持する。画像URIをAndroid Autoへ渡す判定も同じ方式へ統一。
+
+証明書SHA-256はDER全体のハッシュ。公式サンプルのPackageValidator実装と一致させ、SPKIのハッシュとは混同しない。Android Autoの実際の公開証明書をAOSPサンプルからテスト用DERとして収録し、公式allowlistの値と一致し、MEDIA_CONTENT_CONTROL等を持たない検証済みAndroid Autoでも許可する回帰テストを追加した。秘密鍵は含めない。証明書計算結果は署名バイト列をキーにキャッシュし、画像一覧や再生キューを返す時に同じハッシュを繰り返し計算しない。実際のインストール済み署名は毎回PackageManagerから取得して確認する。
+
+rootの4カテゴリーはアルバム・曲・お気に入り・プレイリストの順へ変更。browsableはグリッド、playableはリストの表示ヒントを項目にも付け、アルバム画像から曲名を選べる形を明示する。既存の曲ID→アルバムキューの解決、選択位置、元URIのmediaId、スマホ側の再生は維持する。ログには接続パッケージ／許可判定、入口、一覧種別と件数を記録し、曲名やURIは記録しない。
+
+単体テスト8件追加：正式な公開証明書、Android Auto／Googleアプリで異なる証明書、偽装名／未検証名、デバッグ証明書、不明な署名、ローテーション履歴、既存の自アプリ／システム信頼を検証。Androidテストに表示順・表示ヒントを追加。さらにdebug限定fixture serviceと生成した無音WAVを使い、platform MediaBrowserで接続→アルバム→曲→playFromMediaId→前後の曲送りまで通す従来方式の結合テストを追加（コンパイルのみ）。fixtureはrelease APKには含めない。接続端末なし、実車・Desktop Head Unitでの修正後の動作は未確認。
+
+参照：[Google UAMP allowlist](https://github.com/android/uamp/blob/media3/common/src/main/res/xml/allowed_media_browser_callers.xml)、[PackageValidator](https://github.com/android/uamp/blob/media3/common/src/main/java/com/example/android/uamp/media/PackageValidator.kt)、[公式コンテンツ階層](https://developer.android.com/training/cars/media/create-media-browser/content-hierarchy)、[表示スタイル](https://developer.android.com/training/cars/media/create-media-browser/content-styles)。使用中のMedia3 1.11.1のlegacy browser stubも確認した。
+
+正式版設定でDebug/Release単体テスト各331件成功（失敗・エラー・スキップ0）。compileDebugAndroidTestKotlin成功。Lintエラー0・警告69件。署名付きAPKは140,711,646 bytes、v0.4.32からの差分は3,784,507 bytes（97.3%削減）。アプリと同じKotlin処理で差分復元したAPKのSHA-256が完全一致、旧版と同じ署名証明書・v3署名・16KB ZIP alignmentを確認。APKのSHA-256は `64433c02b582755e20164157bce9412dbeed24a5989784578c0a338863bb8894`。権限変更なし。
+
 ## v0.4.32（2026-11-14）
 
 PlaybackServiceをMediaSessionServiceからMediaLibraryServiceへ拡張し、同じExoPlayer・音声観察・既存コントローラーを再利用する。ライブラリーの音楽を曲／アルバム／お気に入り／プレイリストの4カテゴリーで提供。既存のアルバム正規化・手動アルバム・ディスク／曲番号順を使用し、車の曲IDから元のcontent URIと所属するキューを解決する。実プレーヤーのmediaIdは元URIを維持し、スマホの選曲・ブックマーク・削除と整合させる。動画・HTTP URL・file URI・不明なIDは車用カタログから解決しない。スマホ自身から既存の実URIを渡した場合は動画も含めてそのまま処理する。

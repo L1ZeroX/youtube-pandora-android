@@ -27,7 +27,7 @@ internal class CarMusicCatalog(entries: List<LibraryEntry>, data: LibraryCollect
         val albums=libraryAlbums(songs,data).filter { it.tracks.isNotEmpty() }
         val favorites=songs.filter { it.uri in data.favorites }
         val playlists=data.playlists.map { list -> list to list.uris.mapNotNull(byUri::get) }.filter { it.second.isNotEmpty() }
-        val top=listOf(CarMusicNode(CAR_SONGS,"曲","${songs.size}曲"),CarMusicNode(CAR_ALBUMS,"アルバム","${albums.size}枚"),
+        val top=listOf(CarMusicNode(CAR_ALBUMS,"アルバム","${albums.size}枚"),CarMusicNode(CAR_SONGS,"曲","${songs.size}曲"),
             CarMusicNode(CAR_FAVORITES,"お気に入り","${favorites.size}曲"),CarMusicNode(CAR_PLAYLISTS,"プレイリスト","${playlists.size}件"))
         putChildren(CAR_ROOT,top)
         putTracks(CAR_SONGS,songs)

@@ -1,7 +1,6 @@
 package io.github.l1zerox.pandora
 
 import android.content.Context
-import android.content.pm.PackageManager
 import android.database.ContentObserver
 import android.os.Bundle
 import android.os.Handler
@@ -55,15 +54,20 @@ internal class CarLibraryCallback(private val context: Context,
     fun close() { context.contentResolver.unregisterContentObserver(observer); scope.cancel(); session=null }
 
     private fun own(controller: MediaSession.ControllerInfo)=controller.uid == Process.myUid()
-    private fun allowed(controller: MediaSession.ControllerInfo): Boolean = own(controller) || controller.isTrusted ||
-        controller.isPackageNameVerified && controller.packageName in setOf("com.google.android.projection.gearhead","com.google.android.googlequicksearchbox","com.google.android.gms") &&
-        context.packageManager.checkSignatures(controller.packageName,"com.google.android.gms") == PackageManager.SIGNATURE_MATCH
+    private fun allowed(controller: MediaSession.ControllerInfo): Boolean {
+        val local=own(controller)
+        val keys=if(!local && !controller.isTrusted && controller.isPackageNameVerified) carInstalledCertificateHashes(context,controller.packageName) else emptySet()
+        return carClientAllowed(local,controller.isTrusted,controller.isPackageNameVerified,controller.packageName,keys)
+    }
 
-    override fun onConnectAsync(session: MediaSession, controller: MediaSession.ControllerInfo): ListenableFuture<MediaSession.ConnectionResult> =
-        Futures.immediateFuture(if(!allowed(controller)) MediaSession.ConnectionResult.reject() else
+    override fun onConnectAsync(session: MediaSession, controller: MediaSession.ControllerInfo): ListenableFuture<MediaSession.ConnectionResult> {
+        val accepted=allowed(controller)
+        if(!own(controller)) AppLog.info("Android Auto","接続 ${controller.packageName}: 許可=$accepted / trusted=${controller.isTrusted} / verified=${controller.isPackageNameVerified}")
+        return Futures.immediateFuture(if(!accepted) MediaSession.ConnectionResult.reject() else
             MediaSession.ConnectionResult.AcceptedResultBuilder()
                 .setAvailableSessionCommands(MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS)
                 .setAvailablePlayerCommands(MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS).build())
+    }
 
     private suspend fun catalog(): CarMusicCatalog = mutex.withLock {
         cached?.takeIf { SystemClock.elapsedRealtime()-loadedAt < 10_000 }?.let { return@withLock it }
@@ -97,12 +101,18 @@ internal class CarLibraryCallback(private val context: Context,
         val result=LibraryParams.Builder().setExtras(Bundle(params?.extras ?: Bundle.EMPTY).apply {
             putAll(rootItem().mediaMetadata.extras ?: Bundle.EMPTY)
         }).build()
+        AppLog.info("Android Auto","ライブラリー入口: ${browser.packageName}")
         return Futures.immediateFuture(LibraryResult.ofItem(rootItem(),result))
     }
     private suspend fun browseItem(node: CarMusicNode, catalog: CarMusicCatalog, caller: String): MediaItem = withContext(Dispatchers.IO) {
         val metadata=MediaMetadata.Builder().setTitle(node.title).setSubtitle(node.subtitle)
             .setIsBrowsable(node.entry == null).setIsPlayable(node.entry != null)
             .setMediaType(if(node.entry != null) MediaMetadata.MEDIA_TYPE_MUSIC else if(node.album != null) MediaMetadata.MEDIA_TYPE_ALBUM else MediaMetadata.MEDIA_TYPE_FOLDER_MIXED)
+            .setExtras(Bundle().apply {
+                putInt(MediaConstants.EXTRAS_KEY_CONTENT_STYLE_SINGLE_ITEM,if(node.entry == null) MediaConstants.EXTRAS_VALUE_CONTENT_STYLE_GRID_ITEM else MediaConstants.EXTRAS_VALUE_CONTENT_STYLE_LIST_ITEM)
+                putInt(MediaConstants.EXTRAS_KEY_CONTENT_STYLE_BROWSABLE,MediaConstants.EXTRAS_VALUE_CONTENT_STYLE_GRID_ITEM)
+                putInt(MediaConstants.EXTRAS_KEY_CONTENT_STYLE_PLAYABLE,MediaConstants.EXTRAS_VALUE_CONTENT_STYLE_LIST_ITEM)
+            })
         node.entry?.let { metadata.setArtist(it.artist).setAlbumTitle(it.album).setAlbumArtist(it.albumArtist); if(it.durationMs > 0) metadata.setDurationMs(it.durationMs) }
         catalog.coverEntry(node)?.let { metadata.setArtworkUri(carArtworkUri(context,it,if(node.entry == null) node.album else null,caller)) }
         MediaItem.Builder().setMediaId(node.id).setMediaMetadata(metadata.build()).build()
@@ -117,6 +127,8 @@ internal class CarLibraryCallback(private val context: Context,
         val catalog=catalog(); val rows=catalog.children(parentId,page,pageSize)
         if(rows == null) LibraryResult.ofError(SessionError.ERROR_BAD_VALUE) else {
             visited.add(parentId)
+            val section=when { parentId == CAR_ROOT -> "カテゴリー"; parentId == CAR_ALBUMS -> "アルバム"; parentId.startsWith("car:album:") -> "アルバム内の曲"; else -> "一覧" }
+            AppLog.info("Android Auto","$section: ${rows.size}件")
             LibraryResult.ofItemList(rows.map { browseItem(it,catalog,browser.packageName) },params)
         }
     }

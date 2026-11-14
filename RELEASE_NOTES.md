@@ -1,15 +1,15 @@
-# Youtube Pandora! Android v0.4.32
+# Youtube Pandora! Android v0.4.33
 
-[正式版APKをダウンロード](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.4.32/YoutubePandora-Android-v0.4.32.apk)
+[正式版APKをダウンロード](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.4.33/YoutubePandora-Android-v0.4.33.apk)
 
-- **Android Autoの音楽再生**：標準のメディア画面に曲・アルバム・お気に入り・プレイリストを提供します。再生／一時停止・曲送り・シークはスマホと同じプレーヤーを使います。
-- **アルバムとアートワーク**：アルバム・プレイリスト内の順番で続けて再生。曲名・アーティスト・任意に設定したアートワークも提供します。大きな一覧は80件単位に分け、全曲へ辿れるようにしました。
-- **検索と再開**：曲名・アーティスト・アルバムで検索し、最後に再生した音楽と保存された位置から再開する処理を追加。音声検索用の標準Intentにも対応する入口を追加しました。
+- **一覧が開けない場合の接続修正**：Android Autoのブラウズ接続を拒否し得る署名判定を修正。Google公式サンプルの正式なAndroid Auto証明書を確認し、Google Play開発者サービスと同じ署名を要求する前提を取り除きました。
+- **アルバム→曲選択**：「アルバム」を先頭へ移動。アルバムは画像付きグリッド、曲は曲名リストで表示する指定を追加しました。曲を押すと、その曲からアルバム内の順番で再生する処理です。
+- **確認用ログ**：ブラウズ接続の可否と一覧取得件数を処理ログへ残します。曲名やファイルURIはこの診断ログに含めません。
 
-APK配布版を車で試すには、Android Autoの開発者設定で「不明な提供元」を許可し、ランチャーのカスタマイズで「Youtube Pandora!」を有効にしてください。[Android公式の設定手順](https://developer.android.com/training/cars/testing#allow-unknown-sources)。
+更新後はAndroid Autoを再接続し、車側でYoutube Pandora!を開き直して「アルバム」→アルバム画像→曲名の順に選んでください。
 
-この版はAndroid Autoの音楽機能です。Android 16で車側に動画を投影する機能は追加していません。Googleが発表した停車中の動画投影はAndroid 17以上と対応車両が対象です。[公式発表](https://developer.android.com/blog/posts/whats-new-in-android-for-cars-unifying-platforms-and-unlocking-premium-experiences)。
+単体テスト331件成功、Androidテストのコンパイル成功、Lintエラー0。署名と差分復元を検証済みです。
 
-正式版v0.4.31から差分更新に対応。同じアプリID・署名、versionCode 71で設定と保存ファイルを引き継ぎます。環境設定の「新しいバージョンを確認」から更新できます。
+前版のユーザー提供画像で曲名・アートワーク・再生時刻の表示は確認できています。今回の一覧・曲選択の修正後の動作は、実車・Desktop Head Unitでは未確認です。[検証状況](VALIDATION.md)。
 
-今回はUSB接続端末・実車・Desktop Head Unitでの確認は未実施です。車載機／後付けモジュールでの接続・操作・アートワーク・音声検索は未確認です。[検証状況](VALIDATION.md)。
+正式版v0.4.32から差分更新に対応。同じアプリID・署名、versionCode 72で設定と保存ファイルを引き継ぎます。

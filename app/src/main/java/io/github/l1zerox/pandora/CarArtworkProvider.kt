@@ -4,7 +4,6 @@ import android.content.ContentProvider
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.database.MatrixCursor
 import android.graphics.Bitmap
 import androidx.core.graphics.scale
@@ -27,8 +26,7 @@ internal fun carArtworkUri(context: Context, entry: LibraryEntry, album: String?
     val path=Base64.getUrlEncoder().withoutPadding().encodeToString(request.toByteArray(Charsets.UTF_8))
     val uri=Uri.Builder().scheme("content").authority(context.packageName+".car-artwork").appendPath("cover").appendPath(path).build()
     val targets=mutableSetOf(caller)
-    if(context.packageManager.checkSignatures("com.google.android.projection.gearhead","com.google.android.gms") == PackageManager.SIGNATURE_MATCH)
-        targets.add("com.google.android.projection.gearhead")
+    if(carReleaseInstalled(context,CAR_AUTO_PACKAGE)) targets.add(CAR_AUTO_PACKAGE)
     targets.filterNot { it == context.packageName }.forEach { name -> runCatching { context.grantUriPermission(name,uri,Intent.FLAG_GRANT_READ_URI_PERMISSION) } }
     return uri
 }

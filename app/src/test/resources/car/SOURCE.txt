@@ -1,0 +1,4 @@
+Public Android Auto signing certificate from the AOSP media-browser sample (Apache-2.0). No private key is included.
+https://android.googlesource.com/platform/developers/samples/android/+/487c6fe/media/MediaBrowserService/Application/src/main/res/xml/allowed_media_browser_callers.xml
+The expected certificate SHA-256 is also published in Google UAMP:
+https://github.com/android/uamp/blob/media3/common/src/main/res/xml/allowed_media_browser_callers.xml

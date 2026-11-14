@@ -10,7 +10,7 @@ class CarMusicCatalogTest {
 
     @Test fun carRootHasFourMusicCategoriesAndNeverExposesVideoOrRemoteInputUrls() {
         val catalog=CarMusicCatalog(listOf(a,b,video,a.copy(uri="https://example.com/a.mp3"),a.copy(uri="file:///private/a.mp3")),LibraryCollections())
-        assertEquals(listOf(CAR_SONGS,CAR_ALBUMS,CAR_FAVORITES,CAR_PLAYLISTS),catalog.children(CAR_ROOT,0,Int.MAX_VALUE)!!.map { it.id })
+        assertEquals(listOf(CAR_ALBUMS,CAR_SONGS,CAR_FAVORITES,CAR_PLAYLISTS),catalog.children(CAR_ROOT,0,Int.MAX_VALUE)!!.map { it.id })
         assertEquals(listOf(a,b),catalog.songs)
         assertNull(catalog.item(video.uri)); assertNull(catalog.queue("https://example.com/a.mp3"))
     }
