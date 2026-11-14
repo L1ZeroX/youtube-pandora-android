@@ -1,11 +1,5 @@
 package io.github.l1zerox.pandora
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,6 +7,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SliderState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -27,6 +22,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlin.math.PI
 import kotlin.math.ceil
 import kotlin.math.min
@@ -51,28 +50,38 @@ internal fun WavyPlaybackTrack(state: SliderState, enabled: Boolean, playing: Bo
         lifecycle.addObserver(observer)
         onDispose { lifecycle.removeObserver(observer) }
     }
-    val moving=enabled && playing && visible && state.value > state.valueRange.start && state.value < state.valueRange.endInclusive
-    val settings by Store.state.collectAsStateWithLifecycle()
-    val reactive=effect.reactsToBass(settings.preferences.libraryNotificationBass)
-    val bass=if(reactive) BassRuntime.level.collectAsStateWithLifecycle().value else 0f
-    val spectrum=if(effect == PlaybackEffect.BARS) BassRuntime.spectrum.collectAsStateWithLifecycle().value else emptyList()
-    val bassStrength=animateFloatAsState(if(moving) bass else 0f,tween(90),label="bass-wave-strength")
-    val phase=remember { Animatable(0f) }
-    val strength=animateFloatAsState(if(moving) 1f else 0f,tween(220),label="playback-wave-strength")
-    LaunchedEffect(moving,effect,reactive,if(reactive) bass else 0f) {
-        if(moving && effect != PlaybackEffect.BARS) {
-            val cycles=if(effect == PlaybackEffect.NOTIFICATION) 5f else 1f
-            phase.snapTo(if(reactive) phase.value%cycles else 0f)
-            // Compose's animation clock respects the system animator duration scale.
-            phase.animateTo(if(reactive) phase.value+cycles else cycles,
-                infiniteRepeatable(tween(if(reactive) bassCycleMillis(bass)*cycles.toInt()
-                    else if(effect == PlaybackEffect.NOTIFICATION) 18_000 else 1400,easing=LinearEasing),RepeatMode.Restart))
+    val moving=enabled && playing && visible && state.value >= state.valueRange.start && state.value < state.valueRange.endInclusive
+    val link by remember { Store.state.map { it.preferences.libraryNotificationBass }.distinctUntilChanged() }
+        .collectAsStateWithLifecycle(initialValue=Store.state.value.preferences.libraryNotificationBass)
+    val reactive=effect.reactsToBass(link)
+    val motion=remember(effect,reactive) { PlaybackEffectMotion(effect,reactive) }
+    val redraw=remember(motion) { mutableIntStateOf(0) }
+    LaunchedEffect(moving,motion) {
+        if(motion.clear()) redraw.intValue++
+        if(!moving) return@LaunchedEffect
+        val context=currentCoroutineContext()
+        val durationScale=context[MotionDurationScale]
+        var previous=withFrameNanos { it }
+        while(context.isActive) {
+            withFrameNanos { now ->
+                val scale=durationScale?.scaleFactor ?: 1f
+                val changed=if(scale.isFinite() && scale > 0f)
+                    motion.advance((now-previous)/1_000_000_000.0/scale,BassRuntime.level.value,BassRuntime.spectrum.value)
+                else motion.clear()
+                previous=now
+                if(changed) redraw.intValue++
+            }
         }
     }
     val rtl=LocalLayoutDirection.current == LayoutDirection.Rtl
     val path=remember { Path() }
     val active=if(enabled) color else color.copy(alpha=.38f)
     Canvas(Modifier.fillMaxWidth().height(if(effect != PlaybackEffect.WAVE) 26.dp else 12.dp).testTag("playback-position-track")) {
+        // Read frame invalidation only in drawing: audio/animation updates never recompose the controls.
+        redraw.intValue
+        val phase=motion.phase.toFloat()
+        val strength=if(moving && motion.active) 1f else 0f
+        val spectrum=motion.spectrum
         val range=state.valueRange.endInclusive-state.valueRange.start
         val fraction=if(range > 0) ((state.value-state.valueRange.start)/range).coerceIn(0f,1f) else 0f
         val played=size.width*fraction
@@ -80,7 +89,7 @@ internal fun WavyPlaybackTrack(state: SliderState, enabled: Boolean, playing: Bo
         val stroke=(if(effect == PlaybackEffect.NOTIFICATION) 5 else 3).dp.toPx()
         scale(scaleX=if(rtl) -1f else 1f,scaleY=1f) {
             if(played < size.width) drawLine(active.copy(alpha=active.alpha*.22f),Offset(played,baseline),Offset(size.width,baseline),stroke,StrokeCap.Round)
-            if(effect == PlaybackEffect.BARS && moving && spectrum.isNotEmpty()) {
+            if(effect == PlaybackEffect.BARS && strength > 0f) {
                 val cell=size.width/spectrum.size
                 val barWidth=(cell*.65f).coerceAtMost(6.dp.toPx())
                 for(index in spectrum.indices) {
@@ -102,8 +111,8 @@ internal fun WavyPlaybackTrack(state: SliderState, enabled: Boolean, playing: Bo
                         for(index in 1..samples) {
                             val x=played*index/samples
                             val height=notificationWaveHeight(x,played,(if(layer == 0) 170 else 140).dp.toPx(),
-                                (if(layer == 0) 9 else 6).dp.toPx()*strength.value*(if(reactive) bassStrength.value else 1f),
-                                phase.value*(if(layer == 0) 1f else .8f)+layer*.35f)
+                                (if(layer == 0) 9 else 6).dp.toPx()*strength*(if(reactive) motion.bass else 1f),
+                                phase*(if(layer == 0) 1f else .8f)+layer*.35f)
                             path.lineTo(x,baseline-stroke/2-height)
                         }
                         path.lineTo(played,baseline); path.close()
@@ -111,7 +120,7 @@ internal fun WavyPlaybackTrack(state: SliderState, enabled: Boolean, playing: Bo
                     }
                     return@scale
                 }
-                val amplitude=(if(effect == PlaybackEffect.BASS) 9.dp.toPx()*bassStrength.value else 4.dp.toPx())*strength.value
+                val amplitude=(if(effect == PlaybackEffect.BASS) 9.dp.toPx()*motion.bass else 4.dp.toPx())*strength
                 if(amplitude < .01f) drawLine(active,Offset(0f,baseline),Offset(played,baseline),stroke,StrokeCap.Round)
                 else {
                     path.reset(); path.moveTo(0f,baseline)
@@ -119,7 +128,7 @@ internal fun WavyPlaybackTrack(state: SliderState, enabled: Boolean, playing: Bo
                     for(index in 1..samples) {
                         val x=played*index/samples
                         path.lineTo(x,baseline+playbackWaveOffset(x,played,
-                            (if(effect == PlaybackEffect.BASS) 48 else 28).dp.toPx(),amplitude,phase.value))
+                            (if(effect == PlaybackEffect.BASS) 48 else 28).dp.toPx(),amplitude,phase))
                     }
                     drawPath(path,active,style=Stroke(stroke,cap=StrokeCap.Round))
                 }
