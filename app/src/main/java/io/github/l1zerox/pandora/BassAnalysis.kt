@@ -27,16 +27,17 @@ internal enum class BassPcm(val bytes: Int, val bigEndian: Boolean = false) {
 
 internal data class BassPoint(val timeUs: Long, val level: Float)
 
-/** Two cascaded 100 Hz band-pass filters. Average energy per channel avoids stereo cancellation. */
+/** Two cascaded 80 Hz band-pass filters. Average energy per channel avoids stereo cancellation. */
 internal class BassDetector(private val sampleRate: Int, private val channels: Int, private val encoding: BassPcm) {
     init { require(sampleRate in 1_000..384_000 && channels in 1..32) }
-    private val alpha=sin(2*PI*100/sampleRate)/(2*2.0)
+    private val alpha=sin(2*PI*80/sampleRate)/(2*2.0)
     private val b0=alpha/(1+alpha)
-    private val a1=-2*cos(2*PI*100/sampleRate)/(1+alpha)
+    private val a1=-2*cos(2*PI*80/sampleRate)/(1+alpha)
     private val a2=(1-alpha)/(1+alpha)
     private val z1=DoubleArray(channels); private val z2=DoubleArray(channels)
     private val z3=DoubleArray(channels); private val z4=DoubleArray(channels)
-    private val window=(sampleRate/25).coerceAtLeast(1)
+    // Four cycles at 80 Hz keep a steady bass tone from pulsing at window boundaries.
+    private val window=(sampleRate/20).coerceAtLeast(1)
     val frameBytes=channels*encoding.bytes
     private var count=0; private var energy=0.0
     fun reset() { z1.fill(0.0); z2.fill(0.0); z3.fill(0.0); z4.fill(0.0); count=0; energy=0.0 }

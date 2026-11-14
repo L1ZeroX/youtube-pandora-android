@@ -30,7 +30,7 @@ class BassPlaybackRuntimeTest {
             .put("data".toByteArray()).putInt(bytes).array()
         val pcm=ByteBuffer.allocate(bytes).order(ByteOrder.LITTLE_ENDIAN)
         repeat(rate*4) { frame ->
-            val frequency=if(frame < rate) 1000.0 else if(frame < rate*3) 100.0 else 0.0
+            val frequency=if(frame < rate) 1000.0 else if(frame < rate*3) 80.0 else 0.0
             pcm.putShort((sin(2*PI*frequency*frame/rate)*8191).toInt().toShort())
         }
         file.outputStream().use { it.write(header); it.write(pcm.array()) }

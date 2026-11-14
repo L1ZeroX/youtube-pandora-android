@@ -37,10 +37,9 @@ class PlaybackService : MediaSessionService() {
     private val scope=CoroutineScope(SupervisorJob()+Dispatchers.Main.immediate)
     override fun onCreate() {
         super.onCreate()
-        fun bassEnabled()=Store.state.value.preferences.let { it.libraryPlayerWave && PlaybackEffect.fromId(it.libraryPlayerEffect) == PlaybackEffect.BASS }
-        BassRuntime.enabled=bassEnabled()
+        BassRuntime.enabled=playbackBassEnabled(Store.state.value.preferences)
         scope.launch {
-            Store.state.map { it.preferences.libraryPlayerWave && PlaybackEffect.fromId(it.preferences.libraryPlayerEffect) == PlaybackEffect.BASS }
+            Store.state.map { playbackBassEnabled(it.preferences) }
                 .distinctUntilChanged().collect { BassRuntime.enabled=it; BassRuntime.level.value=0f }
         }
         val player=ExoPlayer.Builder(this,BassRenderersFactory(this))

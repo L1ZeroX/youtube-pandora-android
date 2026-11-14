@@ -25,7 +25,8 @@ internal fun LibrarySeekBar(uri: String, playback: LibraryPlayback, palette: Lib
     val fraction=drag ?: playbackFraction(playback.position,duration)
     val enabled=playback.controller != null && playback.seekable
     val settings by Store.state.collectAsStateWithLifecycle()
-    val bass=settings.preferences.libraryPlayerWave && PlaybackEffect.fromId(settings.preferences.libraryPlayerEffect) == PlaybackEffect.BASS
+    val effect=PlaybackEffect.fromId(settings.preferences.libraryPlayerEffect)
+    val animated=settings.preferences.libraryPlayerWave && (effect == PlaybackEffect.BASS || effect == PlaybackEffect.NOTIFICATION)
     LaunchedEffect(enabled) { if(!enabled) drag=null }
     val accent=remember(source,palette,backdrop) {
         val tint=libraryGlassTint(palette,backdrop.contrastColors,backdrop.transparency)
@@ -33,11 +34,11 @@ internal fun LibrarySeekBar(uri: String, playback: LibraryPlayback, palette: Lib
             .first { color -> backdrop.contrastColors.all { libraryContrast(color,tint.compositeOver(it)) >= 3f } }
     }
     Column {
-        if(compact || bass) {
+        if(compact || animated) {
             PlaybackPositionSlider(mediaKey=uri,value=fraction,onValueChange={drag=it},
                 onValueChangeFinished={drag?.let { playback.seek(uri,it) }; drag=null},enabled=enabled,
                 color=accent,description="再生位置",modifier=Modifier.fillMaxWidth(),compact=true,
-                waveform=bass,playing=playback.panel.advancing && drag == null,effect=if(bass) PlaybackEffect.BASS else PlaybackEffect.WAVE)
+                waveform=animated,playing=playback.panel.advancing && drag == null,effect=effect)
         } else key(uri) {
             Slider(value=fraction.coerceIn(0f,1f),onValueChange={drag=it},
                 onValueChangeFinished={drag?.let { playback.seek(uri,it) }; drag=null},

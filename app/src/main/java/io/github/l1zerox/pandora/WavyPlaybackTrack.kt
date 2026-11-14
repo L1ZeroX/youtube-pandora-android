@@ -52,20 +52,20 @@ internal fun WavyPlaybackTrack(state: SliderState, enabled: Boolean, playing: Bo
         onDispose { lifecycle.removeObserver(observer) }
     }
     val moving=enabled && playing && visible && state.value > state.valueRange.start && state.value < state.valueRange.endInclusive
-    val bass=if(effect == PlaybackEffect.BASS) BassRuntime.level.collectAsStateWithLifecycle().value else 0f
+    val settings by Store.state.collectAsStateWithLifecycle()
+    val reactive=effect.reactsToBass(settings.preferences.libraryNotificationBass)
+    val bass=if(reactive) BassRuntime.level.collectAsStateWithLifecycle().value else 0f
     val bassStrength=animateFloatAsState(if(moving) bass else 0f,tween(90),label="bass-wave-strength")
     val phase=remember { Animatable(0f) }
     val strength=animateFloatAsState(if(moving) 1f else 0f,tween(220),label="playback-wave-strength")
-    LaunchedEffect(moving,effect,if(effect == PlaybackEffect.BASS) bass else 0f) {
+    LaunchedEffect(moving,effect,reactive,if(reactive) bass else 0f) {
         if(moving) {
-            phase.snapTo(if(effect == PlaybackEffect.BASS) phase.value%1f else 0f)
+            val cycles=if(effect == PlaybackEffect.NOTIFICATION) 5f else 1f
+            phase.snapTo(if(reactive) phase.value%cycles else 0f)
             // Compose's animation clock respects the system animator duration scale.
-            phase.animateTo(if(effect == PlaybackEffect.BASS) phase.value+1f else if(effect == PlaybackEffect.NOTIFICATION) 5f else 1f,
-                infiniteRepeatable(tween(when(effect) {
-                    PlaybackEffect.BASS -> bassCycleMillis(bass)
-                    PlaybackEffect.NOTIFICATION -> 18_000
-                    PlaybackEffect.WAVE -> 1400
-                },easing=LinearEasing),RepeatMode.Restart))
+            phase.animateTo(if(reactive) phase.value+cycles else cycles,
+                infiniteRepeatable(tween(if(reactive) bassCycleMillis(bass)*cycles.toInt()
+                    else if(effect == PlaybackEffect.NOTIFICATION) 18_000 else 1400,easing=LinearEasing),RepeatMode.Restart))
         }
     }
     val rtl=LocalLayoutDirection.current == LayoutDirection.Rtl
@@ -88,7 +88,7 @@ internal fun WavyPlaybackTrack(state: SliderState, enabled: Boolean, playing: Bo
                         for(index in 1..samples) {
                             val x=played*index/samples
                             val height=notificationWaveHeight(x,played,(if(layer == 0) 170 else 140).dp.toPx(),
-                                (if(layer == 0) 9 else 6).dp.toPx()*strength.value,
+                                (if(layer == 0) 9 else 6).dp.toPx()*strength.value*(if(reactive) bassStrength.value else 1f),
                                 phase.value*(if(layer == 0) 1f else .8f)+layer*.35f)
                             path.lineTo(x,baseline-stroke/2-height)
                         }

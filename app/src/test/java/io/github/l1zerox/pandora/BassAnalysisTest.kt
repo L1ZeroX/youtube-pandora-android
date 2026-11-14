@@ -7,7 +7,7 @@ import java.nio.ByteOrder
 import kotlin.math.PI
 import kotlin.math.sin
 
-internal fun bassTone(rate: Int = 48_000, frequency: Double = 100.0, amplitude: Double = .25,
+internal fun bassTone(rate: Int = 48_000, frequency: Double = 80.0, amplitude: Double = .25,
     channels: Int = 1, seconds: Double = 1.0, encoding: BassPcm = BassPcm.S16, opposite: Boolean = false): ByteBuffer {
     val frames=(rate*seconds).toInt()
     val buffer=ByteBuffer.allocate(frames*channels*encoding.bytes).order(if(encoding.bigEndian) ByteOrder.BIG_ENDIAN else ByteOrder.LITTLE_ENDIAN)
@@ -29,15 +29,17 @@ internal fun bassTone(rate: Int = 48_000, frequency: Double = 100.0, amplitude: 
 }
 
 class BassAnalysisTest {
-    private fun measured(rate: Int = 48_000, frequency: Double = 100.0, amplitude: Double = .25,
+    private fun measured(rate: Int = 48_000, frequency: Double = 80.0, amplitude: Double = .25,
         channels: Int = 1, encoding: BassPcm = BassPcm.S16, opposite: Boolean = false): List<BassPoint> {
         val result=mutableListOf<BassPoint>()
         BassDetector(rate,channels,encoding).read(bassTone(rate,frequency,amplitude,channels,encoding=encoding,opposite=opposite),0,result::add)
         return result
     }
-    @Test fun hundredHertzRespondsMoreStronglyThanSubBassOrTrebleAtCommonSampleRates() {
+    @Test fun eightyHertzRespondsMoreStronglyThanSubBassOrTrebleAtCommonSampleRates() {
         for(rate in listOf(8_000,44_100,48_000,96_000)) {
-            assertTrue("100 Hz at $rate",measured(rate).takeLast(5).map { it.level }.average() > .8)
+            val steady=measured(rate).takeLast(5).map { it.level }
+            assertTrue("80 Hz at $rate",steady.average() > .8)
+            assertTrue("A steady 80 Hz tone must not make fake beats",steady.max()-steady.min() < .002f)
             assertTrue("1 kHz at $rate",measured(rate,1000.0).takeLast(5).all { it.level < .05f })
             assertTrue("20 Hz at $rate",measured(rate,20.0).takeLast(5).all { it.level < .15f })
         }
@@ -80,7 +82,7 @@ class BassAnalysisTest {
     @Test fun integerFloatAndBothByteOrdersRecognizeTheSameSignal() {
         for(encoding in BassPcm.entries) {
             val levels=measured(encoding=encoding)
-            assertEquals(25,levels.size); assertEquals(1_000_000L,levels.last().timeUs)
+            assertEquals(20,levels.size); assertEquals(1_000_000L,levels.last().timeUs)
             assertEquals(measured().last().level,levels.last().level,.03f)
         }
     }
@@ -105,6 +107,7 @@ class BassAnalysisTest {
             assertEquals(0f,playbackWaveOffset(300f,300f,48f,9f,.3f),0f)
         }
         assertEquals(PlaybackEffect.BASS,PlaybackEffect.fromId("bass_100hz"))
+        assertEquals(PlaybackEffect.BASS,PlaybackEffect.fromId("bass_80hz"))
         assertEquals("wave",Preferences().libraryPlayerEffect)
     }
 }

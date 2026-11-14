@@ -6,9 +6,12 @@ import kotlin.math.pow
 import kotlin.math.sin
 
 internal enum class PlaybackEffect(val id: String, val label: String) {
-    WAVE("wave","従来の波"), NOTIFICATION("notification","通知センター風"), BASS("bass_100hz","100Hz低音連動");
-    companion object { fun fromId(id: String)=entries.firstOrNull { it.id == id } ?: WAVE }
+    WAVE("wave","従来の波"), NOTIFICATION("notification","通知センター風"), BASS("bass_80hz","80Hz低音連動");
+    fun reactsToBass(notificationBass: Boolean)=this == BASS || this == NOTIFICATION && notificationBass
+    companion object { fun fromId(id: String)=if(id == "bass_100hz") BASS else entries.firstOrNull { it.id == id } ?: WAVE }
 }
+
+internal fun playbackBassEnabled(p: Preferences)=p.libraryPlayerWave && PlaybackEffect.fromId(p.libraryPlayerEffect).reactsToBass(p.libraryNotificationBass)
 
 /** Soft, filled crests above the track, observed on the device's notification media player. */
 internal fun notificationWaveHeight(x: Float, played: Float, wavelength: Float, amplitude: Float, phase: Float): Float {

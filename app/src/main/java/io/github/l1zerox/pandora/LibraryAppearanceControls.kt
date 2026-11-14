@@ -41,10 +41,17 @@ internal fun LibraryPlayerAppearanceControls(preferences: Preferences, onChange:
                     colors=ButtonDefaults.textButtonColors(contentColor=LocalContentColor.current)) { Text(effect.label) }
             }
         }
-        if(PlaybackEffect.fromId(preferences.libraryPlayerEffect) == PlaybackEffect.BASS)
-            Text("100Hz付近の低音で、波の大きさ・流れる速さが変わります。",fontSize=11.sp)
+        val selected=PlaybackEffect.fromId(preferences.libraryPlayerEffect)
+        if(selected == PlaybackEffect.NOTIFICATION) Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+            Text("80Hzの低音に連動",Modifier.weight(1f))
+            Switch(checked=preferences.libraryNotificationBass,enabled=preferences.libraryPlayerWave,
+                onCheckedChange={onChange(preferences.copy(libraryNotificationBass=it))},
+                modifier=Modifier.semantics { contentDescription="通知センター風の80Hz低音連動" })
+        }
+        if(selected.reactsToBass(preferences.libraryNotificationBass))
+            Text("80Hz付近の低音で、波の大きさ・流れる速さが変わります。",fontSize=11.sp)
         Text("非表示にしても再生は続きます。",fontSize=11.sp)
-        TextButton(onClick={onChange(preferences.copy(libraryPlayerVisible=true,libraryPlayerScale=DEFAULT_LIBRARY_PLAYER_SCALE,libraryPlayerWave=true,libraryPlayerEffect="wave"))}) {
+        TextButton(onClick={onChange(preferences.copy(libraryPlayerVisible=true,libraryPlayerScale=DEFAULT_LIBRARY_PLAYER_SCALE,libraryPlayerWave=true,libraryPlayerEffect="wave",libraryNotificationBass=true))}) {
             Text("再生パネルを初期設定に戻す")
         }
         Spacer(Modifier.height(8.dp))

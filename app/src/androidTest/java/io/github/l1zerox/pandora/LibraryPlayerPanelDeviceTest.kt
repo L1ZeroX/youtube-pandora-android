@@ -25,17 +25,21 @@ class LibraryPlayerPanelDeviceTest {
         val original=Store.state.value
         val prefs=context.getSharedPreferences("pandora",0)
         try {
-            val changed=original.preferences.copy(libraryPlayerVisible=false,libraryPlayerScale=.9f,libraryPlayerWave=false,libraryPlayerEffect="notification")
+            val changed=original.preferences.copy(libraryPlayerVisible=false,libraryPlayerScale=.9f,libraryPlayerWave=false,libraryPlayerEffect="notification",libraryNotificationBass=false)
             Store.preferences(changed); Store.init(context)
             assertEquals(changed,Store.state.value.preferences)
             val old=JSONObject(prefs.getString("preferences","{}")!!).apply {
-                remove("libraryPlayerVisible"); remove("libraryPlayerScale"); remove("libraryPlayerWave"); remove("libraryPlayerEffect")
+                remove("libraryPlayerVisible"); remove("libraryPlayerScale"); remove("libraryPlayerWave"); remove("libraryPlayerEffect"); remove("libraryNotificationBass")
             }
             prefs.edit().putString("preferences",old.toString()).commit(); Store.init(context)
             assertTrue(Store.state.value.preferences.libraryPlayerVisible)
             assertEquals(.7f,Store.state.value.preferences.libraryPlayerScale,0f)
             assertTrue(Store.state.value.preferences.libraryPlayerWave)
             assertEquals("wave",Store.state.value.preferences.libraryPlayerEffect)
+            assertTrue(Store.state.value.preferences.libraryNotificationBass)
+            old.put("libraryPlayerEffect","bass_100hz")
+            prefs.edit().putString("preferences",old.toString()).commit(); Store.init(context)
+            assertEquals("bass_80hz",Store.state.value.preferences.libraryPlayerEffect)
         } finally { Store.state.value=original; Store.save() }
     }
 
@@ -84,8 +88,11 @@ class LibraryPlayerPanelDeviceTest {
         screen.onNodeWithTag("library-player-panel").assertDoesNotExist()
         screen.onNodeWithContentDescription("再生パネルの大きさ").assertIsNotEnabled()
         screen.onNodeWithContentDescription("再生バーのエフェクト").assertIsEnabled()
-        screen.onNodeWithContentDescription("100Hz低音連動").performClick()
-        screen.runOnIdle { assertEquals("bass_100hz",preferences.libraryPlayerEffect) }
+        screen.onNodeWithContentDescription("通知センター風").performClick()
+        screen.onNodeWithContentDescription("通知センター風の80Hz低音連動").assertIsOn().performClick()
+        screen.runOnIdle { assertFalse(preferences.libraryNotificationBass) }
+        screen.onNodeWithContentDescription("80Hz低音連動").performClick()
+        screen.runOnIdle { assertEquals("bass_80hz",preferences.libraryPlayerEffect) }
         screen.onNodeWithContentDescription("再生パネルを表示").performClick()
         screen.onNodeWithTag("library-player-panel").assertIsDisplayed()
         screen.runOnIdle { assertEquals(.85f,preferences.libraryPlayerScale,0f); assertEquals(0,playbackActions) }
