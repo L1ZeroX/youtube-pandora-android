@@ -1,5 +1,21 @@
 # 検証状況
 
+## v0.4.32（2026-11-14）
+
+PlaybackServiceをMediaSessionServiceからMediaLibraryServiceへ拡張し、同じExoPlayer・音声観察・既存コントローラーを再利用する。ライブラリーの音楽を曲／アルバム／お気に入り／プレイリストの4カテゴリーで提供。既存のアルバム正規化・手動アルバム・ディスク／曲番号順を使用し、車の曲IDから元のcontent URIと所属するキューを解決する。実プレーヤーのmediaIdは元URIを維持し、スマホの選曲・ブックマーク・削除と整合させる。動画・HTTP URL・file URI・不明なIDは車用カタログから解決しない。スマホ自身から既存の実URIを渡した場合は動画も含めてそのまま処理する。
+
+rootの返却は即時FutureでIOを待たない。カタログはIOで読み込み、10秒以内のキャッシュとMutexで重複スキャンを避ける。取り込み・アルバム／お気に入り／画像の変更・MediaStore変更でキャッシュと閲覧一覧を更新する。各階層の表示を80件以下にまとめ、10,001曲でも欠落しないページツリーを単体テストで確認。検索は正規化した曲名・歌手・アルバム情報で最大80件。onSetMediaItemsのsearchQueryと標準MEDIA_PLAY_FROM_SEARCHを扱うVoiceSearchActivityを追加し、音声検索でも同じ音楽カタログへ解決する。最後の音楽URIと既存の再生位置ブックマークからonPlaybackResumptionへ応答する。
+
+Android Auto宣言とlegacy MediaBrowserService action、MediaLibraryService actionを追加するためPlaybackServiceをexported=trueへ変更。接続は自アプリUID、Media3が信頼すると判断したコントローラー、または検証済みパッケージ名かつGoogle Play servicesと署名が一致する既知のGoogleメディアクライアントへ限定する。対応Googleパッケージだけをqueriesへ追加。新しいuses-permissionはない。LintのExportedService警告1件は、このコールバックで接続元を確認する設計によるもの。
+
+画像は非公開CarArtworkProviderから接続先にURI単位の読み取り権限だけを渡す。要求元URI・アルバム・画像リビジョンは許可したパスへ含め、クエリ変更で別ファイルを読ませない。車側から画像を開いた時に256px JPEGへ変換し、128件までキャッシュするため、一覧の返却時に全曲の画像をデコードしない。書き込みモードを拒否し、元の曲やギャラリー画像は外部へ公開しない。Android Autoへ渡すのはカタログから解決した音楽だけ。
+
+単体テストを10件追加：音楽限定・不明なURIの拒否・アルバム統合／順番・お気に入りとプレイリストのキュー・10,001曲のページ分割・ページ番号のオーバーフロー・検索・削除済みID・手動アルバムと安定ID・長さ不明時のシークを確認。Androidテストは宣言・信頼判定・root／検索・既知の曲への解決・送られた任意URLの無視・スマホ側動画の維持・画像読み取り／サイズ／書き込み拒否を追加（コンパイルのみ）。既存の非公開サービスというテスト前提は車向け公開サービスへ更新。
+
+公式の[MediaLibraryService](https://developer.android.com/media/media3/session/serve-content)、[Android Auto宣言](https://developer.android.com/training/cars/media/auto)、[実車テストと不明な提供元](https://developer.android.com/training/cars/testing#allow-unknown-sources)を確認。使用しているMedia3 1.11.1のソースも参照し、onConnectAsyncの信頼既定値、legacy rootの主スレッド制約、検索・再開コールバックを確認した。実車／Desktop Head Unit・Android 16端末との接続、音声検索、車側画像表示、車載機ごとのシーク操作は未確認。動画投影は実装していない。
+
+正式版設定でDebug/Release単体テスト各323件成功（失敗・エラー・スキップ0）。compileDebugAndroidTestKotlin成功。Lintエラー0・警告69件。署名付きAPKは140,707,550 bytes、v0.4.31からの差分は4,055,783 bytes（97.1%削減）。アプリと同じKotlin処理で差分復元したAPKのSHA-256が完全一致、旧版と同じ署名証明書・v3署名・16KB ZIP alignmentを確認。APKのSHA-256は `fa791e9078012a9334d3cdc6d42fde7cf64fd5a2da0a8324dfeaf6f82c94a2ec`。権限変更なし。
+
 ## v0.4.31（2026-11-14）
 
 実機から「再生した時にガクガクする」と報告あり。コード上で、縦棒は20msごとの解析値をComposeの再構成経由でそのまま描画しており、表示フレーム間の補間がなかった。さらに通知センター風・80Hz低音連動の波は、低音値が変わるたびにLaunchedEffectを取り消して再起動していた。これらを原因候補として修正。実機での再現・原因の断定・改善の計測は未実施。

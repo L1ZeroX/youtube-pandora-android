@@ -2,6 +2,7 @@ package io.github.l1zerox.pandora
 
 import android.app.PendingIntent
 import android.content.Intent
+import androidx.core.content.edit
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.Player
@@ -9,7 +10,8 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
-import androidx.media3.session.MediaSessionService
+import androidx.media3.session.MediaLibraryService
+import androidx.media3.session.MediaLibraryService.MediaLibrarySession
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -31,8 +33,9 @@ internal fun removeLibraryMedia(player: Player, uri: String) {
 }
 
 @androidx.annotation.OptIn(UnstableApi::class)
-class PlaybackService : MediaSessionService() {
-    private var session: MediaSession? = null
+class PlaybackService : MediaLibraryService() {
+    private var session: MediaLibrarySession? = null
+    private var library: CarLibraryCallback? = null
     private var betaTools: PlaybackBetaTools? = null
     private val scope=CoroutineScope(SupervisorJob()+Dispatchers.Main.immediate)
     override fun onCreate() {
@@ -50,6 +53,10 @@ class PlaybackService : MediaSessionService() {
             .setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(),true)
             .setHandleAudioBecomingNoisy(true).setWakeMode(C.WAKE_MODE_LOCAL).build()
         player.addListener(object: Player.Listener {
+            override fun onMediaItemTransition(item: androidx.media3.common.MediaItem?, reason: Int) {
+                if(item != null && item.mediaMetadata.extras?.getBoolean("video") != true)
+                    getSharedPreferences("car_playback",0).edit { putString("last_uri",item.mediaId) }
+            }
             override fun onPlayerError(error: PlaybackException) { AppLog.error("ライブラリー再生",error) }
             override fun onEvents(player: Player, events: Player.Events) {
                 if(!player.isPlaying) { BassRuntime.level.value=0f; BassRuntime.spectrum.value=emptyList() }
@@ -58,13 +65,15 @@ class PlaybackService : MediaSessionService() {
             }
         })
         val open=PendingIntent.getActivity(this,40,Intent(this,PlayerActivity::class.java),PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-        session=MediaSession.Builder(this,player).setSessionActivity(open).build()
+        library=CarLibraryCallback(this)
+        session=MediaLibrarySession.Builder(this,player,library!!).setSessionActivity(open).build().also { library!!.attach(it) }
         betaTools=PlaybackBetaTools(player)
         PlaybackRuntime.removeLibraryItem={ uri -> removeLibraryMedia(player,uri) }
     }
-    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
+    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? = session
     override fun onDestroy() {
         scope.cancel(); BassRuntime.enabled=false; BassRuntime.bars=false; BassRuntime.level.value=0f; BassRuntime.spectrum.value=emptyList()
+        library?.close(); library=null
         betaTools?.close(); betaTools=null
         PlaybackRuntime.removeLibraryItem=null
         session?.run { player.release(); release() }; session=null

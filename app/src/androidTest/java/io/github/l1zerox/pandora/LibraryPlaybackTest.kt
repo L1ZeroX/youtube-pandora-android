@@ -75,7 +75,7 @@ class LibraryPlaybackTest {
         assertTrue(service.enabled)
         // FLAG_SUPPORTS_PICTURE_IN_PICTURE = 0x400000 (ActivityInfo constant is hidden on some SDKs).
         assertTrue(player.flags and 0x400000 != 0)
-        assertFalse(player.exported); assertFalse(service.exported)
+        assertFalse(player.exported); assertTrue(service.exported)
     }
 
     @Test fun portraitDownloadIsClassifiedAndDeletionRemovesOnlyItsFileAndRegistration() = runBlocking {

@@ -4,7 +4,9 @@ Windows版と別プロジェクトのAndroid用アプリです。Android 10以�
 
 ## インストール
 
-**[正式版APK v0.4.31](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.4.31/YoutubePandora-Android-v0.4.31.apk)**（再生エフェクトのガクつき対策）
+**[正式版APK v0.4.32](https://github.com/L1ZeroX/youtube-pandora-android/releases/download/v0.4.32/YoutubePandora-Android-v0.4.32.apk)**（Android Autoの音楽再生に対応）
+
+v0.4.32では、Android Autoの標準画面から保存済みの曲・アルバム・お気に入り・プレイリストを選んで再生できる仕組みを追加しました。再生・一時停止・曲送り・シークはスマホと同じ再生サービスを使い、アートワークと曲名も提供します。実車・Desktop Head Unitでの接続は未確認です。設定手順は下の「Android Auto」を参照してください。
 
 v0.4.31では、縦棒スペクトラムの高さを画面のフレームごとに滑らかにつなぐよう変更しました。通知センター風・80Hz低音連動も、低音が変わるたびに波の動きを再起動せず、そのまま速度を変えます。音声の更新で再生操作UIを再構成する処理も減らしました。実機での滑らかさ・負荷は未確認です。
 
@@ -20,7 +22,7 @@ v0.4.26では、音楽の全画面再生の背景をぼかしたアルバムア�
 
 v0.4.25では、バブル終了後の再開ボタン、動画と音楽を分けたライブラリー、アルバムの自動整理・手動追加、フォルダー管理・一括取り込み、保存範囲バー、再生エフェクト、yt-dlpの更新通知、差分更新を正式版へ統合しました。同じアルバムが分離する問題と、ライブラリーを開くと停止する不具合も修正済みです。
 
-正式版v0.4.30・v0.4.25-beta.11から、同じアプリID・署名、versionCode 70で上書き更新できます。設定・背景・保存ファイル・取り込み済みの曲・アルバム等を引き継ぎます。ベータ版を利用中なら環境設定の「リリース版に戻す」、正式版なら「新しいバージョンを確認」から取得できます。[更新内容](RELEASE_NOTES.md)・[検証状況](VALIDATION.md)。
+正式版v0.4.31・v0.4.25-beta.11から、同じアプリID・署名、versionCode 71で上書き更新できます。設定・背景・保存ファイル・取り込み済みの曲・アルバム等を引き継ぎます。ベータ版を利用中なら環境設定の「リリース版に戻す」、正式版なら「新しいバージョンを確認」から取得できます。[更新内容](RELEASE_NOTES.md)・[検証状況](VALIDATION.md)。
 
 旧ベータ版v0.4.25-beta.11の内容は正式版に統合されています。[ベータ版の履歴](BETA_RELEASE_NOTES.md)。
 
@@ -67,6 +69,18 @@ v0.1.2から上記の保存先を使います。Android標準のダウンロー�
 通知を許可すると、画面を離れている間も進捗と停止ボタンを利用できます。プレイリスト全体を追加する場合は環境設定で切り替えてください（1回につき最大500件）。既存のファイルは上書きしません。
 
 v0.4.8では、v0.4.7の「同梱yt-dlpの検証に失敗しました」で処理を開始できない不具合を修正しました。アプリを削除せず上書き更新してください。
+
+## Android Auto
+
+スマホのライブラリーに追加した音楽を、Android Auto標準のメディア画面で選びます。「曲」「アルバム」「お気に入り」「プレイリスト」に対応し、選んだアルバム／プレイリストの順に続けて再生します。曲名・アーティスト・アートワーク、再生／一時停止・前後の曲・シーク、検索・前回の音楽からの再開に対応する処理を追加しました。曲数の多い一覧は80件単位のフォルダーへ分けて全曲へ辿れます。検索結果は最大80件です。
+
+1. APKを上書き更新し、スマホのライブラリーに音楽があることを確認します。
+2. APK配布版を試す場合は、Android Auto設定でバージョン情報を繰り返しタップして開発者モードを有効にし、右上の開発者設定から「不明な提供元」を許可します。
+3. Android Autoのランチャーをカスタマイズする画面で「Youtube Pandora!」を有効にし、車側のAndroid Autoに接続して選びます。
+
+APK配布版を実車でテストするための設定は[Android公式手順](https://developer.android.com/training/cars/testing#allow-unknown-sources)を参照。接続・操作・音声検索・車側のアートワーク表示は実機未確認です。車載機や後付けモジュールの対応状況も影響します。
+
+この版の車載機能は音楽用です。Android Autoでの停車中の動画投影については、GoogleがAndroid 17以上と対応車両向けに発表しています。[公式発表](https://developer.android.com/blog/posts/whats-new-in-android-for-cars-unifying-platforms-and-unlocking-premium-experiences)。Android 16向けの動画投影はこのAPKでは追加していません。後付け機器のミラーリング機能は別の接続方式です。
 
 ## YouTubeで403が出る場合
 
@@ -158,7 +172,7 @@ python scripts/build.py assembleDebug testDebugUnitTest lintDebug
 
 配布用APKを作るには `python scripts/release.py` を実行します。初回に `.signing` 内へ署名鍵を生成します。このフォルダーは公開せずにバックアップしてください。同じ署名鍵を使わないと既存アプリを上書き更新できません。
 
-v0.4.25では、通知センター風の再生バー・差分更新・保存範囲を利用できます。`python scripts/release.py --delta-from release/YoutubePandora-Android-v0.4.30.apk` で正式版APKに加えて差分を生成できます。差分名は `YoutubePandora-Android-v<更新先>-from-v<更新元>.pdelta.gz`。配信時は通常APKと差分の両方が同じリリースに必要で、GitHub APIの両ファイルのSHA-256と、端末の更新元APKのSHA-256を検証します。一致しない場合や差分がない場合は通常APKを取得します。旧版を飛ばす更新には、その更新元に対応する差分を用意してください。このスクリプトはGitHubへ公開しません。[更新内容](RELEASE_NOTES.md)・[検証範囲](VALIDATION.md)。
+v0.4.25では、通知センター風の再生バー・差分更新・保存範囲を利用できます。`python scripts/release.py --delta-from release/YoutubePandora-Android-v0.4.31.apk` で正式版APKに加えて差分を生成できます。差分名は `YoutubePandora-Android-v<更新先>-from-v<更新元>.pdelta.gz`。配信時は通常APKと差分の両方が同じリリースに必要で、GitHub APIの両ファイルのSHA-256と、端末の更新元APKのSHA-256を検証します。一致しない場合や差分がない場合は通常APKを取得します。旧版を飛ばす更新には、その更新元に対応する差分を用意してください。このスクリプトはGitHubへ公開しません。[更新内容](RELEASE_NOTES.md)・[検証範囲](VALIDATION.md)。
 
 端末または起動済みエミュレーターを接続した場合は `python scripts/build.py connectedDebugAndroidTest` で、合成動画の情報取得・MP4保存・24fps変換・MP3保存と画面操作を検証できます。テストが作った保存結果は終了時に削除します。
 

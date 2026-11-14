@@ -10,9 +10,15 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <queries>
+        <package android:name="com.google.android.projection.gearhead" />
+        <package android:name="com.google.android.gms" />
+        <package android:name="com.google.android.googlequicksearchbox" />
+    </queries>
     <application android:name=".PandoraApp" android:label="${appLabel}" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher"
         android:theme="@style/Theme.Pandora" android:allowBackup="false" android:pageSizeCompat="enabled"
         android:supportsRtl="true" android:usesCleartextTraffic="true">
+        <meta-data android:name="com.google.android.gms.car.application" android:resource="@xml/automotive_app_desc" />
         <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTop">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -28,6 +34,13 @@
             </intent-filter>
         </activity>
         <activity android:name=".LibraryActivity" android:exported="false" />
+        <activity android:name=".VoiceSearchActivity" android:exported="true" android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.media.action.MEDIA_PLAY_FROM_SEARCH" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
         <activity android:name=".AppUpdateActivity" android:exported="false" />
         <receiver android:name=".UpdateReplacedReceiver" android:exported="false">
             <intent-filter><action android:name="android.intent.action.MY_PACKAGE_REPLACED" /></intent-filter>
@@ -35,9 +48,12 @@
         <activity android:name=".PlayerActivity" android:exported="false"
             android:launchMode="singleTask" android:supportsPictureInPicture="true"
             android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation" />
-        <service android:name=".PlaybackService" android:exported="false"
+        <service android:name=".PlaybackService" android:exported="true"
             android:foregroundServiceType="mediaPlayback">
-            <intent-filter><action android:name="androidx.media3.session.MediaSessionService" /></intent-filter>
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaLibraryService" />
+                <action android:name="android.media.browse.MediaBrowserService" />
+            </intent-filter>
         </service>
         <service android:name=".DownloadService" android:exported="false" android:foregroundServiceType="dataSync|mediaProcessing" />
         <service android:name=".BubbleService" android:exported="false" android:enabled="true" android:foregroundServiceType="specialUse">
@@ -52,5 +68,7 @@
             android:exported="false" android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/log_paths" />
         </provider>
+        <provider android:name=".CarArtworkProvider" android:authorities="${applicationId}.car-artwork"
+            android:exported="false" android:grantUriPermissions="true" />
     </application>
 </manifest>

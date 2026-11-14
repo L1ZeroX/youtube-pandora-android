@@ -16,10 +16,13 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 import org.json.JSONArray
 import org.json.JSONObject
 
 internal object LibraryRepository {
+    val revision=MutableStateFlow(0L)
     private val importLock=Any()
     private fun preferences(context: Context) = context.getSharedPreferences("library",Context.MODE_PRIVATE)
 
@@ -140,6 +143,7 @@ internal object LibraryRepository {
             .put("mime",item.mime).put("duration",item.durationMs).put("added",item.added)) }
         val edit=preferences(context).edit().putString("items",array.toString())
         if(durable) check(edit.commit()) { "取り込み情報を保存できませんでした。" } else edit.apply()
+        revision.update { it+1 }
     }
 
     internal fun forgetImport(context: Context, uri: String) {
