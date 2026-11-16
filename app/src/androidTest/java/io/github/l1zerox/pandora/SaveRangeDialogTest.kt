@@ -11,9 +11,13 @@ import org.junit.Test
 
 class SaveRangeDialogTest {
     @get:Rule val screen=createComposeRule()
+    private val noPreview=object: RangePreviewLoader {
+        override suspend fun storyboard(video: Video): SaveRangeStoryboard?=null
+        override suspend fun frame(tile: StoryboardTile): android.graphics.Bitmap=error("No preview fixture")
+    }
     @Test fun rangeBarRemainsVisibleWhenTimeRangeIsOff() {
         val video=Video("one","https://example.com/1","One",duration=180.0)
-        screen.setContent { MaterialTheme { SaveRangeDialog(SaveRange(),true,{},{},listOf(video)) } }
+        screen.setContent { MaterialTheme { SaveRangeDialog(SaveRange(),true,{},{},listOf(video),previewLoader=noPreview) } }
         screen.onNodeWithTag("save-range-slider").assertExists()
         val handles=screen.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsActions.SetProgress),useUnmergedTree=true)
         handles[0].assertIsNotEnabled()
@@ -23,7 +27,7 @@ class SaveRangeDialogTest {
     @Test fun metadataArrivalRestoresTheBarWithoutClosingOrLosingTypedTimes() {
         var videos by mutableStateOf(listOf(Video("one","https://example.com/1","One")))
         var requests=0
-        screen.setContent { MaterialTheme { SaveRangeDialog(SaveRange(true,30,90),true,{},{},videos,onResolve={requests++}) } }
+        screen.setContent { MaterialTheme { SaveRangeDialog(SaveRange(true,30,90),true,{},{},videos,onResolve={requests++},previewLoader=noPreview) } }
         screen.runOnIdle { assertEquals(1,requests) }
         screen.onNodeWithTag("save-range-slider").assertExists()
         screen.onNodeWithText("動画の長さを取得").performScrollTo().performClick()
@@ -36,7 +40,7 @@ class SaveRangeDialogTest {
     @Test fun barAndTimeFieldsStayInSyncBeforeApply() {
         var saved: SaveRange?=null
         val video=Video("one","https://example.com/1","One",duration=180.0)
-        screen.setContent { MaterialTheme { SaveRangeDialog(SaveRange(true,30,90),true,{saved=it},{},listOf(video)) } }
+        screen.setContent { MaterialTheme { SaveRangeDialog(SaveRange(true,30,90),true,{saved=it},{},listOf(video),previewLoader=noPreview) } }
         screen.onNodeWithText("開始時刻").performScrollTo().performTextReplacement("0:40")
         screen.onNodeWithText("終了時刻").performScrollTo().performTextReplacement("2:00")
         screen.onNodeWithTag("save-range-slider").performScrollTo()
@@ -54,7 +58,7 @@ class SaveRangeDialogTest {
         var saved: SaveRange?=null
         val one=Video("one","https://example.com/1","One",duration=180.0)
         val two=one.copy(key="two",title="Two",duration=60.0)
-        screen.setContent { MaterialTheme { SaveRangeDialog(SaveRange(true,30,90),true,{saved=it},{},listOf(one,two)) } }
+        screen.setContent { MaterialTheme { SaveRangeDialog(SaveRange(true,30,90),true,{saved=it},{},listOf(one,two),previewLoader=noPreview) } }
         screen.onNodeWithText("基準: One ▾").performClick()
         screen.onNodeWithText("Two · 1:00").performClick()
         screen.onNodeWithText("終了 1:00").assertIsDisplayed()
@@ -65,7 +69,7 @@ class SaveRangeDialogTest {
     @Test fun unknownDurationKeepsManualTimeInputAvailable() {
         var saved: SaveRange?=null
         val unknown=Video("unknown","https://example.com/1","Unknown")
-        screen.setContent { MaterialTheme { SaveRangeDialog(SaveRange(true,30,90),true,{saved=it},{},listOf(unknown)) } }
+        screen.setContent { MaterialTheme { SaveRangeDialog(SaveRange(true,30,90),true,{saved=it},{},listOf(unknown),previewLoader=noPreview) } }
         screen.onNodeWithTag("save-range-slider").assertExists()
         screen.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsActions.SetProgress),useUnmergedTree=true)[0].assertIsNotEnabled()
         screen.onNodeWithText("開始時刻").performScrollTo().performTextReplacement("40")
@@ -74,7 +78,7 @@ class SaveRangeDialogTest {
     }
     @Test fun acceptsTimeRangeAndRejectsReversedTimes() {
         var saved: SaveRange?=null
-        screen.setContent { MaterialTheme { SaveRangeDialog(SaveRange(),true,{saved=it},{}) } }
+        screen.setContent { MaterialTheme { SaveRangeDialog(SaveRange(),true,{saved=it},{},previewLoader=noPreview) } }
         screen.onNodeWithContentDescription("保存範囲を指定").performClick()
         screen.onNodeWithText("開始時刻").performScrollTo().performTextReplacement("1:30")
         screen.onNodeWithText("終了時刻").performScrollTo().performTextReplacement("1:00")
@@ -87,7 +91,7 @@ class SaveRangeDialogTest {
     }
     @Test fun blankEndMeansToEndAndTurningOffPreservesExistingTimes() {
         var saved: SaveRange?=null
-        screen.setContent { MaterialTheme { SaveRangeDialog(SaveRange(true,30,90),true,{saved=it},{}) } }
+        screen.setContent { MaterialTheme { SaveRangeDialog(SaveRange(true,30,90),true,{saved=it},{},previewLoader=noPreview) } }
         screen.onNodeWithText("終了時刻").performScrollTo().performTextReplacement("")
         screen.onNodeWithText("適用").performClick()
         screen.runOnIdle { assertEquals(SaveRange(true,30),saved) }
@@ -97,7 +101,7 @@ class SaveRangeDialogTest {
     }
     @Test fun busyDownloadLocksEditingAndCancelNeverApplies() {
         var applied=false; var cancelled=false
-        screen.setContent { MaterialTheme { SaveRangeDialog(SaveRange(true,30,90),false,{applied=true},{cancelled=true}) } }
+        screen.setContent { MaterialTheme { SaveRangeDialog(SaveRange(true,30,90),false,{applied=true},{cancelled=true},previewLoader=noPreview) } }
         screen.onNodeWithContentDescription("保存範囲を指定").assertIsNotEnabled()
         screen.onNodeWithText("開始時刻").assertIsNotEnabled()
         screen.onNodeWithText("終了時刻").assertIsNotEnabled()

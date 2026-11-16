@@ -18,7 +18,8 @@ import androidx.compose.ui.unit.sp
 
 @Composable
 internal fun SaveRangeDialog(initial: SaveRange, editable: Boolean, onApply: (SaveRange)->Unit, onDismiss: ()->Unit,
-    videos: List<Video> = emptyList(), resolving: Boolean = false, onResolve: ((Video)->Unit)? = null) {
+    videos: List<Video> = emptyList(), resolving: Boolean = false, onResolve: ((Video)->Unit)? = null,
+    previewLoader: RangePreviewLoader? = null) {
     var enabled by rememberSaveable { mutableStateOf(initial.enabled) }
     var start by rememberSaveable { mutableStateOf(saveTimeText(initial.startSeconds)) }
     var end by rememberSaveable { mutableStateOf(initial.endSeconds?.let(::saveTimeText).orEmpty()) }
@@ -63,6 +64,7 @@ internal fun SaveRangeDialog(initial: SaveRange, editable: Boolean, onApply: (Sa
                         }
                     } else Text(reference.title,maxLines=2,overflow=TextOverflow.Ellipsis,fontSize=12.sp)
                     val selection=saveRangeBarSelection(start,end,maximum)
+                    if(enabled) SaveRangeFramePreviews(reference,selection,previewLoader)
                     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
                         Text("開始 ${saveTimeText(selection.start)}",fontSize=12.sp)
                         Text(if(end.isBlank()) "終了 最後まで" else "終了 ${saveTimeText(selection.end)}",fontSize=12.sp)
