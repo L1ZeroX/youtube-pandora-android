@@ -423,7 +423,8 @@ internal fun LibraryScreen(preferences: Preferences, onBack: ()->Unit) {
                     }
                 }
             }
-            LibraryIndexRail(indexTargets,onStart={sortName=LibrarySort.TITLE.name; controlsExpanded=false; focusManager.clearFocus(); keyboard?.hide()},onJump={indexLabel=it})
+            LibraryIndexRail(indexTargets,onStart={sortName=LibrarySort.TITLE.name; controlsExpanded=false; focusManager.clearFocus(); keyboard?.hide()},onJump={indexLabel=it},
+                scrolling=gridState.isScrollInProgress)
             }
         }
     }
