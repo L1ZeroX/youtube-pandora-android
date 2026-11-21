@@ -37,6 +37,8 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
+import androidx.media3.session.SessionCommand
+import androidx.media3.session.SessionResult
 import androidx.media3.ui.PlayerView
 import androidx.media3.ui.AspectRatioFrameLayout
 import com.google.common.util.concurrent.ListenableFuture
@@ -68,6 +70,7 @@ class PlayerActivity : ComponentActivity() {
     internal val videoFullscreen get() = video && landscape && !inPip
     private var error by mutableStateOf("")
     private var connected by mutableStateOf(false)
+    private var shuffleBusy by mutableStateOf(false)
     private var requestedUri: String? = null
     private var restorePosition=0L
     private var restoring=false
@@ -92,7 +95,8 @@ class PlayerActivity : ComponentActivity() {
                 UpdatePrompt(allowed=!inPip && !videoFullscreen && error.isBlank())
                 if(!video && !inPip) {
                     MusicPlayerScreen(controller,title,artwork,artworkColor,error,
-                        onBack={closePlayerScreen()},onStop={controller?.stop(); controller?.clearMediaItems(); closePlayerScreen()})
+                        onBack={closePlayerScreen()},onStop={controller?.stop(); controller?.clearMediaItems(); closePlayerScreen()},
+                        onShuffle=::changeShuffleScope,shuffleBusy=shuffleBusy)
                 } else {
                 Column(Modifier.fillMaxSize().background(Color.Black).then(if(inPip || videoFullscreen) Modifier else Modifier.safeDrawingPadding())) {
                     if(!inPip && !videoFullscreen) {
@@ -162,6 +166,23 @@ class PlayerActivity : ComponentActivity() {
         super.onNewIntent(intent); setIntent(intent)
         requestedUri=intent.getStringExtra("uri"); restoring=false; restorePosition=0
         if(controller != null) loadRequested()
+    }
+
+    private fun changeShuffleScope(uri: String, scope: MusicShuffleScope) {
+        val player=controller ?: return
+        if(shuffleBusy) return
+        val command=SessionCommand(MUSIC_SHUFFLE_COMMAND,Bundle.EMPTY)
+        if(!player.availableSessionCommands.contains(command)) {
+            Toast.makeText(this,"再生画面を開き直してからお試しください。",Toast.LENGTH_SHORT).show(); return
+        }
+        shuffleBusy=true
+        val result=player.sendCustomCommand(command,Bundle().apply { putString("uri",uri); putString("scope",scope.name) })
+        result.addListener({
+            shuffleBusy=false
+            if(!isDestroyed && !isFinishing) runCatching { result.get().resultCode == SessionResult.RESULT_SUCCESS }
+                .onSuccess { ok -> if(!ok) Toast.makeText(this,"曲を確認して、もう一度シャッフル範囲を選択してください。",Toast.LENGTH_LONG).show() }
+                .onFailure { Toast.makeText(this,"シャッフル範囲を変更できませんでした。",Toast.LENGTH_SHORT).show() }
+        },ContextCompat.getMainExecutor(this))
     }
 
     private fun loadRequested() {

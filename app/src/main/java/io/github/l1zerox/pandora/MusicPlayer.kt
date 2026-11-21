@@ -54,7 +54,7 @@ internal fun musicPalette(source: Color?, artworkBackground: Boolean = false): M
 
 @Composable
 internal fun MusicPlayerScreen(player: Player?, title: String, artwork: Bitmap?, source: Color?, error: String,
-    onBack: ()->Unit, onStop: ()->Unit) {
+    onBack: ()->Unit, onStop: ()->Unit, onShuffle: ((String,MusicShuffleScope)->Unit)? = null, shuffleBusy: Boolean = false) {
     val transport=rememberMusicPlayback(player)
     val palette=remember(source,artwork != null) { musicPalette(source,artworkBackground=artwork != null) }
     var menu by remember { mutableStateOf(false) }
@@ -92,13 +92,13 @@ internal fun MusicPlayerScreen(player: Player?, title: String, artwork: Bitmap?,
                     horizontalArrangement=Arrangement.spacedBy(24.dp)) {
                     MusicArtwork(artwork,palette,Modifier.size(artSize))
                     Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-                        MusicControls(title,error,transport,palette)
+                        MusicControls(title,error,transport,palette,onShuffle,shuffleBusy)
                         TextButton(onClick={queue=true},modifier=Modifier.align(Alignment.End)) { Text("再生リスト",color=palette.secondary) }
                     }
                 } else {
                     MusicArtwork(artwork,palette,Modifier.padding(vertical=20.dp).size(artSize))
                     Column(Modifier.fillMaxWidth()) {
-                        MusicControls(title,error,transport,palette)
+                        MusicControls(title,error,transport,palette,onShuffle,shuffleBusy)
                         Row(Modifier.fillMaxWidth().padding(top=12.dp),horizontalArrangement=Arrangement.End) {
                             TextButton(onClick={queue=true}) { Text("再生リスト",color=palette.secondary) }
                         }
@@ -135,10 +135,13 @@ private fun MusicArtwork(artwork: Bitmap?, palette: MusicPalette, modifier: Modi
 @androidx.annotation.OptIn(UnstableApi::class)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MusicControls(title: String, error: String, transport: MusicPlayback, palette: MusicPalette) {
+private fun MusicControls(title: String, error: String, transport: MusicPlayback, palette: MusicPalette,
+    onShuffle: ((String,MusicShuffleScope)->Unit)?, shuffleBusy: Boolean) {
     val state=transport.state
     val preferences by Store.state.collectAsStateWithLifecycle()
     var drag by remember(state.uri) { mutableStateOf<Float?>(null) }
+    var shuffleUri by rememberSaveable { mutableStateOf<String?>(null) }
+    shuffleUri?.let { expected -> MusicShuffleDialog(onChoose={option -> shuffleUri=null; onShuffle?.invoke(expected,option)},onDismiss={shuffleUri=null}) }
     val fraction=drag ?: playbackFraction(state.position,state.duration)
     LaunchedEffect(state.seekable) { if(!state.seekable) drag=null }
     Column(Modifier.fillMaxWidth()) {
@@ -155,9 +158,10 @@ private fun MusicControls(title: String, error: String, transport: MusicPlayback
             Text(if(state.duration > 0) durationText(state.duration/1000.0) else "--:--",fontSize=12.sp,color=palette.secondary)
         }
         Row(Modifier.fillMaxWidth().padding(top=16.dp),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically) {
-            MusicIconButton(MediaUiR.drawable.exo_icon_shuffle_on,"シャッフル",state.canShuffle,
-                if(state.shuffle) palette.accent else palette.secondary,transport::shuffle,
-                if(state.shuffle) "オン" else "オフ")
+            MusicIconButton(MediaUiR.drawable.exo_icon_shuffle_on,"シャッフル",state.canShuffle && !shuffleBusy,
+                if(state.shuffle) palette.accent else palette.secondary,
+                { if(onShuffle == null) transport.shuffle() else shuffleUri=state.uri },
+                if(shuffleBusy) "変更中" else if(state.shuffle) MusicShuffleScope.entries.firstOrNull { it.name == state.shuffleScope }?.label ?: "オン" else "オフ")
             MusicIconButton(MediaUiR.drawable.exo_icon_previous,"前の曲",state.canPrevious,palette.accent,transport::previous)
             FilledIconButton(onClick=transport::toggle,enabled=state.canPlay,shape=CircleShape,modifier=Modifier.size(68.dp),
                 colors=IconButtonDefaults.filledIconButtonColors(containerColor=palette.accent,contentColor=palette.onAccent)) {

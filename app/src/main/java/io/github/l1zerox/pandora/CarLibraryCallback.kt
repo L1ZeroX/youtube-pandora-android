@@ -35,6 +35,7 @@ internal class CarLibraryCallback(private val context: Context,
     private var cached: CarMusicCatalog?=null
     private var loadedAt=0L
     private var revision=0L
+    private var shuffleRevision=0L
     private val visited=mutableSetOf(CAR_ROOT,CAR_SONGS,CAR_ALBUMS,CAR_FAVORITES,CAR_PLAYLISTS)
     private var session: MediaLibrarySession?=null
     private val observer=object: ContentObserver(Handler(Looper.getMainLooper())) { override fun onChange(selfChange: Boolean) { invalidate() } }
@@ -65,8 +66,35 @@ internal class CarLibraryCallback(private val context: Context,
         if(!own(controller)) AppLog.info("Android Auto","接続 ${controller.packageName}: 許可=$accepted / trusted=${controller.isTrusted} / verified=${controller.isPackageNameVerified}")
         return Futures.immediateFuture(if(!accepted) MediaSession.ConnectionResult.reject() else
             MediaSession.ConnectionResult.AcceptedResultBuilder()
-                .setAvailableSessionCommands(MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS)
+                .setAvailableSessionCommands(MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS.buildUpon().apply {
+                    if(own(controller)) add(SessionCommand(MUSIC_SHUFFLE_COMMAND,Bundle.EMPTY))
+                }.build())
                 .setAvailablePlayerCommands(MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS).build())
+    }
+
+    override fun onCustomCommand(session: MediaSession, controller: MediaSession.ControllerInfo,
+        customCommand: SessionCommand, args: Bundle): ListenableFuture<SessionResult> {
+        if(customCommand.customAction != MUSIC_SHUFFLE_COMMAND)
+            return Futures.immediateFuture(SessionResult(SessionError.ERROR_NOT_SUPPORTED))
+        if(!own(controller)) return Futures.immediateFuture(SessionResult(SessionError.ERROR_PERMISSION_DENIED))
+        val option=MusicShuffleScope.entries.firstOrNull { it.name == args.getString("scope") }
+            ?: return Futures.immediateFuture(SessionResult(SessionError.ERROR_BAD_VALUE))
+        val expected=args.getString("uri").orEmpty()
+        if(expected.isBlank()) return Futures.immediateFuture(SessionResult(SessionError.ERROR_BAD_VALUE))
+        val request=++shuffleRevision
+        return later {
+            try {
+                val items=if(option == MusicShuffleScope.OFF) emptyList() else {
+                    val entries=loadEntries()
+                    val data=collections()
+                    withContext(Dispatchers.IO) { musicShuffleEntries(entries,data,expected,option).map { it.mediaItem() } }
+                }
+                if(request != shuffleRevision) return@later SessionResult(SessionError.INFO_CANCELLED)
+                applyMusicShuffle(session.player,expected,items,option)
+                SessionResult(SessionResult.RESULT_SUCCESS)
+            } catch(e: CancellationException) { throw e }
+            catch(_: Exception) { SessionResult(SessionError.ERROR_BAD_VALUE) }
+        }
     }
 
     private suspend fun catalog(): CarMusicCatalog = mutex.withLock {
